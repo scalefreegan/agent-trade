@@ -1,0 +1,23 @@
+[project]
+name = "agent-trade"
+version = "0.1.0"
+description = "MCP server for stock market data and news"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=3.0.0b2",
+    "yfinance>=0.2.40",
+    "tiingo",
+    "newsapi-python",
+]
+
+[project.optional-dependencies]
+# Optional: for programmatic use with Claude Agent SDK
+agent = ["claude-agent-sdk"]
+
+[project.scripts]
+# Run as standalone MCP server
+agent-trade = "agent_trade.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
