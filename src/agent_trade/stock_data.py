@@ -104,11 +104,16 @@ def get_dividend_history(symbol: str, period: str = "5y") -> DividendHistory:
 
     # Filter by period if needed
     if period != "max":
-        years = int(period.replace("y", ""))
-        import pandas as pd
-        from datetime import datetime, timedelta, timezone
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=years * 365)
-        dividends = dividends[dividends.index >= cutoff_date]
+        try:
+            # Extract years from period string (e.g., "5y" -> 5)
+            years = int(period.rstrip("y"))
+            import pandas as pd
+            from datetime import datetime, timedelta, timezone
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=years * 365)
+            dividends = dividends[dividends.index >= cutoff_date]
+        except (ValueError, AttributeError):
+            # If period format is invalid, return all dividends
+            pass
 
     # Convert to list of DividendRecord models
     dividend_list = []

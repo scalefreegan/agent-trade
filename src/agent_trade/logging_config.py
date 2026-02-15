@@ -4,7 +4,7 @@ import os
 import json
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 from .models import LogLevel, ToolUsageLog
 
@@ -83,7 +83,7 @@ class ToolLogger:
             tokens_used: Token usage dict (optional)
         """
         log_entry = ToolUsageLog(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             tool_name=tool_name,
             mode=mode,
             input_args=input_args,

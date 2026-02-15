@@ -44,8 +44,8 @@ def example_sequential_workflow():
 
     if result.success:
         info = result.results["get_info"]
-        print(f"\nCurrent price: ${info['current_price']}")
-        print(f"52-week high: ${info['52_week_high']}")
+        print(f"\nCurrent price: ${info.current_price}")
+        print(f"52-week high: ${info.fifty_two_week_high}")
 
 
 def example_parallel_workflow():
@@ -67,8 +67,8 @@ def example_parallel_workflow():
     print(f"Stocks analyzed: {len(result.results)}")
 
     for step_name, data in result.results.items():
-        symbol = data['symbol']
-        price = data['current_price']
+        symbol = data.symbol
+        price = data.current_price
         print(f"{symbol}: ${price}")
 
 
@@ -77,8 +77,10 @@ def example_conditional_workflow():
 
     def should_analyze(context: dict) -> bool:
         """Check if stock price is above threshold."""
-        info = context.get("get_info", {})
-        price = info.get("current_price", 0)
+        info = context.get("get_info")
+        if info is None:
+            return False
+        price = info.current_price or 0
         return price > 200  # Only analyze if price > $200
 
     workflow = Workflow("conditional_analysis", mode=ExecutionMode.CONDITIONAL)
@@ -119,37 +121,29 @@ def example_agent_workflow():
         "TSLA"
     )
 
-    # Step 2: Analyze with Claude
-    def analyze_stock(context: dict):
-        """Use Claude to analyze the stock data."""
-        data = context["get_data"]
-        question = f"""
-        Analyze this stock data and provide investment insights:
-
-        Symbol: {data['symbol']}
-        Price: ${data['current_price']}
-        PE Ratio: {data['pe_ratio']}
-        52-week high: ${data['52_week_high']}
-        52-week low: ${data['52_week_low']}
-
-        Is this a good time to buy, sell, or hold?
-        """
-        return agent.query(question)
-
-    workflow.add_step(
-        "ai_analysis",
-        analyze_stock,
-        # Pass context as kwargs
-    )
-
-    # Execute
+    # Execute data collection first
     result = workflow.execute()
 
     if result.success:
+        # Step 2: Analyze with Claude using the retrieved data
+        data = result.results["get_data"]
+        question = f"""
+        Analyze this stock data and provide investment insights:
+
+        Symbol: {data.symbol}
+        Price: ${data.current_price}
+        PE Ratio: {data.pe_ratio}
+        52-week high: ${data.fifty_two_week_high}
+        52-week low: ${data.fifty_two_week_low}
+
+        Is this a good time to buy, sell, or hold?
+        """
+        ai_result = agent.query(question)
+
         print("Stock Data:")
         print(result.results["get_data"])
         print("\nAI Analysis:")
-        print(result.results["ai_analysis"]["answer"])
+        print(ai_result["answer"])
 
 
 def example_pipeline():

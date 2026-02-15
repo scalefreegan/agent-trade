@@ -2,6 +2,7 @@
 
 import os
 import time
+import json
 from typing import Any
 from anthropic import Anthropic
 from . import stock_data, news_data
@@ -224,7 +225,7 @@ def query(question: str, model: str = "claude-sonnet-4-5-20250929", max_iteratio
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
-                            "content": str(result_dict)
+                            "content": json.dumps(result_dict)
                         })
                     except Exception as e:
                         execution_time_ms = (time.time() - start_time) * 1000
