@@ -119,10 +119,16 @@ class ToolLogger:
         """Get usage statistics from logs.
 
         Returns:
-            Dictionary with usage statistics
+            Dictionary with usage statistics (always includes all keys)
         """
         if not self.log_file.exists():
-            return {"total_calls": 0, "by_tool": {}, "by_mode": {}}
+            return {
+                "total_calls": 0,
+                "by_tool": {},
+                "by_mode": {},
+                "errors": 0,
+                "total_execution_time_ms": 0,
+            }
 
         stats = {
             "total_calls": 0,

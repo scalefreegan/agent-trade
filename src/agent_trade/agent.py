@@ -209,8 +209,9 @@ def query(question: str, model: str = "claude-sonnet-4-5-20250929", max_iteratio
                         result = TOOL_FUNCTIONS[tool_name](**tool_input)
                         execution_time_ms = (time.time() - start_time) * 1000
 
-                        # Convert Pydantic model to dict for logging and API
-                        result_dict = result.model_dump() if hasattr(result, 'model_dump') else result
+                        # Convert Pydantic model to JSON-serializable dict
+                        # Use mode="json" to handle Decimal and other special types
+                        result_dict = result.model_dump(mode="json") if hasattr(result, 'model_dump') else result
 
                         # Log successful tool call
                         log_tool_call(

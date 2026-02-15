@@ -85,6 +85,8 @@ async def run_skill(
 async def get_stock_data_via_claude(
     query_text: str,
     cwd: Optional[str] = None,
+    system_prompt: Optional[str] = None,
+    permission_mode: str = "default",
 ) -> str:
     """Get stock data by querying through Claude Code with agent-trade MCP server.
 
@@ -93,6 +95,8 @@ async def get_stock_data_via_claude(
     Args:
         query_text: Natural language query about stocks
         cwd: Working directory
+        system_prompt: Optional system prompt
+        permission_mode: Permission mode for tools
 
     Returns:
         The assistant's response as text
@@ -105,7 +109,12 @@ async def get_stock_data_via_claude(
     """
     response_text = ""
 
-    async for message in query_claude_code(query_text, cwd=cwd):
+    async for message in query_claude_code(
+        query_text,
+        cwd=cwd,
+        system_prompt=system_prompt,
+        permission_mode=permission_mode,
+    ):
         # Extract text from assistant messages
         if isinstance(message, dict):
             msg_type = message.get("type") or message.get("_type")
@@ -165,6 +174,8 @@ class ClaudeCodeSession:
         response = await get_stock_data_via_claude(
             prompt,
             cwd=self.cwd,
+            system_prompt=self.system_prompt,
+            permission_mode=self.permission_mode,
         )
 
         # Store in history
