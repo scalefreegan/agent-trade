@@ -162,10 +162,12 @@ Data storage:
 ## Key Pydantic Models
 
 **Core:**
-- `StockPosition` - symbol, shares, cost basis
+- `TaxLot` - shares, cost_basis, purchase_date (for holding period tracking)
+- `StockPosition` - symbol, lots[] (list of TaxLot for FIFO accounting)
 - `Portfolio` - cash + positions
 - `Order` - buy/sell request with reasoning
-- `ExecutedTransaction` - completed trade with tax info
+- `LotSale` - per-lot sale details (shares, holding period, tax rate, tax amount)
+- `ExecutedTransaction` - completed trade with lot_sales[] for transparency
 
 **Strategy:**
 - `InvestmentThesis` - philosophy, risk tolerance, sectors
@@ -173,7 +175,7 @@ Data storage:
 - `AgentStrategy` - thesis + rationale + learnings
 
 **Game State:**
-- `ExperimentConfig` - num_agents, starting_capital, tax_rate, rules
+- `ExperimentConfig` - num_agents, starting_capital, short_term_tax_rate, long_term_tax_rate, long_term_holding_days
 - `AgentState` - status, portfolio, strategy, stats
 - `GameState` - all agents, daily outcomes, config
 - `DailyDecision` - research notes + orders + strategy updates
@@ -189,7 +191,9 @@ Data storage:
 4. **Coordinator** processes all decisions:
    - Validate orders (sufficient cash/shares, position limits)
    - Execute orders at current market prices
-   - Apply 15% tax on capital gains for sells
+   - Apply tiered tax on capital gains (35% short-term, 15% long-term)
+   - Use FIFO accounting for multi-lot positions
+   - Track per-lot holding periods and tax calculations
    - Update portfolios, eliminate bankrupt agents
 5. **Save state** and generate daily report
 
@@ -197,9 +201,9 @@ Data storage:
 
 Each agent receives:
 - Their identity (agent_id, name)
-- Current portfolio (cash, positions, total value)
+- Current portfolio (cash, positions with lot details, total value)
 - Strategy summary (thesis, recent learnings)
-- Trading rules (tax rate, min trade, position limits)
+- Trading rules (tiered tax rates, min trade, position limits, FIFO accounting)
 - Task: research, decide, explain reasoning
 
 Output format enforced via templated document structure.
@@ -396,13 +400,32 @@ Create comprehensive documentation in `docs/experiment/`:
 ### Phase 2: Experiment Core
 - [ ] 18. **src/agent_trade/experiment/__init__.py** - Package init
 - [ ] 19. **src/agent_trade/experiment/models.py** - Experiment Pydantic models
+  - TaxLot (shares, cost_basis, purchase_date)
+  - StockPosition (symbol, lots[])
+  - LotSale (holding period, tax rate, tax amount)
+  - ExecutedTransaction (with lot_sales[])
+  - ExperimentConfig (short_term_tax_rate, long_term_tax_rate, long_term_holding_days)
+  - Portfolio, Order, AgentStrategy, GameState, DailyDecision
 - [ ] 20. **src/agent_trade/experiment/config.py** - Config loading/defaults
+  - Default short_term_tax_rate = 0.35
+  - Default long_term_tax_rate = 0.15
+  - Default long_term_holding_days = 365
 - [ ] 21. **src/agent_trade/experiment/templates.py** - Strategy/decision templates
 
 ### Phase 3: State Management
 - [ ] 22. **src/agent_trade/experiment/portfolio_tracker.py** - Portfolio state
+  - Track lots per position
+  - Calculate total shares across lots
+  - Calculate weighted average cost basis
+  - Support adding new lots (buys)
+  - Support removing lots via FIFO (sells)
 - [ ] 23. **src/agent_trade/experiment/strategy_manager.py** - Strategy files
 - [ ] 24. **src/agent_trade/experiment/transaction_processor.py** - Order execution
+  - FIFO lot selection for sells
+  - Per-lot holding period calculation
+  - Per-lot tax rate determination (short-term vs long-term)
+  - Per-lot tax calculation
+  - Create LotSale records for transparency
 
 ### Phase 4: Agent System
 - [ ] 25. **src/agent_trade/experiment/market_data.py** - Price fetching wrapper
@@ -410,8 +433,17 @@ Create comprehensive documentation in `docs/experiment/`:
 
 ### Phase 5: Orchestration
 - [ ] 27. **src/agent_trade/experiment/coordinator.py** - Daily orchestration
+  - Collect decisions from all agents
+  - Validate orders (cash, shares, position limits)
+  - Execute transactions with FIFO lot processing
+  - Apply tiered tax rates per lot
+  - Update portfolios and eliminate bankrupt agents
+  - Generate daily outcome with lot-level transparency
 - [ ] 28. **src/agent_trade/experiment/daily_runner.py** - Main entry point
 - [ ] 29. **src/agent_trade/experiment/analysis_reporter.py** - Reports
+  - Tax efficiency metrics (short-term vs long-term gains)
+  - Holding period distributions
+  - Tax drag analysis per agent
 
 ### Phase 6: CLI & Integration
 - [ ] 30. **src/agent_trade/experiment/experiment_cli.py** - Typer CLI
