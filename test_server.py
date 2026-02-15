@@ -1,7 +1,7 @@
 """Simple test script to verify MCP server functionality."""
 
 import os
-from src.agent_trade import stock_data, news_data
+from agent_trade import stock_data, news_data
 
 def test_stock_data():
     """Test stock data functions without API keys."""

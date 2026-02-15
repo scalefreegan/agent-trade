@@ -44,6 +44,10 @@ class ToolLogger:
         self.logger = logging.getLogger("agent_trade.tools")
         self.logger.setLevel(getattr(logging, log_level.value.upper()))
 
+        # Clear any existing handlers to prevent duplication
+        # (getLogger returns same instance, so handlers can accumulate)
+        self.logger.handlers.clear()
+
         # Add file handler
         file_handler = logging.FileHandler(self.log_file)
         file_handler.setLevel(logging.DEBUG)
