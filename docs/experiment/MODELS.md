@@ -12,41 +12,110 @@ Complete documentation of all Pydantic models used in the trading experiment.
 
 ## Core Trading Models
 
+### TaxLot
+
+Represents a single purchase lot for tax tracking.
+
+```python
+class TaxLot(BaseModel):
+    """A single tax lot (purchase) for tracking holding periods."""
+    shares: Decimal
+    cost_basis: Decimal  # Price per share at purchase
+    purchase_date: datetime
+
+    @property
+    def holding_period_days(self) -> int:
+        """Calculate holding period in days."""
+        return (datetime.now(timezone.utc) - self.purchase_date).days
+
+    @property
+    def is_long_term(self) -> bool:
+        """Check if holding period >= 1 year (365 days)."""
+        return self.holding_period_days >= 365
+```
+
+**Fields**:
+- `shares`: Number of shares in this lot
+- `cost_basis`: Purchase price per share
+- `purchase_date`: When shares were purchased (for holding period calculation)
+
+**Example**:
+```json
+{
+  "shares": "5.0",
+  "cost_basis": "150.25",
+  "purchase_date": "2026-01-01T10:00:00Z"
+}
+```
+
+---
+
 ### StockPosition
 
-Represents a holding in a specific stock.
+Represents all holdings in a specific stock (may contain multiple tax lots).
 
 ```python
 class StockPosition(BaseModel):
-    """A position in a specific stock."""
+    """A position in a specific stock with tax lot tracking."""
     symbol: str
-    shares: Decimal
-    cost_basis: Decimal  # Average purchase price per share
+    lots: list[TaxLot] = Field(default_factory=list)
+
+    @property
+    def total_shares(self) -> Decimal:
+        """Total shares across all lots."""
+        return sum(lot.shares for lot in self.lots)
+
+    @property
+    def average_cost_basis(self) -> Decimal:
+        """Weighted average cost basis across all lots."""
+        if not self.lots:
+            return Decimal("0")
+        total_cost = sum(lot.shares * lot.cost_basis for lot in self.lots)
+        return total_cost / self.total_shares
 
     @property
     def total_cost(self) -> Decimal:
-        """Total amount invested (shares * cost_basis)."""
-        return self.shares * self.cost_basis
+        """Total amount invested across all lots."""
+        return sum(lot.shares * lot.cost_basis for lot in self.lots)
 ```
 
 **Fields**:
 - `symbol`: Stock ticker symbol (e.g., "AAPL", "TSLA")
-- `shares`: Number of shares owned (can be fractional, e.g., 2.5)
-- `cost_basis`: Average price paid per share (used for tax calculation)
+- `lots`: List of tax lots (purchases) for this stock
 
 **Example**:
 ```json
 {
   "symbol": "AAPL",
-  "shares": "10.5",
-  "cost_basis": "150.25"
+  "lots": [
+    {
+      "shares": "5.0",
+      "cost_basis": "150.25",
+      "purchase_date": "2026-01-01T10:00:00Z"
+    },
+    {
+      "shares": "3.0",
+      "cost_basis": "155.00",
+      "purchase_date": "2026-02-01T10:00:00Z"
+    }
+  ]
 }
 ```
 
+**Total Shares**: 8.0 (5.0 + 3.0)
+**Average Cost Basis**: $152.03 ((5.0 × $150.25 + 3.0 × $155.00) / 8.0)
+
 **Usage**:
 ```python
-position = StockPosition(symbol="AAPL", shares=Decimal("10.5"), cost_basis=Decimal("150.25"))
-total_invested = position.total_cost  # Decimal("1577.625")
+position = StockPosition(
+    symbol="AAPL",
+    lots=[
+        TaxLot(shares=Decimal("5.0"), cost_basis=Decimal("150.25"), purchase_date=datetime(...)),
+        TaxLot(shares=Decimal("3.0"), cost_basis=Decimal("155.00"), purchase_date=datetime(...)),
+    ]
+)
+total_shares = position.total_shares  # Decimal("8.0")
+avg_cost = position.average_cost_basis  # Decimal("152.03...")
 ```
 
 ---
@@ -152,9 +221,20 @@ class Order(BaseModel):
 
 ### ExecutedTransaction
 
-Record of a completed trade.
+Record of a completed trade with tax lot details.
 
 ```python
+class LotSale(BaseModel):
+    """Details of selling from a specific tax lot."""
+    shares: Decimal
+    cost_basis: Decimal
+    purchase_date: datetime
+    holding_period_days: int
+    is_long_term: bool
+    capital_gain: Decimal
+    tax_rate: Decimal  # 0.35 for short-term, 0.15 for long-term
+    tax_amount: Decimal
+
 class ExecutedTransaction(BaseModel):
     """Record of an executed trade with tax calculation."""
     timestamp: datetime
@@ -164,8 +244,9 @@ class ExecutedTransaction(BaseModel):
     shares: Decimal
     price_per_share: Decimal
     gross_amount: Decimal  # Total value of shares
-    tax_amount: Decimal  # Tax paid (for sells only)
+    tax_amount: Decimal  # Total tax paid (sum across lots for sells)
     net_amount: Decimal  # Amount added/subtracted from cash
+    lot_sales: Optional[list[LotSale]] = None  # Details per lot (for sells only)
 
     @property
     def total_value(self) -> Decimal:
@@ -178,13 +259,14 @@ class ExecutedTransaction(BaseModel):
 - `agent_id`: Which agent made the trade
 - `action`: "buy" or "sell"
 - `symbol`: Stock ticker
-- `shares`: Number of shares traded
+- `shares`: Number of shares traded (total across all lots)
 - `price_per_share`: Execution price
 - `gross_amount`: Total value (shares × price)
-- `tax_amount`: Capital gains tax paid (0 for buys or loss-making sells)
+- `tax_amount`: Total capital gains tax paid (sum across all lots)
 - `net_amount`: Actual cash change
+- `lot_sales`: List of LotSale details (for sells only, shows per-lot breakdown)
 
-**Example**:
+**Example (Short-term Sale)**:
 ```json
 {
   "timestamp": "2026-02-15T15:05:23.123456Z",
@@ -195,24 +277,71 @@ class ExecutedTransaction(BaseModel):
   "price_per_share": "180.00",
   "gross_amount": "900.00",
   "tax_amount": "52.50",
-  "net_amount": "847.50"
+  "net_amount": "847.50",
+  "lot_sales": [
+    {
+      "shares": "5.0",
+      "cost_basis": "150.00",
+      "purchase_date": "2026-01-15T10:00:00Z",
+      "holding_period_days": 31,
+      "is_long_term": false,
+      "capital_gain": "150.00",
+      "tax_rate": "0.35",
+      "tax_amount": "52.50"
+    }
+  ]
 }
 ```
 
-**Tax Calculation**:
-```python
-# For sells with capital gain:
-capital_gain = gross_amount - cost_basis
-if capital_gain > 0:
-    tax_amount = capital_gain * 0.35
-    net_amount = gross_amount - tax_amount
-else:
-    tax_amount = 0
-    net_amount = gross_amount
+**Example (Long-term Sale)**:
+```json
+{
+  "timestamp": "2027-02-15T15:05:23.123456Z",
+  "agent_id": "agent_003",
+  "action": "sell",
+  "symbol": "MSFT",
+  "shares": "10.0",
+  "price_per_share": "250.00",
+  "gross_amount": "2500.00",
+  "tax_amount": "75.00",
+  "net_amount": "2425.00",
+  "lot_sales": [
+    {
+      "shares": "10.0",
+      "cost_basis": "200.00",
+      "purchase_date": "2025-12-01T10:00:00Z",
+      "holding_period_days": 441,
+      "is_long_term": true,
+      "capital_gain": "500.00",
+      "tax_rate": "0.15",
+      "tax_amount": "75.00"
+    }
+  ]
+}
+```
 
-# For buys:
-tax_amount = 0
-net_amount = -gross_amount  # Cash decreases
+**Tax Savings**: Long-term holding saved $100 (35% would be $175, but 15% is only $75)
+
+**Tax Calculation** (FIFO with mixed lots):
+```python
+# For sells - process lots in FIFO order
+lot_sales = []
+shares_remaining = shares_to_sell
+
+for lot in position.lots:  # Oldest first (FIFO)
+    shares_from_lot = min(shares_remaining, lot.shares)
+    holding_days = (now - lot.purchase_date).days
+    is_long_term = holding_days >= 365
+    tax_rate = Decimal("0.15") if is_long_term else Decimal("0.35")
+
+    capital_gain = shares_from_lot * (price_per_share - lot.cost_basis)
+    tax_amount = max(capital_gain * tax_rate, Decimal("0"))
+
+    lot_sales.append(LotSale(...))
+    shares_remaining -= shares_from_lot
+
+total_tax = sum(ls.tax_amount for ls in lot_sales)
+net_amount = gross_amount - total_tax
 ```
 
 ## Strategy Models
@@ -326,7 +455,9 @@ class ExperimentConfig(BaseModel):
     name: str
     num_agents: int
     starting_capital: Decimal
-    tax_rate: Decimal = Decimal("0.35")
+    short_term_tax_rate: Decimal = Decimal("0.35")
+    long_term_tax_rate: Decimal = Decimal("0.15")
+    long_term_holding_days: int = 365
     max_position_pct: Decimal = Decimal("0.50")
     min_trade_amount: Decimal = Decimal("1.00")
     created_at: datetime
@@ -338,7 +469,9 @@ class ExperimentConfig(BaseModel):
 - `name`: Human-readable name
 - `num_agents`: Number of agents in competition
 - `starting_capital`: Initial cash per agent
-- `tax_rate`: Short-term capital gains tax (default 35%)
+- `short_term_tax_rate`: Tax on gains from positions held < 1 year (default 35%)
+- `long_term_tax_rate`: Tax on gains from positions held >= 1 year (default 15%)
+- `long_term_holding_days`: Days required for long-term status (default 365)
 - `max_position_pct`: Max % of portfolio in one stock (default 50%)
 - `min_trade_amount`: Minimum trade size (default $1.00)
 - `created_at`: When experiment started
@@ -351,7 +484,9 @@ class ExperimentConfig(BaseModel):
   "name": "Q1 2026 Competition",
   "num_agents": 10,
   "starting_capital": "1000.00",
-  "tax_rate": "0.35",
+  "short_term_tax_rate": "0.35",
+  "long_term_tax_rate": "0.15",
+  "long_term_holding_days": 365,
   "max_position_pct": "0.50",
   "min_trade_amount": "1.00",
   "created_at": "2026-02-15T10:00:00Z",

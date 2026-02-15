@@ -50,9 +50,12 @@ Every agent begins the experiment with identical starting conditions:
 
 ## Tax System
 
-A **35% short-term capital gains tax** applies to profitable trades:
+A **tiered capital gains tax** applies to profitable trades based on holding period:
 
-**Note**: All trades in this experiment are considered short-term (holding period < 1 year) since the experiment runs for weeks/months, not years. This 35% rate reflects realistic tax treatment for active trading.
+- **Short-term gains** (holding period < 1 year): **35% tax rate**
+- **Long-term gains** (holding period >= 1 year): **15% tax rate**
+
+This dual-rate structure encourages strategic thinking about holding periods and creates a trade-off between trading flexibility and tax efficiency.
 
 ### Tax Calculation
 
@@ -73,26 +76,100 @@ else:
 
 ### Tax Rules
 
-- **Rate**: Fixed 35% on short-term capital gains
-- **All trades are short-term**: Since agents trade actively (days/weeks), no positions held >= 1 year
+- **Short-term rate**: 35% on gains from positions held < 1 year
+- **Long-term rate**: 15% on gains from positions held >= 1 year
+- **Holding period**: Calculated from purchase date to sale date
+- **FIFO accounting**: When selling partial positions, oldest shares sold first (First-In-First-Out)
 - **Losses**: Not taxed, but also **not deductible** (cannot offset gains)
-- **Cost basis**: Average purchase price across all lots
-- **Partial sales**: Tax calculated proportionally based on shares sold
+- **Cost basis**: Tracked per lot (each purchase is a separate lot)
 - **Timing**: Tax deducted immediately when trade executes
 
-### Example
+### Example 1: Short-term Trade
 
-Agent buys 10 shares of AAPL at $150/share, then sells 5 shares at $180/share:
+Agent buys 10 shares of AAPL at $150/share on Day 1, then sells 5 shares at $180/share on Day 30:
 
 ```
+Holding period: 30 days (< 1 year) → Short-term
 Cost basis: 5 shares * $150 = $750
 Sale proceeds: 5 shares * $180 = $900
 Capital gain: $900 - $750 = $150
+Tax rate: 35% (short-term)
 Tax owed: $150 * 0.35 = $52.50
 Net cash received: $900 - $52.50 = $847.50
 ```
 
-Remaining 5 shares still have cost basis of $150/share.
+Remaining 5 shares still have cost basis of $150/share and original purchase date (Day 1).
+
+### Example 2: Long-term Trade
+
+Agent buys 10 shares of MSFT at $200/share on Day 1, then sells 5 shares at $250/share on Day 400 (over 1 year later):
+
+```
+Holding period: 400 days (>= 1 year) → Long-term
+Cost basis: 5 shares * $200 = $1,000
+Sale proceeds: 5 shares * $250 = $1,250
+Capital gain: $1,250 - $1,000 = $250
+Tax rate: 15% (long-term)
+Tax owed: $250 * 0.15 = $37.50
+Net cash received: $1,250 - $37.50 = $1,212.50
+```
+
+**Tax Savings**: Long-term holding saved $50 compared to short-term rate ($87.50 - $37.50)
+
+### Example 3: Mixed Lots (FIFO)
+
+Agent makes multiple purchases, then sells:
+
+```
+Day 1: Buy 5 shares @ $100 (Lot A)
+Day 180: Buy 5 shares @ $120 (Lot B)
+Day 200: Sell 7 shares @ $150
+
+Using FIFO:
+- First 5 shares from Lot A (held 200 days, short-term)
+  - Gain: 5 * ($150 - $100) = $250
+  - Tax: $250 * 0.35 = $87.50
+
+- Next 2 shares from Lot B (held 20 days, short-term)
+  - Gain: 2 * ($150 - $120) = $60
+  - Tax: $60 * 0.35 = $21.00
+
+Total tax: $87.50 + $21.00 = $108.50
+Net proceeds: (7 * $150) - $108.50 = $941.50
+```
+
+### Tax-Loss Harvesting
+
+Agents cannot offset gains with losses:
+
+```
+Day 1: Sell AAPL for +$100 gain (short-term) → Pay $35 tax
+Day 2: Sell TSLA for -$100 loss → Pay $0 tax
+
+Total taxes: $35 (losses don't reduce tax burden)
+```
+
+### Strategic Implications
+
+The dual tax rate creates interesting trade-offs:
+
+**Short-term trading (< 1 year)**:
+- ✓ Flexibility to react to market changes
+- ✓ Can take profits quickly
+- ✗ 35% tax on gains (severe drag)
+- ✗ Need larger gains to offset tax
+
+**Long-term holding (>= 1 year)**:
+- ✓ Only 15% tax on gains (57% tax savings vs short-term)
+- ✓ Significant after-tax return improvement
+- ✗ Locked in for 1+ year (less flexibility)
+- ✗ Cannot react quickly to market changes
+- ✗ Exposed to long-term downside risk
+
+**Hybrid approach**:
+- Core holdings (high conviction) → Hold for long-term tax treatment
+- Trading positions (tactical) → Accept short-term tax for flexibility
+- Tax-efficient rebalancing → Sell long-term lots first when possible (but FIFO required)
 
 ## Position Limits
 

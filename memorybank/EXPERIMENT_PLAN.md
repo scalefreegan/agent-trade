@@ -236,8 +236,12 @@ agent-trade-experiment list
 ## Trading Rules
 
 - Starting capital: $1000 per agent
-- Tax rate: 35% on short-term capital gains (losses not taxed)
-  - All trades are short-term since experiment runs weeks/months, not years
+- **Tax rates** (tiered by holding period):
+  - **Short-term** (< 1 year): 35% on capital gains
+  - **Long-term** (>= 1 year): 15% on capital gains
+  - Losses not taxed or deductible
+  - FIFO accounting (oldest shares sold first)
+  - Tax lot tracking for accurate holding period calculation
 - Fractional shares: allowed
 - Short selling: disabled
 - Max position: 50% of portfolio in one stock

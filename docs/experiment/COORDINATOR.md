@@ -310,34 +310,80 @@ This prevents timing advantages and ensures fairness.
 
 Tax is calculated on **capital gains** from sell orders:
 
-### Formula
+### Formula (FIFO with Tax Lots)
 
 ```python
-cost_basis = shares_sold * position.cost_basis
-sale_proceeds = shares_sold * current_price
-capital_gain = sale_proceeds - cost_basis
+# Process lots in FIFO order (oldest first)
+total_tax = Decimal("0")
+shares_remaining = shares_to_sell
 
-if capital_gain > 0:
-    tax = capital_gain * tax_rate  # 35% for short-term gains
-else:
-    tax = 0  # Losses not taxed
+for lot in position.lots:  # Sorted by purchase_date (oldest first)
+    shares_from_lot = min(shares_remaining, lot.shares)
+
+    # Calculate holding period
+    holding_days = (sale_date - lot.purchase_date).days
+    is_long_term = holding_days >= 365
+
+    # Determine tax rate
+    tax_rate = Decimal("0.15") if is_long_term else Decimal("0.35")
+
+    # Calculate gain and tax for this lot
+    cost_basis = shares_from_lot * lot.cost_basis
+    sale_proceeds = shares_from_lot * current_price
+    capital_gain = sale_proceeds - cost_basis
+
+    if capital_gain > 0:
+        lot_tax = capital_gain * tax_rate
+    else:
+        lot_tax = Decimal("0")  # Losses not taxed
+
+    total_tax += lot_tax
+    shares_remaining -= shares_from_lot
+
+net_proceeds = (shares_to_sell * current_price) - total_tax
 ```
 
-### Example
+### Example 1: Short-term Sale
 
-Agent's position: 10 shares of AAPL at $150/share cost basis
+Agent's position:
+- Lot A: 10 shares purchased at $150 on Day 1
 
-Sells 5 shares at $180/share:
+Sells 5 shares at $180 on Day 30:
 
 ```
-Cost basis: 5 * $150 = $750
-Sale proceeds: 5 * $180 = $900
-Capital gain: $900 - $750 = $150
-Tax: $150 * 0.35 = $52.50
+Lot A: 5 shares sold
+  Holding period: 30 days (< 365) → Short-term
+  Cost basis: 5 * $150 = $750
+  Sale proceeds: 5 * $180 = $900
+  Capital gain: $900 - $750 = $150
+  Tax rate: 35%
+  Tax: $150 * 0.35 = $52.50
+
 Net cash: $900 - $52.50 = $847.50
 ```
 
-Remaining position: 5 shares at $150/share cost basis (unchanged)
+Remaining: Lot A with 5 shares at $150/share (purchased Day 1)
+
+### Example 2: Long-term Sale
+
+Agent's position:
+- Lot A: 10 shares purchased at $200 on Day 1
+
+Sells 5 shares at $250 on Day 400:
+
+```
+Lot A: 5 shares sold
+  Holding period: 400 days (>= 365) → Long-term
+  Cost basis: 5 * $200 = $1,000
+  Sale proceeds: 5 * $250 = $1,250
+  Capital gain: $1,250 - $1,000 = $250
+  Tax rate: 15%
+  Tax: $250 * 0.15 = $37.50
+
+Net cash: $1,250 - $37.50 = $1,212.50
+```
+
+**Tax Savings**: $50 compared to short-term ($87.50 - $37.50)
 
 ### Partial Positions
 

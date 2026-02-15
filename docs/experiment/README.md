@@ -10,7 +10,7 @@ This experiment simulates a competitive trading environment where:
 - Each agent makes **daily trading decisions** autonomously
 - Agents research stocks using **real market data** and news
 - They **learn and adapt** their strategies based on outcomes
-- A **35% short-term capital gains tax** adds realistic friction
+- A **tiered capital gains tax** (35% short-term, 15% long-term) creates strategic trade-offs
 - Agents can be **eliminated** if their portfolio value drops to zero
 
 The experiment runs continuously via cron, with agents spawning each trading day at 10:00 AM EST (30 minutes after market open).
@@ -79,7 +79,7 @@ agent-trade-experiment analyze <experiment_id> "compare top 3 agent strategies"
 4. **Coordinator** processes all decisions:
    - Validates orders (sufficient funds, position limits)
    - Executes trades at current market prices
-   - Applies 35% tax on capital gains
+   - Applies tiered tax on capital gains (35% short-term, 15% long-term)
    - Updates portfolios and eliminates bankrupt agents
 5. **State is saved** and a daily report is generated
 
@@ -130,8 +130,11 @@ Agents maintain a **strategy document** that includes:
 ## Trading Rules Summary
 
 - **Starting capital**: $1,000 per agent
-- **Tax rate**: 35% on short-term capital gains (losses not taxed)
-  - All trades are short-term (holding period < 1 year)
+- **Tax rates** (tiered by holding period):
+  - **Short-term** (< 1 year): 35% on capital gains
+  - **Long-term** (>= 1 year): 15% on capital gains
+  - Losses not taxed or deductible
+  - FIFO accounting (oldest shares sold first)
 - **Fractional shares**: Allowed
 - **Short selling**: Disabled
 - **Max position**: 50% of portfolio in one stock
