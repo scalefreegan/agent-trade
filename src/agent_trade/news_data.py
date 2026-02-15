@@ -1,9 +1,9 @@
 """News data functions using Tiingo and NewsAPI."""
 
 import os
-from typing import Any
 from tiingo import TiingoClient
 from newsapi import NewsApiClient
+from .models import NewsResponse, NewsArticle
 
 
 def _get_tiingo_client() -> TiingoClient:
@@ -22,7 +22,7 @@ def _get_newsapi_client() -> NewsApiClient:
     return NewsApiClient(api_key=api_key)
 
 
-def get_stock_news(tickers: list[str], limit: int = 10) -> dict[str, Any]:
+def get_stock_news(tickers: list[str], limit: int = 10) -> NewsResponse:
     """Get financial news for specific stock tickers from Tiingo.
 
     Args:
@@ -30,7 +30,7 @@ def get_stock_news(tickers: list[str], limit: int = 10) -> dict[str, Any]:
         limit: Maximum number of articles to return
 
     Returns:
-        Dictionary containing news articles
+        NewsResponse model containing news articles
     """
     try:
         client = _get_tiingo_client()
@@ -38,28 +38,29 @@ def get_stock_news(tickers: list[str], limit: int = 10) -> dict[str, Any]:
 
         formatted_articles = []
         for article in articles[:limit]:
-            formatted_articles.append({
-                "title": article.get("title"),
-                "description": article.get("description"),
-                "url": article.get("url"),
-                "source": article.get("source"),
-                "published_date": article.get("publishedDate"),
-                "tickers": article.get("tickers", []),
-            })
+            formatted_articles.append(NewsArticle(
+                title=article.get("title"),
+                description=article.get("description"),
+                url=article.get("url"),
+                source=article.get("source"),
+                published_at=article.get("publishedDate"),
+                tickers=article.get("tickers", []),
+            ))
 
-        return {
-            "source": "tiingo",
-            "tickers": tickers,
-            "count": len(formatted_articles),
-            "articles": formatted_articles,
-        }
+        return NewsResponse(
+            source="tiingo",
+            tickers=tickers,
+            count=len(formatted_articles),
+            articles=formatted_articles,
+        )
     except Exception as e:
-        return {
-            "source": "tiingo",
-            "tickers": tickers,
-            "error": str(e),
-            "articles": [],
-        }
+        return NewsResponse(
+            source="tiingo",
+            tickers=tickers,
+            count=0,
+            articles=[],
+            error=str(e),
+        )
 
 
 def search_news(
@@ -67,7 +68,7 @@ def search_news(
     limit: int = 10,
     language: str = "en",
     sort_by: str = "publishedAt"
-) -> dict[str, Any]:
+) -> NewsResponse:
     """Search general news by keyword using NewsAPI.
 
     Args:
@@ -77,7 +78,7 @@ def search_news(
         sort_by: Sort order ('publishedAt', 'relevancy', 'popularity')
 
     Returns:
-        Dictionary containing news articles
+        NewsResponse model containing news articles
     """
     try:
         client = _get_newsapi_client()
@@ -89,37 +90,39 @@ def search_news(
         )
 
         if response.get("status") != "ok":
-            return {
-                "source": "newsapi",
-                "query": query,
-                "error": "API request failed",
-                "articles": [],
-            }
+            return NewsResponse(
+                source="newsapi",
+                query=query,
+                count=0,
+                articles=[],
+                error="API request failed",
+            )
 
         articles = response.get("articles", [])
         formatted_articles = []
 
         for article in articles:
-            formatted_articles.append({
-                "title": article.get("title"),
-                "description": article.get("description"),
-                "url": article.get("url"),
-                "source": article.get("source", {}).get("name"),
-                "published_at": article.get("publishedAt"),
-                "author": article.get("author"),
-            })
+            formatted_articles.append(NewsArticle(
+                title=article.get("title"),
+                description=article.get("description"),
+                url=article.get("url"),
+                source=article.get("source", {}).get("name"),
+                published_at=article.get("publishedAt"),
+                author=article.get("author"),
+            ))
 
-        return {
-            "source": "newsapi",
-            "query": query,
-            "count": len(formatted_articles),
-            "total_results": response.get("totalResults", 0),
-            "articles": formatted_articles,
-        }
+        return NewsResponse(
+            source="newsapi",
+            query=query,
+            count=len(formatted_articles),
+            articles=formatted_articles,
+            total_results=response.get("totalResults", 0),
+        )
     except Exception as e:
-        return {
-            "source": "newsapi",
-            "query": query,
-            "error": str(e),
-            "articles": [],
-        }
+        return NewsResponse(
+            source="newsapi",
+            query=query,
+            count=0,
+            articles=[],
+            error=str(e),
+        )

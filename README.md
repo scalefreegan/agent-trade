@@ -41,19 +41,74 @@ Get API keys from:
 - Tiingo: https://www.tiingo.com/
 - NewsAPI: https://newsapi.org/
 
-## Running the MCP Server
+## Usage
 
-### Option 1: With uvx (no install needed)
+There are **three modes** of operation:
+
+### Mode 1: Headless CLI via Anthropic API (Fast & Direct)
+
+Run queries directly using Anthropic API with function calling:
+
+```bash
+# Install with agent support
+uv sync --extra agent
+
+# Set your API keys
+export ANTHROPIC_API_KEY="your_anthropic_key"
+export TIINGO_API_KEY="your_tiingo_key"  # optional
+export NEWSAPI_KEY="your_newsapi_key"    # optional
+
+# Run queries (calls tools directly via Anthropic API)
+agent-trade-query "What is AAPL trading at?"
+agent-trade-query "Get historical prices for TSLA over 3 months"
+agent-trade-query "What news is there about Federal Reserve?"
+
+# Verbose mode (shows token usage)
+agent-trade-query --verbose "What dividends has Microsoft paid?"
+
+# Use different model
+agent-trade-query --model claude-opus-4-5-20251101 "Analyze TSLA stock"
+```
+
+**Pros**: Fast, cheap, no Claude Code needed
+**Cons**: Only has access to the 6 stock market tools
+
+### Mode 1b: Automate Claude Code CLI (Full Access)
+
+Automate Claude Code to access **all skills and MCP servers**:
+
+```bash
+# Requires agent-trade MCP server configured in Claude Code
+# (see "Connecting to Claude Code" section below)
+
+# Query through Claude Code (has access to ALL tools/skills)
+agent-trade-claude query "What is AAPL trading at?"
+agent-trade-claude query "Get historical prices for TSLA"
+
+# Run Claude Code skills
+agent-trade-claude skill commit "-m 'Update code'"
+agent-trade-claude skill review-pr "123"
+
+# Interactive mode
+agent-trade-claude interactive
+```
+
+**Pros**: Access to all Claude Code features, skills, and MCP servers
+**Cons**: Requires Claude Code installed and configured
+
+### Mode 2: MCP Server (For Claude Code/Cursor)
+
+#### Option 1: With uvx (no install needed)
 ```bash
 uvx --from . agent-trade
 ```
 
-### Option 2: After installing
+#### Option 2: After installing
 ```bash
 uv run agent-trade
 ```
 
-### Option 3: Development mode with FastMCP
+#### Option 3: Development mode with FastMCP
 ```bash
 uv run fastmcp dev agent_trade.server:mcp
 ```
