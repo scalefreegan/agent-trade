@@ -44,13 +44,17 @@ def get_stock_info(symbol: str) -> dict:
         return result.model_dump(by_alias=True)
     except Exception as e:
         execution_time_ms = (time.time() - start_time) * 1000
-        log_tool_call(
-            tool_name="get_stock_info",
-            mode="mcp",
-            input_args={"symbol": symbol},
-            error=str(e),
-            execution_time_ms=execution_time_ms,
-        )
+        try:
+            log_tool_call(
+                tool_name="get_stock_info",
+                mode="mcp",
+                input_args={"symbol": symbol},
+                error=str(e),
+                execution_time_ms=execution_time_ms,
+            )
+        except Exception:
+            # Don't mask the original exception if logging fails
+            pass
         raise
 
 
@@ -80,13 +84,17 @@ def get_historical_prices(symbol: str, period: str = "1mo") -> dict:
         return result.model_dump()
     except Exception as e:
         execution_time_ms = (time.time() - start_time) * 1000
-        log_tool_call(
-            tool_name="get_historical_prices",
-            mode="mcp",
-            input_args={"symbol": symbol, "period": period},
-            error=str(e),
-            execution_time_ms=execution_time_ms,
-        )
+        try:
+            log_tool_call(
+                tool_name="get_historical_prices",
+                mode="mcp",
+                input_args={"symbol": symbol, "period": period},
+                error=str(e),
+                execution_time_ms=execution_time_ms,
+            )
+        except Exception:
+            # Don't mask the original exception if logging fails
+            pass
         raise
 
 
@@ -116,13 +124,17 @@ def get_dividend_history(symbol: str, period: str = "5y") -> dict:
         return result.model_dump()
     except Exception as e:
         execution_time_ms = (time.time() - start_time) * 1000
-        log_tool_call(
-            tool_name="get_dividend_history",
-            mode="mcp",
-            input_args={"symbol": symbol, "period": period},
-            error=str(e),
-            execution_time_ms=execution_time_ms,
-        )
+        try:
+            log_tool_call(
+                tool_name="get_dividend_history",
+                mode="mcp",
+                input_args={"symbol": symbol, "period": period},
+                error=str(e),
+                execution_time_ms=execution_time_ms,
+            )
+        except Exception:
+            # Don't mask the original exception if logging fails
+            pass
         raise
 
 
@@ -151,13 +163,17 @@ def get_stock_splits(symbol: str) -> dict:
         return result.model_dump()
     except Exception as e:
         execution_time_ms = (time.time() - start_time) * 1000
-        log_tool_call(
-            tool_name="get_stock_splits",
-            mode="mcp",
-            input_args={"symbol": symbol},
-            error=str(e),
-            execution_time_ms=execution_time_ms,
-        )
+        try:
+            log_tool_call(
+                tool_name="get_stock_splits",
+                mode="mcp",
+                input_args={"symbol": symbol},
+                error=str(e),
+                execution_time_ms=execution_time_ms,
+            )
+        except Exception:
+            # Don't mask the original exception if logging fails
+            pass
         raise
 
 
@@ -191,13 +207,17 @@ def get_stock_news(tickers: list[str], limit: int = 10) -> dict:
         return result.model_dump()
     except Exception as e:
         execution_time_ms = (time.time() - start_time) * 1000
-        log_tool_call(
-            tool_name="get_stock_news",
-            mode="mcp",
-            input_args={"tickers": tickers, "limit": limit},
-            error=str(e),
-            execution_time_ms=execution_time_ms,
-        )
+        try:
+            log_tool_call(
+                tool_name="get_stock_news",
+                mode="mcp",
+                input_args={"tickers": tickers, "limit": limit},
+                error=str(e),
+                execution_time_ms=execution_time_ms,
+            )
+        except Exception:
+            # Don't mask the original exception if logging fails
+            pass
         raise
 
 
@@ -229,13 +249,17 @@ def search_news(query: str, limit: int = 10) -> dict:
         return result.model_dump()
     except Exception as e:
         execution_time_ms = (time.time() - start_time) * 1000
-        log_tool_call(
-            tool_name="search_news",
-            mode="mcp",
-            input_args={"query": query, "limit": limit},
-            error=str(e),
-            execution_time_ms=execution_time_ms,
-        )
+        try:
+            log_tool_call(
+                tool_name="search_news",
+                mode="mcp",
+                input_args={"query": query, "limit": limit},
+                error=str(e),
+                execution_time_ms=execution_time_ms,
+            )
+        except Exception:
+            # Don't mask the original exception if logging fails
+            pass
         raise
 
 

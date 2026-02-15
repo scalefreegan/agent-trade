@@ -56,6 +56,8 @@ async def run_skill(
     skill_name: str,
     args: Optional[str] = None,
     cwd: Optional[str] = None,
+    system_prompt: Optional[str] = None,
+    permission_mode: str = "default",
 ) -> AsyncIterator[dict[str, Any]]:
     """Run a specific Claude Code skill.
 
@@ -63,6 +65,8 @@ async def run_skill(
         skill_name: Name of the skill (e.g., 'commit', 'review-pr')
         args: Arguments for the skill
         cwd: Working directory
+        system_prompt: Optional system prompt
+        permission_mode: Permission mode for tools
 
     Yields:
         Messages from the skill execution
@@ -78,7 +82,12 @@ async def run_skill(
     if args:
         prompt += f" {args}"
 
-    async for message in query_claude_code(prompt, cwd=cwd):
+    async for message in query_claude_code(
+        prompt,
+        cwd=cwd,
+        system_prompt=system_prompt,
+        permission_mode=permission_mode,
+    ):
         yield message
 
 
@@ -202,7 +211,13 @@ class ClaudeCodeSession:
         """
         response_text = ""
 
-        async for message in run_skill(skill_name, args, cwd=self.cwd):
+        async for message in run_skill(
+            skill_name,
+            args,
+            cwd=self.cwd,
+            system_prompt=self.system_prompt,
+            permission_mode=self.permission_mode,
+        ):
             if isinstance(message, dict):
                 msg_type = message.get("type") or message.get("_type")
                 if msg_type == "assistant" or "AssistantMessage" in str(type(message.get("raw", ""))):
