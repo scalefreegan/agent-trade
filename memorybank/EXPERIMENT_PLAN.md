@@ -236,7 +236,8 @@ agent-trade-experiment list
 ## Trading Rules
 
 - Starting capital: $1000 per agent
-- Tax rate: 15% on capital gains (losses not taxed)
+- Tax rate: 35% on short-term capital gains (losses not taxed)
+  - All trades are short-term since experiment runs weeks/months, not years
 - Fractional shares: allowed
 - Short selling: disabled
 - Max position: 50% of portfolio in one stock
@@ -377,15 +378,16 @@ Create comprehensive documentation in `docs/experiment/`:
 - [x] **Phase 0 Verification Complete** (2026-02-15)
 
 ### Phase 1: Documentation
-- [ ] 9. **docs/experiment/README.md** - Overview and quick start
-- [ ] 10. **docs/experiment/RULES.md** - Complete game rules
-- [ ] 11. **docs/experiment/MODELS.md** - Pydantic model reference
-- [ ] 12. **docs/experiment/AGENT_BEHAVIOR.md** - Agent spawning and decisions
-- [ ] 13. **docs/experiment/COORDINATOR.md** - End-of-day processing
-- [ ] 14. **docs/experiment/CLI_REFERENCE.md** - CLI command reference
-- [ ] 15. **docs/experiment/ARCHITECTURE.md** - System design
-- [ ] 16. **docs/experiment/STRATEGY_TEMPLATE.md** - Strategy document template
-- [ ] 17. **docs/experiment/DAILY_DECISION_TEMPLATE.md** - Daily output template
+- [x] 9. **docs/experiment/README.md** - Overview and quick start (2026-02-15)
+- [x] 10. **docs/experiment/RULES.md** - Complete game rules (2026-02-15)
+- [x] 11. **docs/experiment/MODELS.md** - Pydantic model reference (2026-02-15)
+- [x] 12. **docs/experiment/AGENT_BEHAVIOR.md** - Agent spawning and decisions (2026-02-15)
+- [x] 13. **docs/experiment/COORDINATOR.md** - End-of-day processing (2026-02-15)
+- [x] 14. **docs/experiment/CLI_REFERENCE.md** - CLI command reference (2026-02-15)
+- [x] 15. **docs/experiment/ARCHITECTURE.md** - System design (2026-02-15)
+- [x] 16. **docs/experiment/STRATEGY_TEMPLATE.md** - Strategy document template (2026-02-15)
+- [x] 17. **docs/experiment/DAILY_DECISION_TEMPLATE.md** - Daily output template (2026-02-15)
+- [x] **Phase 1 Verification Complete** (2026-02-15)
 
 ### Phase 2: Experiment Core
 - [ ] 18. **src/agent_trade/experiment/__init__.py** - Package init
@@ -420,13 +422,13 @@ Create comprehensive documentation in `docs/experiment/`:
 | Phase | Status | Items | Completed |
 |-------|--------|-------|-----------|
 | 0 - Pydantic Foundation | Complete | 8 | 8 |
-| 1 - Documentation | Not Started | 9 | 0 |
+| 1 - Documentation | Complete | 9 | 9 |
 | 2 - Experiment Core | Not Started | 4 | 0 |
 | 3 - State Management | Not Started | 3 | 0 |
 | 4 - Agent System | Not Started | 2 | 0 |
 | 5 - Orchestration | Not Started | 3 | 0 |
 | 6 - CLI & Integration | Not Started | 3 | 0 |
-| **Total** | | **32** | **8** |
+| **Total** | | **32** | **17** |
 
 ---
 
