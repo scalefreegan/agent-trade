@@ -8,15 +8,28 @@ dependencies = [
     "yfinance>=0.2.40",
     "tiingo",
     "newsapi-python",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
-# Optional: for programmatic use with Claude Agent SDK
-agent = ["claude-agent-sdk"]
+# Optional: for programmatic/CLI use with Anthropic API and Claude Code automation
+agent = [
+    "anthropic>=0.40.0",
+    "claude-agent-sdk>=0.1.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0"
+]
 
 [project.scripts]
 # Run as standalone MCP server
 agent-trade = "agent_trade.server:main"
+# Run headless CLI queries via Anthropic API (requires agent extra)
+agent-trade-query = "agent_trade.cli:main"
+# Automate Claude Code CLI (requires agent extra)
+agent-trade-claude = "agent_trade.claude_cli:main"
+# View tool usage logs and statistics
+agent-trade-logs = "agent_trade.logs_cli:main"
 
 [build-system]
 requires = ["hatchling"]

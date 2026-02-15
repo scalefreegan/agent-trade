@@ -1,37 +1,44 @@
 """Stock market data functions using yfinance."""
 
 import yfinance as yf
-from typing import Any
+from decimal import Decimal
+from .models import StockInfo, HistoricalPriceData, HistoricalPrice, DividendHistory, DividendRecord, StockSplitHistory, StockSplit
 
 
-def get_stock_info(symbol: str) -> dict[str, Any]:
+def get_stock_info(symbol: str) -> StockInfo:
     """Get current stock price and company info.
 
     Args:
         symbol: Stock ticker symbol (e.g., 'AAPL', 'TSLA')
 
     Returns:
-        Dictionary containing stock information
+        StockInfo model containing stock information
     """
     ticker = yf.Ticker(symbol)
     info = ticker.info
 
-    return {
-        "symbol": symbol.upper(),
-        "name": info.get("longName"),
-        "current_price": info.get("currentPrice") or info.get("regularMarketPrice"),
-        "market_cap": info.get("marketCap"),
-        "sector": info.get("sector"),
-        "industry": info.get("industry"),
-        "pe_ratio": info.get("trailingPE"),
-        "52_week_high": info.get("fiftyTwoWeekHigh"),
-        "52_week_low": info.get("fiftyTwoWeekLow"),
-        "volume": info.get("volume"),
-        "average_volume": info.get("averageVolume"),
-    }
+    # Convert prices to Decimal
+    current_price = info.get("currentPrice") or info.get("regularMarketPrice")
+    pe_ratio = info.get("trailingPE")
+    week_high = info.get("fiftyTwoWeekHigh")
+    week_low = info.get("fiftyTwoWeekLow")
+
+    return StockInfo(
+        symbol=symbol.upper(),
+        name=info.get("longName"),
+        current_price=Decimal(str(current_price)) if current_price is not None else None,
+        market_cap=info.get("marketCap"),
+        sector=info.get("sector"),
+        industry=info.get("industry"),
+        pe_ratio=Decimal(str(pe_ratio)) if pe_ratio is not None else None,
+        fifty_two_week_high=Decimal(str(week_high)) if week_high is not None else None,
+        fifty_two_week_low=Decimal(str(week_low)) if week_low is not None else None,
+        volume=info.get("volume"),
+        average_volume=info.get("averageVolume"),
+    )
 
 
-def get_historical_prices(symbol: str, period: str = "1mo") -> dict[str, Any]:
+def get_historical_prices(symbol: str, period: str = "1mo") -> HistoricalPriceData:
     """Get historical price data.
 
     Args:
@@ -39,40 +46,41 @@ def get_historical_prices(symbol: str, period: str = "1mo") -> dict[str, Any]:
         period: Time period (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max)
 
     Returns:
-        Dictionary containing historical price data
+        HistoricalPriceData model containing historical price data
     """
     ticker = yf.Ticker(symbol)
     hist = ticker.history(period=period)
 
     if hist.empty:
-        return {
-            "symbol": symbol.upper(),
-            "period": period,
-            "data": [],
-            "error": "No data available for this symbol/period"
-        }
+        return HistoricalPriceData(
+            symbol=symbol.upper(),
+            period=period,
+            count=0,
+            data=[],
+            error="No data available for this symbol/period"
+        )
 
-    # Convert to list of dicts for easier consumption
+    # Convert to list of HistoricalPrice models
     data = []
     for date, row in hist.iterrows():
-        data.append({
-            "date": date.strftime("%Y-%m-%d"),
-            "open": float(row["Open"]),
-            "high": float(row["High"]),
-            "low": float(row["Low"]),
-            "close": float(row["Close"]),
-            "volume": int(row["Volume"]),
-        })
+        data.append(HistoricalPrice(
+            date=date.strftime("%Y-%m-%d"),
+            open=Decimal(str(row["Open"])),
+            high=Decimal(str(row["High"])),
+            low=Decimal(str(row["Low"])),
+            close=Decimal(str(row["Close"])),
+            volume=int(row["Volume"]),
+        ))
 
-    return {
-        "symbol": symbol.upper(),
-        "period": period,
-        "count": len(data),
-        "data": data,
-    }
+    return HistoricalPriceData(
+        symbol=symbol.upper(),
+        period=period,
+        count=len(data),
+        data=data,
+    )
 
 
-def get_dividend_history(symbol: str, period: str = "5y") -> dict[str, Any]:
+def get_dividend_history(symbol: str, period: str = "5y") -> DividendHistory:
     """Get dividend payment history.
 
     Args:
@@ -80,72 +88,83 @@ def get_dividend_history(symbol: str, period: str = "5y") -> dict[str, Any]:
         period: Time period (1y, 2y, 5y, max)
 
     Returns:
-        Dictionary containing dividend history
+        DividendHistory model containing dividend history
     """
     ticker = yf.Ticker(symbol)
     dividends = ticker.dividends
 
     if dividends.empty:
-        return {
-            "symbol": symbol.upper(),
-            "period": period,
-            "dividends": [],
-            "message": "No dividend history available"
-        }
+        return DividendHistory(
+            symbol=symbol.upper(),
+            period=period,
+            count=0,
+            dividends=[],
+            message="No dividend history available"
+        )
 
     # Filter by period if needed
+    period_warning = None
     if period != "max":
-        years = int(period.replace("y", ""))
-        import pandas as pd
-        from datetime import datetime, timedelta, timezone
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=years * 365)
-        dividends = dividends[dividends.index >= cutoff_date]
+        try:
+            # Extract years from period string (e.g., "5y" -> 5)
+            years = int(period.rstrip("y"))
+            if years <= 0:
+                raise ValueError("Years must be positive")
+            import pandas as pd
+            from datetime import datetime, timedelta, timezone
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=years * 365)
+            dividends = dividends[dividends.index >= cutoff_date]
+        except (ValueError, AttributeError) as e:
+            # If period format is invalid, return all dividends with warning
+            period_warning = f"Invalid period format '{period}' (expected: 1y, 2y, 5y, max). Returning all dividends."
 
-    # Convert to list of dicts
+    # Convert to list of DividendRecord models
     dividend_list = []
     for date, amount in dividends.items():
-        dividend_list.append({
-            "date": date.strftime("%Y-%m-%d"),
-            "amount": float(amount),
-        })
+        dividend_list.append(DividendRecord(
+            date=date.strftime("%Y-%m-%d"),
+            amount=Decimal(str(amount)),
+        ))
 
-    return {
-        "symbol": symbol.upper(),
-        "period": period,
-        "count": len(dividend_list),
-        "dividends": dividend_list,
-    }
+    return DividendHistory(
+        symbol=symbol.upper(),
+        period=period,
+        count=len(dividend_list),
+        dividends=dividend_list,
+        message=period_warning,
+    )
 
 
-def get_stock_splits(symbol: str) -> dict[str, Any]:
+def get_stock_splits(symbol: str) -> StockSplitHistory:
     """Get stock split history.
 
     Args:
         symbol: Stock ticker symbol
 
     Returns:
-        Dictionary containing stock split history
+        StockSplitHistory model containing stock split history
     """
     ticker = yf.Ticker(symbol)
     splits = ticker.splits
 
     if splits.empty:
-        return {
-            "symbol": symbol.upper(),
-            "splits": [],
-            "message": "No stock splits in history"
-        }
+        return StockSplitHistory(
+            symbol=symbol.upper(),
+            count=0,
+            splits=[],
+            message="No stock splits in history"
+        )
 
-    # Convert to list of dicts
+    # Convert to list of StockSplit models
     split_list = []
     for date, ratio in splits.items():
-        split_list.append({
-            "date": date.strftime("%Y-%m-%d"),
-            "ratio": float(ratio),
-        })
+        split_list.append(StockSplit(
+            date=date.strftime("%Y-%m-%d"),
+            ratio=float(ratio),
+        ))
 
-    return {
-        "symbol": symbol.upper(),
-        "count": len(split_list),
-        "splits": split_list,
-    }
+    return StockSplitHistory(
+        symbol=symbol.upper(),
+        count=len(split_list),
+        splits=split_list,
+    )

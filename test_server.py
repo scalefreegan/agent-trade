@@ -1,7 +1,7 @@
 """Simple test script to verify MCP server functionality."""
 
 import os
-from src.agent_trade import stock_data, news_data
+from agent_trade import stock_data, news_data
 
 def test_stock_data():
     """Test stock data functions without API keys."""
@@ -10,28 +10,28 @@ def test_stock_data():
     # Test get_stock_info
     try:
         result = stock_data.get_stock_info("AAPL")
-        print(f"✓ get_stock_info: {result['symbol']} - {result.get('name')} - ${result.get('current_price')}")
+        print(f"✓ get_stock_info: {result.symbol} - {result.name} - ${result.current_price}")
     except Exception as e:
         print(f"✗ get_stock_info failed: {e}")
 
     # Test get_historical_prices
     try:
         result = stock_data.get_historical_prices("AAPL", "5d")
-        print(f"✓ get_historical_prices: Got {result.get('count', 0)} data points")
+        print(f"✓ get_historical_prices: Got {result.count} data points")
     except Exception as e:
         print(f"✗ get_historical_prices failed: {e}")
 
     # Test get_dividend_history
     try:
         result = stock_data.get_dividend_history("AAPL", "1y")
-        print(f"✓ get_dividend_history: Got {result.get('count', 0)} dividend records")
+        print(f"✓ get_dividend_history: Got {result.count} dividend records")
     except Exception as e:
         print(f"✗ get_dividend_history failed: {e}")
 
     # Test get_stock_splits
     try:
         result = stock_data.get_stock_splits("AAPL")
-        print(f"✓ get_stock_splits: Got {result.get('count', 0)} split records")
+        print(f"✓ get_stock_splits: Got {result.count} split records")
     except Exception as e:
         print(f"✗ get_stock_splits failed: {e}")
 
@@ -48,10 +48,10 @@ def test_news_data():
     else:
         try:
             result = news_data.get_stock_news(["AAPL"], limit=3)
-            if "error" in result:
-                print(f"✗ get_stock_news: {result['error']}")
+            if result.error:
+                print(f"✗ get_stock_news: {result.error}")
             else:
-                print(f"✓ get_stock_news: Got {result.get('count', 0)} articles")
+                print(f"✓ get_stock_news: Got {result.count} articles")
         except Exception as e:
             print(f"✗ get_stock_news failed: {e}")
 
@@ -60,10 +60,10 @@ def test_news_data():
     else:
         try:
             result = news_data.search_news("Tesla", limit=3)
-            if "error" in result:
-                print(f"✗ search_news: {result['error']}")
+            if result.error:
+                print(f"✗ search_news: {result.error}")
             else:
-                print(f"✓ search_news: Got {result.get('count', 0)} articles")
+                print(f"✓ search_news: Got {result.count} articles")
         except Exception as e:
             print(f"✗ search_news failed: {e}")
 
