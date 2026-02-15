@@ -80,14 +80,9 @@ class NewsArticle(BaseModel):
     description: Optional[str] = None
     url: Optional[str] = None
     source: Optional[str] = None
-    published_date: Optional[str] = Field(None, alias="published_at")  # For NewsAPI
-    published_at: Optional[str] = None  # For Tiingo
+    published_at: Optional[str] = None
     tickers: list[str] = Field(default_factory=list)
     author: Optional[str] = None
-
-    def get_published_date(self) -> Optional[str]:
-        """Get published date regardless of field name."""
-        return self.published_date or self.published_at
 
 
 class NewsResponse(BaseModel):

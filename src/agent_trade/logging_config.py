@@ -139,7 +139,9 @@ class ToolLogger:
         }
 
         with open(self.log_file, 'r') as f:
+            line_num = 0
             for line in f:
+                line_num += 1
                 if not line.strip():
                     continue
 
@@ -163,7 +165,11 @@ class ToolLogger:
                     if entry.get("execution_time_ms"):
                         stats["total_execution_time_ms"] += entry["execution_time_ms"]
 
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    # Warn about corrupted log lines
+                    self.logger.warning(
+                        f"Skipping malformed JSON at line {line_num} in {self.log_file}: {e}"
+                    )
                     continue
 
         return stats
@@ -184,12 +190,24 @@ def get_logger() -> ToolLogger:
     if _logger is None:
         # Check for env var configuration
         log_file = os.environ.get("AGENT_TRADE_LOG_FILE")
-        log_level = os.environ.get("AGENT_TRADE_LOG_LEVEL", "INFO")
+        log_level_str = os.environ.get("AGENT_TRADE_LOG_LEVEL", "INFO")
         console_output = os.environ.get("AGENT_TRADE_LOG_CONSOLE", "true").lower() == "true"
+
+        # Parse log level with fallback to INFO if invalid
+        try:
+            log_level = LogLevel(log_level_str.lower())
+        except ValueError:
+            # Invalid log level, fallback to INFO and warn
+            log_level = LogLevel.INFO
+            import warnings
+            warnings.warn(
+                f"Invalid AGENT_TRADE_LOG_LEVEL='{log_level_str}'. "
+                f"Valid values: {[e.value for e in LogLevel]}. Defaulting to INFO."
+            )
 
         _logger = ToolLogger(
             log_file=Path(log_file) if log_file else None,
-            log_level=LogLevel(log_level.lower()),
+            log_level=log_level,
             console_output=console_output,
         )
 

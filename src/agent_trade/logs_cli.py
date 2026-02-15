@@ -8,6 +8,9 @@ from rich.console import Console
 from rich.table import Table
 from rich.json import JSON
 
+# Track corrupted lines globally for reporting
+_corrupted_lines = []
+
 app = typer.Typer(
     name="agent-trade-logs",
     help="View tool usage logs and statistics",
@@ -144,8 +147,8 @@ def tail(
                     try:
                         entry = json.loads(line)
                         _print_log_entry(entry)
-                    except json.JSONDecodeError:
-                        pass
+                    except json.JSONDecodeError as e:
+                        console.print(f"[yellow]Warning: Skipping malformed JSON line: {e}[/yellow]")
                 else:
                     time.sleep(0.1)
     else:
@@ -154,12 +157,16 @@ def tail(
             all_lines = f.readlines()
             recent_lines = all_lines[-lines:]
 
+        corrupted = 0
         for line in recent_lines:
             try:
                 entry = json.loads(line)
                 _print_log_entry(entry)
             except json.JSONDecodeError:
-                pass
+                corrupted += 1
+
+        if corrupted > 0:
+            console.print(f"\n[yellow]Warning: Skipped {corrupted} malformed JSON line(s)[/yellow]")
 
 
 @app.command()
@@ -205,6 +212,7 @@ def show(
         return
 
     count = 0
+    corrupted = 0
     with open(log_file, 'r') as f:
         for line in f:
             try:
@@ -222,9 +230,11 @@ def show(
                 count += 1
 
             except json.JSONDecodeError:
-                pass
+                corrupted += 1
 
     console.print(f"\n[dim]Showing {count} log entries[/dim]")
+    if corrupted > 0:
+        console.print(f"[yellow]Warning: Skipped {corrupted} malformed JSON line(s)[/yellow]")
 
 
 @app.command()

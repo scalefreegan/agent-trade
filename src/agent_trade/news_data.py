@@ -1,9 +1,12 @@
 """News data functions using Tiingo and NewsAPI."""
 
 import os
+import logging
 from tiingo import TiingoClient
 from newsapi import NewsApiClient
 from .models import NewsResponse, NewsArticle
+
+logger = logging.getLogger(__name__)
 
 
 def _get_tiingo_client() -> TiingoClient:
@@ -53,13 +56,19 @@ def get_stock_news(tickers: list[str], limit: int = 10) -> NewsResponse:
             count=len(formatted_articles),
             articles=formatted_articles,
         )
+    except ValueError as e:
+        # API key not set - this is a configuration error, raise it
+        raise
     except Exception as e:
+        # Log the error so it's visible even if caller doesn't check error field
+        error_msg = f"Tiingo API error: {type(e).__name__}: {str(e)}"
+        logger.error(error_msg)
         return NewsResponse(
             source="tiingo",
             tickers=tickers,
             count=0,
             articles=[],
-            error=str(e),
+            error=error_msg,
         )
 
 
@@ -90,12 +99,17 @@ def search_news(
         )
 
         if response.get("status") != "ok":
+            # Include detailed error information from API response
+            error_code = response.get("code", "unknown")
+            error_message = response.get("message", "API request failed")
+            error_msg = f"NewsAPI error [{error_code}]: {error_message}"
+            logger.error(error_msg)
             return NewsResponse(
                 source="newsapi",
                 query=query,
                 count=0,
                 articles=[],
-                error="API request failed",
+                error=error_msg,
             )
 
         articles = response.get("articles", [])
@@ -118,11 +132,17 @@ def search_news(
             articles=formatted_articles,
             total_results=response.get("totalResults", 0),
         )
+    except ValueError as e:
+        # API key not set - this is a configuration error, raise it
+        raise
     except Exception as e:
+        # Log the error so it's visible even if caller doesn't check error field
+        error_msg = f"NewsAPI error: {type(e).__name__}: {str(e)}"
+        logger.error(error_msg)
         return NewsResponse(
             source="newsapi",
             query=query,
             count=0,
             articles=[],
-            error=str(e),
+            error=error_msg,
         )
