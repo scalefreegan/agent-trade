@@ -55,6 +55,12 @@ def stats(
 
     overview.add_row("Total Calls", str(stats["total_calls"]))
     overview.add_row("Errors", str(stats["errors"]))
+
+    # Warn about corrupted lines if any
+    corrupted = stats.get("corrupted_lines", 0)
+    if corrupted > 0:
+        overview.add_row("Corrupted Lines", f"[red]{corrupted}[/red]")
+
     overview.add_row(
         "Total Execution Time",
         f"{stats['total_execution_time_ms']:.2f} ms"
@@ -64,6 +70,11 @@ def stats(
         overview.add_row("Average Execution Time", f"{avg_time:.2f} ms")
 
     console.print(overview)
+
+    # Display prominent warning if corruption detected
+    if corrupted > 0:
+        console.print(f"\n[bold red]⚠ WARNING: {corrupted} corrupted log line(s) detected and skipped![/bold red]")
+        console.print("[yellow]Log file may be corrupted. Consider investigating or clearing corrupted entries.[/yellow]")
 
     # By tool table
     if stats["by_tool"]:
@@ -158,15 +169,17 @@ def tail(
             recent_lines = all_lines[-lines:]
 
         corrupted = 0
-        for line in recent_lines:
+        for line_num, line in enumerate(recent_lines, start=1):
             try:
                 entry = json.loads(line)
                 _print_log_entry(entry)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 corrupted += 1
+                import sys
+                print(f"WARNING: Malformed JSON at line {line_num}: {e}", file=sys.stderr)
 
         if corrupted > 0:
-            console.print(f"\n[yellow]Warning: Skipped {corrupted} malformed JSON line(s)[/yellow]")
+            console.print(f"\n[bold red]⚠ WARNING: Skipped {corrupted} corrupted line(s)[/bold red]")
 
 
 @app.command()
@@ -214,7 +227,7 @@ def show(
     count = 0
     corrupted = 0
     with open(log_file, 'r') as f:
-        for line in f:
+        for line_num, line in enumerate(f, start=1):
             try:
                 entry = json.loads(line)
 
@@ -229,12 +242,14 @@ def show(
                 _print_log_entry(entry)
                 count += 1
 
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 corrupted += 1
+                import sys
+                print(f"WARNING: Malformed JSON at line {line_num}: {e}", file=sys.stderr)
 
     console.print(f"\n[dim]Showing {count} log entries[/dim]")
     if corrupted > 0:
-        console.print(f"[yellow]Warning: Skipped {corrupted} malformed JSON line(s)[/yellow]")
+        console.print(f"[bold red]⚠ WARNING: Skipped {corrupted} corrupted line(s)[/bold red]")
 
 
 @app.command()

@@ -128,6 +128,7 @@ class ToolLogger:
                 "by_mode": {},
                 "errors": 0,
                 "total_execution_time_ms": 0,
+                "corrupted_lines": 0,
             }
 
         stats = {
@@ -136,6 +137,7 @@ class ToolLogger:
             "by_mode": {},
             "errors": 0,
             "total_execution_time_ms": 0,
+            "corrupted_lines": 0,
         }
 
         with open(self.log_file, 'r') as f:
@@ -166,9 +168,13 @@ class ToolLogger:
                         stats["total_execution_time_ms"] += entry["execution_time_ms"]
 
                 except json.JSONDecodeError as e:
-                    # Warn about corrupted log lines
-                    self.logger.warning(
-                        f"Skipping malformed JSON at line {line_num} in {self.log_file}: {e}"
+                    # Track and warn about corrupted log lines
+                    stats["corrupted_lines"] += 1
+                    import sys
+                    # Print to stderr for immediate visibility
+                    print(
+                        f"WARNING: Skipping malformed JSON at line {line_num} in {self.log_file}: {e}",
+                        file=sys.stderr
                     )
                     continue
 
@@ -197,12 +203,14 @@ def get_logger() -> ToolLogger:
         try:
             log_level = LogLevel(log_level_str.lower())
         except ValueError:
-            # Invalid log level, fallback to INFO and warn
+            # Invalid log level, fallback to INFO and warn loudly
             log_level = LogLevel.INFO
-            import warnings
-            warnings.warn(
-                f"Invalid AGENT_TRADE_LOG_LEVEL='{log_level_str}'. "
-                f"Valid values: {[e.value for e in LogLevel]}. Defaulting to INFO."
+            import sys
+            # Print to stderr so it's always visible, even if logging isn't configured yet
+            print(
+                f"WARNING: Invalid AGENT_TRADE_LOG_LEVEL='{log_level_str}'. "
+                f"Valid values: {[e.value for e in LogLevel]}. Defaulting to INFO.",
+                file=sys.stderr
             )
 
         _logger = ToolLogger(
