@@ -54,6 +54,33 @@ export interface GameState {
 }
 
 // ==============================================================================
+// Leaderboard & Performance Types
+// ==============================================================================
+
+export interface LeaderboardEntry {
+  rank: number;
+  agent_id: string;
+  name: string;
+  portfolio_value: number;
+  returns_pct: number | null;
+  status: string;
+}
+
+export interface LeaderboardResponse {
+  entries: LeaderboardEntry[];
+}
+
+export interface PerformanceDataPoint {
+  date: string; // ISO date string
+  trading_day: number;
+  values: Record<string, number>; // agent_id -> portfolio_value
+}
+
+export interface PerformanceResponse {
+  data_points: PerformanceDataPoint[];
+}
+
+// ==============================================================================
 // Agent Detail Types
 // ==============================================================================
 
