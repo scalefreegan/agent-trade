@@ -430,8 +430,9 @@ Create comprehensive documentation in `docs/experiment/`:
 - [x] **Phase 3 Verification Complete** (2026-02-16)
 
 ### Phase 4: Agent System
-- [ ] 25. **src/agent_trade/experiment/market_data.py** - Price fetching wrapper
-- [ ] 26. **src/agent_trade/experiment/agent_runner.py** - Spawn Claude agents
+- [x] 25. **src/agent_trade/experiment/market_data.py** - Price fetching wrapper (2026-02-16)
+- [x] 26. **src/agent_trade/experiment/agent_runner.py** - Spawn Claude agents (2026-02-16)
+- [x] **Phase 4 Verification Complete** (2026-02-16)
 
 ### Phase 5: Orchestration
 - [ ] 27. **src/agent_trade/experiment/coordinator.py** - Daily orchestration
@@ -463,10 +464,10 @@ Create comprehensive documentation in `docs/experiment/`:
 | 1 - Documentation | Complete | 9 | 9 |
 | 2 - Experiment Core | Complete | 5 | 5 |
 | 3 - State Management | Complete | 4 | 4 |
-| 4 - Agent System | Not Started | 2 | 0 |
+| 4 - Agent System | Complete | 3 | 3 |
 | 5 - Orchestration | Not Started | 3 | 0 |
 | 6 - CLI & Integration | Not Started | 3 | 0 |
-| **Total** | | **34** | **26** |
+| **Total** | | **35** | **29** |
 
 ---
 
