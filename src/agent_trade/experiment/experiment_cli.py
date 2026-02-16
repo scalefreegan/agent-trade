@@ -102,8 +102,7 @@ def init(
     save_game_state(experiment_id, game_state)
 
     # Create agent directories with initial strategy files
-    from .strategy_manager import StrategyManager
-    strategy_mgr = StrategyManager(exp_dir)
+    from .strategy_manager import save_strategy
 
     for agent in game_state.agents.values():
         agent_dir = exp_dir / "agents" / agent.agent_id
@@ -111,7 +110,7 @@ def init(
         (agent_dir / "decisions").mkdir(exist_ok=True)
 
         # Create initial strategy file
-        strategy_mgr.save_strategy(agent.agent_id, agent.strategy)
+        save_strategy(experiment_id, agent.agent_id, agent.strategy)
 
         # Create initial portfolio file
         portfolio_file = agent_dir / "portfolio.json"
@@ -160,7 +159,8 @@ def run(
         if success:
             console.print("[green]✓[/green] Daily cycle completed successfully")
         else:
-            console.print("[yellow]⚠[/yellow] Daily cycle completed with warnings or was skipped")
+            console.print("[yellow]⚠[/yellow] Daily cycle was skipped (not a trading day, paused, or error)")
+            raise typer.Exit(1)  # Exit code 1 for skipped/failed runs
 
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
