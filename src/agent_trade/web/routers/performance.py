@@ -2,6 +2,7 @@
 from fastapi import APIRouter
 
 from agent_trade.experiment.analysis_reporter import load_all_daily_outcomes
+from agent_trade.web.dependencies import validate_experiment_exists
 from agent_trade.web.schemas import PerformanceDataPoint, PerformanceResponse
 
 router = APIRouter(prefix="/experiments/{experiment_id}", tags=["performance"])
@@ -17,6 +18,9 @@ async def get_performance(
     Returns daily portfolio values for each agent across all trading days.
     Uses portfolio_values from each DailyOutcome.
     """
+    # Validate experiment exists (raises 404 if not)
+    validate_experiment_exists(experiment_id)
+
     # Load all daily outcomes
     outcomes = load_all_daily_outcomes(experiment_id)
 
