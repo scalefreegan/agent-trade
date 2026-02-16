@@ -12,6 +12,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
+from pydantic import ValidationError
+
 from .models import ExperimentConfig
 
 logger = logging.getLogger(__name__)
@@ -107,7 +109,7 @@ def load_config(experiment_id: str) -> Optional[ExperimentConfig]:
     except (OSError, json.JSONDecodeError) as e:
         logger.error(f"Failed to load config for experiment {experiment_id}: {e}")
         raise
-    except Exception as e:
+    except ValidationError as e:
         logger.error(f"Failed to validate config for experiment {experiment_id}: {e}")
         raise
 
@@ -140,9 +142,9 @@ def list_experiments() -> list[tuple[str, str]]:
                 experiment_id = exp_dir.name
                 name = data.get("name", experiment_id)
                 experiments.append((experiment_id, name))
-        except (json.JSONDecodeError, KeyError) as e:
-            # Skip malformed configs
-            logger.debug(f"Skipping malformed config in {exp_dir}: {e}")
+        except (OSError, json.JSONDecodeError, KeyError) as e:
+            # Skip inaccessible or malformed configs
+            logger.debug(f"Skipping config in {exp_dir}: {e}")
             continue
 
     return sorted(experiments)
@@ -153,14 +155,22 @@ def generate_experiment_id() -> str:
     Generate a unique experiment ID.
 
     Format: exp_YYYYMMDD_NNN (e.g., exp_20260215_001)
+
+    Raises:
+        RuntimeError: If more than 999 experiments created in one day
     """
     base_dir = Path.home() / ".agent-trade" / "experiments"
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
 
-    # Find the next available number for today
+    # Find the next available number for today (max 999)
     counter = 1
-    while True:
+    while counter <= 999:
         exp_id = f"exp_{date_str}_{counter:03d}"
         if not (base_dir / exp_id).exists():
             return exp_id
         counter += 1
+
+    # Counter overflow - more than 999 experiments created today
+    raise RuntimeError(
+        f"Experiment ID overflow: more than 999 experiments created on {date_str}"
+    )

@@ -205,9 +205,8 @@ def parse_daily_decision(markdown: str, agent_id: str, date: str) -> DailyDecisi
     2. Have agents output structured JSON directly
     3. Use this as a partial parser and extract orders/updates separately
 
-    Raises:
-        NotImplementedError: If the parser is used in a context where complete
-                            parsing is required
+    Returns empty orders list and None for strategy_updates. Callers requiring
+    complete parsing should implement their own or use structured input.
     """
     # Extract sections (simplified parsing)
     research_notes = ""
