@@ -16,7 +16,7 @@ from .models import ExperimentConfig, GameState, AgentState
 from . import daily_runner
 from . import analysis_reporter
 from .market_data import get_current_prices
-from .config import create_experiment_config
+from .config import create_experiment_config, save_config
 
 app = typer.Typer(
     name="agent-trade-experiment",
@@ -378,6 +378,7 @@ def pause(
 
         game_state.config.status = "paused"
         save_game_state(experiment_id, game_state)
+        save_config(game_state.config)  # Keep config.json in sync
 
         console.print(f"[green]✓[/green] Experiment paused")
 
@@ -405,6 +406,7 @@ def resume(
 
         game_state.config.status = "active"
         save_game_state(experiment_id, game_state)
+        save_config(game_state.config)  # Keep config.json in sync
 
         console.print(f"[green]✓[/green] Experiment resumed")
 
