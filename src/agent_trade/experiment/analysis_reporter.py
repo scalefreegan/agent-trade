@@ -16,7 +16,7 @@ from typing import Any, Optional
 from .config import get_experiment_dir
 from .coordinator import load_game_state
 from .market_data import get_current_prices
-from .models import DailyOutcome, ExecutedTransaction, GameState
+from .models import DailyOutcome, GameState
 
 logger = logging.getLogger(__name__)
 

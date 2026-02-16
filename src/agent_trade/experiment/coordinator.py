@@ -134,6 +134,15 @@ def process_daily_cycle(
                             f"(max: {game_state.config.max_position_pct * 100:.0f}%)"
                         )
 
+                elif order.action == "sell":
+                    # Check minimum trade value for sells
+                    sell_value = order.amount * current_price
+                    if sell_value < game_state.config.min_trade_amount:
+                        raise ValueError(
+                            f"Sell value ${sell_value:.2f} below minimum "
+                            f"${game_state.config.min_trade_amount:.2f}"
+                        )
+
                 # Execute the order
                 txn = execute_order(
                     portfolio=agent.portfolio,
