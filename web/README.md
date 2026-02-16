@@ -6,8 +6,10 @@ React-based web UI for visualizing and controlling multi-agent trading experimen
 
 ### Prerequisites
 
-- Node.js 18+
-- npm or yarn
+- Node.js 20+ (required for Vite 7, React 19, and React Router 7)
+  - Check your version: `node --version`
+  - Install/update: [nodejs.org](https://nodejs.org/) or use [nvm](https://github.com/nvm-sh/nvm)
+- npm 10+ (comes with Node.js 20+)
 - Python 3.10+ with `agent-trade[web]` installed
 
 ### Setup
