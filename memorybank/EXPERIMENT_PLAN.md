@@ -398,19 +398,20 @@ Create comprehensive documentation in `docs/experiment/`:
 - [x] **Phase 1 Verification Complete** (2026-02-15)
 
 ### Phase 2: Experiment Core
-- [ ] 18. **src/agent_trade/experiment/__init__.py** - Package init
-- [ ] 19. **src/agent_trade/experiment/models.py** - Experiment Pydantic models
+- [x] 18. **src/agent_trade/experiment/__init__.py** - Package init (2026-02-15)
+- [x] 19. **src/agent_trade/experiment/models.py** - Experiment Pydantic models (2026-02-15)
   - TaxLot (shares, cost_basis, purchase_date)
   - StockPosition (symbol, lots[])
   - LotSale (holding period, tax rate, tax amount)
   - ExecutedTransaction (with lot_sales[])
   - ExperimentConfig (short_term_tax_rate, long_term_tax_rate, long_term_holding_days)
   - Portfolio, Order, AgentStrategy, GameState, DailyDecision
-- [ ] 20. **src/agent_trade/experiment/config.py** - Config loading/defaults
+- [x] 20. **src/agent_trade/experiment/config.py** - Config loading/defaults (2026-02-15)
   - Default short_term_tax_rate = 0.35
   - Default long_term_tax_rate = 0.15
   - Default long_term_holding_days = 365
-- [ ] 21. **src/agent_trade/experiment/templates.py** - Strategy/decision templates
+- [x] 21. **src/agent_trade/experiment/templates.py** - Strategy/decision templates (2026-02-15)
+- [x] **Phase 2 Verification Complete** (2026-02-15)
 
 ### Phase 3: State Management
 - [ ] 22. **src/agent_trade/experiment/portfolio_tracker.py** - Portfolio state
@@ -459,12 +460,12 @@ Create comprehensive documentation in `docs/experiment/`:
 |-------|--------|-------|-----------|
 | 0 - Pydantic Foundation | Complete | 8 | 8 |
 | 1 - Documentation | Complete | 9 | 9 |
-| 2 - Experiment Core | Not Started | 4 | 0 |
+| 2 - Experiment Core | Complete | 5 | 5 |
 | 3 - State Management | Not Started | 3 | 0 |
 | 4 - Agent System | Not Started | 2 | 0 |
 | 5 - Orchestration | Not Started | 3 | 0 |
 | 6 - CLI & Integration | Not Started | 3 | 0 |
-| **Total** | | **32** | **17** |
+| **Total** | | **33** | **22** |
 
 ---
 
