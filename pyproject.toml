@@ -21,6 +21,12 @@ agent = [
     "rich>=13.0.0"
 ]
 
+# Optional: for running tests
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
 [project.scripts]
 # Run as standalone MCP server
 agent-trade = "agent_trade.server:main"
