@@ -139,10 +139,12 @@ async def spawn_all_agents(
     # Spawn all agents in parallel
     agent_tasks = []
     agent_ids = []
+    decisions_dirs = {}
 
     for agent in agents:
         decisions_dir = decisions_base_dir / agent.agent_id / "decisions"
         decisions_dir.mkdir(parents=True, exist_ok=True)
+        decisions_dirs[agent.agent_id] = decisions_dir
 
         task = asyncio.wait_for(
             spawn_agent(agent, config, date, current_prices, decisions_dir),
@@ -159,20 +161,32 @@ async def spawn_all_agents(
     for agent_id, result in zip(agent_ids, gathered_results):
         if isinstance(result, asyncio.TimeoutError):
             # Create timeout decision
+            error_msg = f"TIMEOUT: Agent exceeded {timeout} second limit"
             logger.warning(f"Agent {agent_id} exceeded timeout on {date}")
+
+            # Persist error decision for audit trail
+            decision_file = decisions_dirs[agent_id] / f"{date}.md"
+            decision_file.write_text(f"# Daily Trading Decision: {date}\n\n{error_msg}\n")
+
             results[agent_id] = DailyDecision(
                 date=date,
-                research_notes=f"TIMEOUT: Agent exceeded {timeout} second limit",
+                research_notes=error_msg,
                 orders=[],
                 strategy_updates=None,
                 execution_time_ms=timeout * 1000,
             )
         elif isinstance(result, Exception):
             # Create error decision
+            error_msg = f"ERROR: {str(result)}"
             logger.error(f"Agent {agent_id} failed on {date}: {result}")
+
+            # Persist error decision for audit trail
+            decision_file = decisions_dirs[agent_id] / f"{date}.md"
+            decision_file.write_text(f"# Daily Trading Decision: {date}\n\n{error_msg}\n")
+
             results[agent_id] = DailyDecision(
                 date=date,
-                research_notes=f"ERROR: {str(result)}",
+                research_notes=error_msg,
                 orders=[],
                 strategy_updates=None,
                 execution_time_ms=0.0,
