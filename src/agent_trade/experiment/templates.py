@@ -105,7 +105,9 @@ def render_daily_decision_template(
         current_prices: Current market prices
         config: Experiment config (if None, uses default values in template)
     """
-    # Calculate current portfolio value (strict=False for backward compatibility)
+    # Calculate current portfolio value (strict=False to avoid errors)
+    # Track missing prices for transparency
+    missing_prices = []
     total_value = portfolio.total_value(current_prices, strict=False)
 
     # Format current positions
@@ -113,19 +115,31 @@ def render_daily_decision_template(
     if portfolio.positions:
         for pos in portfolio.positions:
             current_price = current_prices.get(pos.symbol, Decimal("0"))
+            if pos.symbol not in current_prices:
+                missing_prices.append(pos.symbol)
             position_value = pos.total_shares * current_price
             gain_loss = position_value - pos.total_cost
             gain_loss_pct = (
                 (gain_loss / pos.total_cost * 100) if pos.total_cost > 0 else Decimal("0")
             )
 
+            price_note = "" if pos.symbol in current_prices else " ⚠️ (price unavailable)"
             positions_md += f"""- **{pos.symbol}**: {pos.total_shares} shares @ avg ${pos.average_cost_basis:.2f}
-  - Current price: ${current_price:.2f}
+  - Current price: ${current_price:.2f}{price_note}
   - Position value: ${position_value:.2f}
   - Gain/Loss: ${gain_loss:.2f} ({gain_loss_pct:+.1f}%)
 """
     else:
         positions_md = "- *No positions held*\n"
+
+    # Add warning if prices are missing
+    price_warning = ""
+    if missing_prices:
+        price_warning = f"""
+⚠️ **Warning**: Market prices unavailable for {len(missing_prices)} symbol(s): {', '.join(missing_prices)}
+Portfolio value may be materially understated. These positions are valued at $0.00 until prices are available.
+
+"""
 
     return f"""# Daily Trading Decision: {date}
 
@@ -139,7 +153,7 @@ def render_daily_decision_template(
 {positions_md}
 **Total Portfolio Value**: ${total_value:.2f}
 
----
+{price_warning}---
 
 ## Market Research & Analysis
 

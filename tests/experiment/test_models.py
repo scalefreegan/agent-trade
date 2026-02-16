@@ -8,7 +8,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from src.agent_trade.experiment.models import (
+from agent_trade.experiment.models import (
     TaxLot,
     StockPosition,
     Portfolio,

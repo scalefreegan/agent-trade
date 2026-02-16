@@ -8,7 +8,7 @@ import pytest
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from src.agent_trade.experiment.models import (
+from agent_trade.experiment.models import (
     AgentStrategy,
     ExperimentConfig,
     InvestmentThesis,
@@ -17,7 +17,7 @@ from src.agent_trade.experiment.models import (
     StrategyLearning,
     TaxLot,
 )
-from src.agent_trade.experiment.templates import (
+from agent_trade.experiment.templates import (
     render_strategy_template,
     render_daily_decision_template,
     parse_daily_decision,

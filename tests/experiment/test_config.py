@@ -12,7 +12,7 @@ from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
-from src.agent_trade.experiment.config import (
+from agent_trade.experiment.config import (
     create_experiment_config,
     save_config,
     load_config,
@@ -20,7 +20,7 @@ from src.agent_trade.experiment.config import (
     generate_experiment_id,
     get_experiment_dir,
 )
-from src.agent_trade.experiment.models import ExperimentConfig
+from agent_trade.experiment.models import ExperimentConfig
 
 
 class TestCreateExperimentConfig:
@@ -65,7 +65,7 @@ class TestSaveAndLoadConfig:
     def test_save_and_load_cycle(self, tmp_path, monkeypatch):
         """Test saving and loading config."""
         # Use temp directory for test
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         config = create_experiment_config(
             experiment_id="test_save_load",
@@ -90,14 +90,14 @@ class TestSaveAndLoadConfig:
 
     def test_load_nonexistent_config(self, tmp_path, monkeypatch):
         """Test loading config that doesn't exist."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         result = load_config("nonexistent")
         assert result is None
 
     def test_load_malformed_json(self, tmp_path, monkeypatch):
         """Test loading config with malformed JSON."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         # Create directory and malformed JSON file
         config_dir = tmp_path / ".agent-trade" / "experiments" / "malformed"
@@ -112,7 +112,7 @@ class TestSaveAndLoadConfig:
         """Test loading config with invalid schema."""
         from pydantic import ValidationError
 
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         # Create directory and invalid config
         config_dir = tmp_path / ".agent-trade" / "experiments" / "invalid_schema"
@@ -125,7 +125,7 @@ class TestSaveAndLoadConfig:
 
     def test_save_creates_directories(self, tmp_path, monkeypatch):
         """Test that save_config creates necessary directories."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         config = create_experiment_config(
             experiment_id="test_mkdir",
@@ -148,14 +148,14 @@ class TestListExperiments:
 
     def test_list_empty(self, tmp_path, monkeypatch):
         """Test listing with no experiments."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         experiments = list_experiments()
         assert experiments == []
 
     def test_list_multiple_experiments(self, tmp_path, monkeypatch):
         """Test listing multiple experiments."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         # Create multiple configs
         configs = [
@@ -176,7 +176,7 @@ class TestListExperiments:
 
     def test_list_skips_malformed_configs(self, tmp_path, monkeypatch):
         """Test that list_experiments skips malformed configs."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         # Create valid config
         config = create_experiment_config("exp_valid", "Valid")
@@ -194,7 +194,7 @@ class TestListExperiments:
 
     def test_list_skips_inaccessible_configs(self, tmp_path, monkeypatch):
         """Test that list_experiments skips configs with read errors."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         # Create valid config
         config = create_experiment_config("exp_valid", "Valid")
@@ -211,7 +211,7 @@ class TestListExperiments:
 
     def test_list_uses_directory_name_as_id(self, tmp_path, monkeypatch):
         """Test that list_experiments uses directory name as canonical ID."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         # Create config with mismatched experiment_id in JSON
         config_dir = tmp_path / ".agent-trade" / "experiments" / "dir_name"
@@ -238,7 +238,7 @@ class TestGenerateExperimentId:
 
     def test_generate_id_format(self, tmp_path, monkeypatch):
         """Test that generated ID follows exp_YYYYMMDD_NNN format."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         exp_id = generate_experiment_id()
 
@@ -251,7 +251,7 @@ class TestGenerateExperimentId:
 
     def test_generate_increments_counter(self, tmp_path, monkeypatch):
         """Test that counter increments for existing IDs."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         # Create first experiment
         exp_id_1 = generate_experiment_id()
@@ -269,7 +269,7 @@ class TestGenerateExperimentId:
 
     def test_generate_overflow_raises_error(self, tmp_path, monkeypatch):
         """Test that counter overflow raises RuntimeError."""
-        monkeypatch.setattr("src.agent_trade.experiment.config.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent_trade.experiment.config.Path.home", lambda: tmp_path)
 
         # Create 1000 experiment directories (000-999)
         base_dir = tmp_path / ".agent-trade" / "experiments"
@@ -277,7 +277,7 @@ class TestGenerateExperimentId:
 
         # Mock the date to ensure consistent exp_YYYYMMDD prefix
         fixed_date = "20260215"
-        with patch("src.agent_trade.experiment.config.datetime") as mock_datetime:
+        with patch("agent_trade.experiment.config.datetime") as mock_datetime:
             mock_datetime.now.return_value.strftime.return_value = fixed_date
 
             # Create directories for all counters 001-999

@@ -143,8 +143,8 @@ def list_experiments() -> list[tuple[str, str]]:
                 name = data.get("name", experiment_id)
                 experiments.append((experiment_id, name))
         except (OSError, json.JSONDecodeError, KeyError) as e:
-            # Skip inaccessible or malformed configs
-            logger.debug(f"Skipping config in {exp_dir}: {e}")
+            # Skip inaccessible or malformed configs (log at warning level for visibility)
+            logger.warning(f"Skipping experiment config in {exp_dir}: {e}")
             continue
 
     return sorted(experiments)
