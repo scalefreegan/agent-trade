@@ -6,8 +6,8 @@ given their portfolio state and strategy, and asked to make trading decisions.
 """
 
 import asyncio
+import logging
 import time
-from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
@@ -15,7 +15,8 @@ from typing import Optional
 from ..claude_wrapper import query_claude_code
 from .market_data import get_current_prices
 from .models import AgentState, DailyDecision, ExperimentConfig, Order, StrategyLearning
-from .templates import render_daily_decision_template
+
+logger = logging.getLogger(__name__)
 
 
 async def spawn_agent(
@@ -74,9 +75,16 @@ async def spawn_agent(
     except asyncio.TimeoutError:
         # Agent timed out
         execution_time = (time.time() - start_time) * 1000
+        error_msg = f"TIMEOUT: Agent did not respond within time limit"
+        logger.warning(f"Agent {agent.agent_id} timed out on {date}")
+
+        # Persist error decision for audit trail
+        decision_file = decisions_dir / f"{date}.md"
+        decision_file.write_text(f"# Daily Trading Decision: {date}\n\n{error_msg}\n")
+
         return DailyDecision(
             date=date,
-            research_notes=f"TIMEOUT: Agent did not respond within time limit",
+            research_notes=error_msg,
             orders=[],
             strategy_updates=None,
             execution_time_ms=execution_time,
@@ -84,9 +92,16 @@ async def spawn_agent(
     except Exception as e:
         # Other errors
         execution_time = (time.time() - start_time) * 1000
+        error_msg = f"ERROR: {str(e)}"
+        logger.error(f"Agent {agent.agent_id} failed on {date}: {e}")
+
+        # Persist error decision for audit trail
+        decision_file = decisions_dir / f"{date}.md"
+        decision_file.write_text(f"# Daily Trading Decision: {date}\n\n{error_msg}\n")
+
         return DailyDecision(
             date=date,
-            research_notes=f"ERROR: {str(e)}",
+            research_notes=error_msg,
             orders=[],
             strategy_updates=None,
             execution_time_ms=execution_time,
@@ -122,7 +137,9 @@ async def spawn_all_agents(
     current_prices = get_current_prices(list(all_symbols))
 
     # Spawn all agents in parallel
-    tasks = []
+    agent_tasks = []
+    agent_ids = []
+
     for agent in agents:
         decisions_dir = decisions_base_dir / agent.agent_id / "decisions"
         decisions_dir.mkdir(parents=True, exist_ok=True)
@@ -131,16 +148,18 @@ async def spawn_all_agents(
             spawn_agent(agent, config, date, current_prices, decisions_dir),
             timeout=timeout,
         )
-        tasks.append((agent.agent_id, task))
+        agent_tasks.append(task)
+        agent_ids.append(agent.agent_id)
 
-    # Gather results
+    # Execute all tasks in parallel
+    gathered_results = await asyncio.gather(*agent_tasks, return_exceptions=True)
+
+    # Process results
     results = {}
-    for agent_id, task in tasks:
-        try:
-            decision = await task
-            results[agent_id] = decision
-        except asyncio.TimeoutError:
+    for agent_id, result in zip(agent_ids, gathered_results):
+        if isinstance(result, asyncio.TimeoutError):
             # Create timeout decision
+            logger.warning(f"Agent {agent_id} exceeded timeout on {date}")
             results[agent_id] = DailyDecision(
                 date=date,
                 research_notes=f"TIMEOUT: Agent exceeded {timeout} second limit",
@@ -148,15 +167,19 @@ async def spawn_all_agents(
                 strategy_updates=None,
                 execution_time_ms=timeout * 1000,
             )
-        except Exception as e:
+        elif isinstance(result, Exception):
             # Create error decision
+            logger.error(f"Agent {agent_id} failed on {date}: {result}")
             results[agent_id] = DailyDecision(
                 date=date,
-                research_notes=f"ERROR: {str(e)}",
+                research_notes=f"ERROR: {str(result)}",
                 orders=[],
                 strategy_updates=None,
                 execution_time_ms=0.0,
             )
+        else:
+            # Success
+            results[agent_id] = result
 
     return results
 
@@ -168,15 +191,29 @@ def _build_system_prompt(
     current_prices: dict[str, Decimal],
 ) -> str:
     """Build system prompt with agent context."""
-    # Format portfolio positions
+    # Check for missing prices and build warning
+    missing_prices = []
     positions_text = ""
+    price_warning = ""
+
     if agent.portfolio.positions:
         for pos in agent.portfolio.positions:
-            current_price = current_prices.get(pos.symbol, Decimal("0"))
+            if pos.symbol not in current_prices:
+                missing_prices.append(pos.symbol)
+                current_price = Decimal("0")
+                price_warning_mark = " ⚠️ (price unavailable)"
+            else:
+                current_price = current_prices[pos.symbol]
+                price_warning_mark = ""
+
             position_value = pos.total_shares * current_price
-            positions_text += f"- {pos.symbol}: {pos.total_shares} shares @ ${pos.average_cost_basis:.2f}/share (current: ${current_price:.2f}, value: ${position_value:.2f})\n"
+            positions_text += f"- {pos.symbol}: {pos.total_shares} shares @ ${pos.average_cost_basis:.2f}/share (current: ${current_price:.2f}, value: ${position_value:.2f}){price_warning_mark}\n"
     else:
         positions_text = "- No positions held\n"
+
+    # Add warning about missing prices
+    if missing_prices:
+        price_warning = f"\n⚠️ **WARNING**: Market prices unavailable for {len(missing_prices)} symbol(s): {', '.join(missing_prices)}. These positions are valued at $0 in the total below, which may materially understate your actual portfolio value.\n"
 
     # Format recent learnings
     learnings_text = ""
@@ -188,7 +225,7 @@ def _build_system_prompt(
     else:
         learnings_text = "*No learnings recorded yet*\n"
 
-    # Calculate total portfolio value (using strict=False to avoid KeyError)
+    # Calculate total portfolio value (with strict=False but we've warned about missing prices)
     total_value = agent.portfolio.total_value(current_prices, strict=False)
 
     return f"""# Trading Agent: {agent.name} ({agent.agent_id})
@@ -202,7 +239,7 @@ You are an autonomous trading agent competing in a stock market simulation. Your
 **Positions**:
 {positions_text}
 **Total Portfolio Value**: ${total_value:.2f}
-
+{price_warning}
 ## Your Strategy
 
 {agent.strategy.thesis.philosophy}
@@ -370,8 +407,8 @@ def _parse_agent_response(
     section_content = []
 
     for line in lines:
-        # Check for section headers
-        if line.startswith("##"):
+        # Check for section headers (only H2, not H3 or deeper)
+        if line.startswith("## ") and not line.startswith("### "):
             # Save previous section
             if current_section and section_content:
                 content = "\n".join(section_content).strip()
@@ -436,6 +473,17 @@ def _parse_orders(content: str) -> list[Order]:
 
         # Look for order headers
         if "**BUY" in line_upper or "**SELL" in line_upper:
+            # If we have a pending order with amount, finalize it first
+            if current_order and current_order["amount"] is not None:
+                orders.append(
+                    Order(
+                        action=current_order["action"],
+                        symbol=current_order["symbol"],
+                        amount=current_order["amount"],
+                        reasoning=current_order["reasoning"],
+                    )
+                )
+
             # Parse action and symbol
             # Example: "**BUY AAPL**" or "**SELL TSLA**"
             parts = line.replace("*", "").strip().split()
@@ -461,22 +509,21 @@ def _parse_orders(content: str) -> list[Order]:
             except (ValueError, TypeError):
                 pass
 
-        # Look for reasoning
+        # Look for reasoning (optional)
         elif "reasoning:" in line.lower() and current_order:
             reasoning_text = line.split(":", 1)[1].strip()
             current_order["reasoning"] = reasoning_text
 
-            # If we have all required fields, create Order
-            if current_order["amount"] is not None:
-                orders.append(
-                    Order(
-                        action=current_order["action"],
-                        symbol=current_order["symbol"],
-                        amount=current_order["amount"],
-                        reasoning=current_order["reasoning"],
-                    )
-                )
-                current_order = None
+    # Finalize any pending order
+    if current_order and current_order["amount"] is not None:
+        orders.append(
+            Order(
+                action=current_order["action"],
+                symbol=current_order["symbol"],
+                amount=current_order["amount"],
+                reasoning=current_order["reasoning"],
+            )
+        )
 
     return orders
 

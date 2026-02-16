@@ -4,11 +4,14 @@ Market data wrapper for the trading experiment.
 Provides a simple interface for fetching current stock prices during daily processing.
 """
 
+import logging
 from decimal import Decimal
 from typing import Optional
 
 from ..stock_data import get_stock_info
 from ..models import StockInfo
+
+logger = logging.getLogger(__name__)
 
 
 def get_current_price(symbol: str) -> Optional[Decimal]:
@@ -24,8 +27,9 @@ def get_current_price(symbol: str) -> Optional[Decimal]:
     try:
         stock_info: StockInfo = get_stock_info(symbol)
         return stock_info.current_price
-    except Exception:
-        # Return None if we can't get the price (network error, invalid symbol, etc.)
+    except Exception as e:
+        # Log the failure and return None
+        logger.warning(f"Failed to fetch price for {symbol}: {e}")
         return None
 
 
