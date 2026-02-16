@@ -41,7 +41,7 @@ class TaxLotResponse(BaseModel):
 
     shares: float
     cost_basis: float
-    purchase_date: date
+    purchase_date: datetime
 
     @field_serializer("shares", "cost_basis")
     def serialize_decimal(self, v: Any) -> float:

@@ -22,7 +22,7 @@ export interface ExperimentDetail {
 export interface TaxLot {
   shares: number;
   cost_basis: number;
-  purchase_date: string;
+  purchase_date: string; // ISO datetime string
 }
 
 export interface StockPosition {

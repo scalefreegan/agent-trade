@@ -16,21 +16,30 @@ async def get_experiments() -> list[ExperimentListItem]:
     experiments = list_experiments()
     result = []
     for exp_id, name in experiments:
-        config = load_experiment_config(exp_id)
-        # Load game state to get current day if available
-        game_state = load_game_state(exp_id)
-        current_day = game_state.trading_day if game_state else None
+        try:
+            config = load_experiment_config(exp_id)
+            # Load game state to get current day if available
+            # Handle potential JSON/filesystem errors gracefully
+            try:
+                game_state = load_game_state(exp_id)
+                current_day = game_state.trading_day if game_state else None
+            except Exception:
+                # If game state is malformed, skip current_day
+                current_day = None
 
-        result.append(
-            ExperimentListItem(
-                id=exp_id,
-                name=name,
-                created_at=config.created_at,
-                num_agents=config.num_agents,
-                status=config.status,
-                current_day=current_day,
+            result.append(
+                ExperimentListItem(
+                    id=exp_id,
+                    name=name,
+                    created_at=config.created_at,
+                    num_agents=config.num_agents,
+                    status=config.status,
+                    current_day=current_day,
+                )
             )
-        )
+        except Exception:
+            # Skip experiments with malformed configs
+            continue
     return result
 
 
@@ -41,8 +50,13 @@ async def get_experiment(
 ) -> ExperimentDetail:
     """Get experiment details."""
     # Load game state to get current day if available
-    game_state = load_game_state(experiment_id)
-    current_day = game_state.trading_day if game_state else None
+    # Handle potential JSON/filesystem errors gracefully
+    try:
+        game_state = load_game_state(experiment_id)
+        current_day = game_state.trading_day if game_state else None
+    except Exception:
+        # If game state is malformed, skip current_day
+        current_day = None
 
     return ExperimentDetail(
         id=experiment_id,

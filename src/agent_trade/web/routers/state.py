@@ -53,7 +53,7 @@ async def get_game_state(
                 symbol=position.symbol,
                 total_shares=float(total_shares),
                 total_cost_basis=float(total_cost),
-                current_price=float(current_price) if current_price else None,
+                current_price=float(current_price) if current_price is not None else None,
                 current_value=current_value,
                 unrealized_gain=unrealized_gain,
                 lots=[
