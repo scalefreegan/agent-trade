@@ -1,6 +1,4 @@
 """Shared dependencies for FastAPI routes."""
-from pathlib import Path
-
 from fastapi import HTTPException
 
 from agent_trade.experiment.config import load_config, list_experiments
@@ -8,32 +6,33 @@ from agent_trade.experiment.coordinator import load_game_state
 from agent_trade.experiment.models import ExperimentConfig, GameState
 
 
-def get_experiment_path(experiment_id: str) -> Path:
-    """Get experiment directory path."""
+def validate_experiment_exists(experiment_id: str) -> None:
+    """Validate that experiment exists, raise 404 if not."""
     experiments = list_experiments()
-    for exp in experiments:
-        if exp["id"] == experiment_id:
-            return exp["path"]
-    raise HTTPException(status_code=404, detail=f"Experiment {experiment_id} not found")
+    experiment_ids = [exp_id for exp_id, _ in experiments]
+    if experiment_id not in experiment_ids:
+        raise HTTPException(
+            status_code=404, detail=f"Experiment {experiment_id} not found"
+        )
 
 
 def load_experiment_config(experiment_id: str) -> ExperimentConfig:
     """Load experiment configuration."""
-    exp_path = get_experiment_path(experiment_id)
-    try:
-        return load_config(exp_path)
-    except Exception as e:
+    validate_experiment_exists(experiment_id)
+    config = load_config(experiment_id)
+    if config is None:
         raise HTTPException(
-            status_code=500, detail=f"Failed to load experiment config: {e}"
+            status_code=404, detail=f"Config not found for experiment {experiment_id}"
         )
+    return config
 
 
 def load_experiment_state(experiment_id: str) -> GameState:
     """Load game state for experiment."""
-    exp_path = get_experiment_path(experiment_id)
-    try:
-        return load_game_state(exp_path)
-    except Exception as e:
+    validate_experiment_exists(experiment_id)
+    state = load_game_state(experiment_id)
+    if state is None:
         raise HTTPException(
-            status_code=500, detail=f"Failed to load game state: {e}"
+            status_code=404, detail=f"Game state not found for experiment {experiment_id}"
         )
+    return state

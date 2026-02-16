@@ -1,7 +1,8 @@
 """Experiment endpoints."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 
 from agent_trade.experiment.config import list_experiments
+from agent_trade.experiment.coordinator import load_game_state
 from agent_trade.experiment.models import ExperimentConfig
 from agent_trade.web.dependencies import load_experiment_config
 from agent_trade.web.schemas import ExperimentDetail, ExperimentListItem
@@ -14,16 +15,20 @@ async def get_experiments() -> list[ExperimentListItem]:
     """List all experiments."""
     experiments = list_experiments()
     result = []
-    for exp in experiments:
-        config = load_experiment_config(exp["id"])
+    for exp_id, name in experiments:
+        config = load_experiment_config(exp_id)
+        # Load game state to get current day if available
+        game_state = load_game_state(exp_id)
+        current_day = game_state.trading_day if game_state else None
+
         result.append(
             ExperimentListItem(
-                id=exp["id"],
-                name=exp["name"],
+                id=exp_id,
+                name=name,
                 start_date=config.start_date,
                 num_agents=len(config.agents),
-                status=exp["status"],
-                current_day=exp.get("current_day"),
+                status=config.status,
+                current_day=current_day,
             )
         )
     return result
@@ -31,36 +36,21 @@ async def get_experiments() -> list[ExperimentListItem]:
 
 @router.get("/{experiment_id}", response_model=ExperimentDetail)
 async def get_experiment(
+    experiment_id: str = Path(..., description="Experiment ID"),
     config: ExperimentConfig = Depends(load_experiment_config),
 ) -> ExperimentDetail:
     """Get experiment details."""
-    from agent_trade.experiment.config import list_experiments
-
-    # Find experiment in list to get ID and status
-    experiments = list_experiments()
-    exp_info = None
-    for exp in experiments:
-        # Match by name since we have the config
-        if exp["name"] == config.name:
-            exp_info = exp
-            break
-
-    if not exp_info:
-        # Fallback: use config name as ID
-        exp_info = {
-            "id": config.name.lower().replace(" ", "-"),
-            "name": config.name,
-            "status": "active",
-            "current_day": None,
-        }
+    # Load game state to get current day if available
+    game_state = load_game_state(experiment_id)
+    current_day = game_state.trading_day if game_state else None
 
     return ExperimentDetail(
-        id=exp_info["id"],
+        id=experiment_id,
         name=config.name,
         start_date=config.start_date,
         end_date=config.end_date,
         starting_cash=float(config.starting_cash),
         num_agents=len(config.agents),
-        status=exp_info["status"],
-        current_day=exp_info.get("current_day"),
+        status=config.status,
+        current_day=current_day,
     )
