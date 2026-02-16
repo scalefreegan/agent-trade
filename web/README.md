@@ -28,7 +28,8 @@ uv pip install -e ".[web]"
 
 1. Start the FastAPI backend (from project root):
 ```bash
-agent-trade-web
+# Development mode (hot reload, binds to 0.0.0.0)
+AGENT_TRADE_ENV=dev agent-trade-web
 ```
 This starts the API server on http://localhost:8000
 
@@ -40,6 +41,25 @@ npm run dev
 This starts the frontend on http://localhost:5173 with hot reload.
 
 The Vite dev server proxies `/api` requests to the FastAPI backend.
+
+### Environment Variables
+
+The backend server supports the following environment variables:
+
+- `AGENT_TRADE_ENV`: Set to `dev` or `development` for development mode (default: `production`)
+  - **Dev mode**: Binds to `0.0.0.0`, enables hot reload
+  - **Production mode**: Binds to `127.0.0.1`, no reload
+- `PORT`: Server port (default: `8000`)
+- `LOG_LEVEL`: Logging level (default: `info`)
+
+**Production example:**
+```bash
+# Binds to 127.0.0.1:8000, no reload
+agent-trade-web
+
+# Custom port
+PORT=3000 agent-trade-web
+```
 
 ### Building for Production
 

@@ -1,9 +1,9 @@
 """Response schemas for API - converts Decimal to float for JSON serialization."""
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, field_serializer
 
 
 class ExperimentListItem(BaseModel):

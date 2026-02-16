@@ -45,14 +45,19 @@ if static_dir.exists():
 
 def main() -> None:
     """Entry point for agent-trade-web command."""
+    import os
     import uvicorn
+
+    # Check environment - default to production settings
+    env = os.getenv("AGENT_TRADE_ENV", "production").lower()
+    is_dev = env in ("dev", "development")
 
     uvicorn.run(
         "agent_trade.web.api:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info",
+        host="127.0.0.1" if not is_dev else "0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),
+        reload=is_dev,
+        log_level=os.getenv("LOG_LEVEL", "info").lower(),
     )
 
 
