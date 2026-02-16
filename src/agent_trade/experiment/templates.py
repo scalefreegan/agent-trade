@@ -4,12 +4,14 @@ Document templates for agent strategy and daily decisions.
 These templates structure how agents document their strategies and daily trading decisions.
 """
 
-from datetime import datetime
+import random
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from .models import (
     AgentStrategy,
     DailyDecision,
+    ExperimentConfig,
     InvestmentThesis,
     Order,
     Portfolio,
@@ -57,9 +59,12 @@ def render_strategy_template(strategy: AgentStrategy) -> str:
         else "None specified"
     )
 
+    # Format timestamp with timezone info
+    tz_name = "UTC" if strategy.last_updated.tzinfo else "local"
+
     return f"""# Agent Investment Strategy
 
-**Last Updated**: {strategy.last_updated.strftime("%Y-%m-%d %H:%M:%S UTC")}
+**Last Updated**: {strategy.last_updated.strftime("%Y-%m-%d %H:%M:%S")} {tz_name}
 
 ## Investment Thesis
 
@@ -85,15 +90,23 @@ def render_daily_decision_template(
     date: str,
     portfolio: Portfolio,
     current_prices: dict[str, Decimal],
+    config: ExperimentConfig | None = None,
 ) -> str:
     """
     Render template for agent's daily decision output.
 
     This template guides agents to structure their daily trading decisions
     in a consistent format.
+
+    Args:
+        agent_id: Agent identifier
+        date: Trading date (YYYY-MM-DD)
+        portfolio: Current portfolio state
+        current_prices: Current market prices
+        config: Experiment config (if None, uses default values in template)
     """
-    # Calculate current portfolio value
-    total_value = portfolio.total_value(current_prices)
+    # Calculate current portfolio value (strict=False for backward compatibility)
+    total_value = portfolio.total_value(current_prices, strict=False)
 
     # Format current positions
     positions_md = ""
@@ -173,11 +186,11 @@ def render_daily_decision_template(
 ## Trading Rules Reminder
 
 - **Tax Rates** (tiered by holding period):
-  - Short-term (< 1 year): 35% on capital gains
-  - Long-term (>= 1 year): 15% on capital gains
+  - Short-term (< {config.long_term_holding_days if config else 365} days): {int((config.short_term_tax_rate if config else Decimal("0.35")) * 100)}% on capital gains
+  - Long-term (>= {config.long_term_holding_days if config else 365} days): {int((config.long_term_tax_rate if config else Decimal("0.15")) * 100)}% on capital gains
   - FIFO accounting: oldest shares sold first
-- **Max Position**: 50% of portfolio in one stock
-- **Min Trade**: $1.00
+- **Max Position**: {int((config.max_position_pct if config else Decimal("0.50")) * 100)}% of portfolio in one stock
+- **Min Trade**: ${config.min_trade_amount if config else Decimal("1.00")}
 - **No Short Selling**: Can only sell stocks you own
 """
 
@@ -186,8 +199,15 @@ def parse_daily_decision(markdown: str, agent_id: str, date: str) -> DailyDecisi
     """
     Parse daily decision markdown into structured DailyDecision model.
 
-    This is a simplified parser - in production, you'd want more robust parsing
-    or have agents output structured JSON directly.
+    Note: This is a simplified parser that extracts research notes but does not
+    parse orders or strategy updates. For production use, either:
+    1. Implement full markdown parsing
+    2. Have agents output structured JSON directly
+    3. Use this as a partial parser and extract orders/updates separately
+
+    Raises:
+        NotImplementedError: If the parser is used in a context where complete
+                            parsing is required
     """
     # Extract sections (simplified parsing)
     research_notes = ""
@@ -197,18 +217,28 @@ def parse_daily_decision(markdown: str, agent_id: str, date: str) -> DailyDecisi
     # Split by sections
     sections = markdown.split("---")
 
-    # Extract research notes (section after "Market Research & Analysis")
-    for i, section in enumerate(sections):
+    # Extract research notes from the section containing "Market Research & Analysis"
+    for section in sections:
         if "Market Research & Analysis" in section:
-            if i + 1 < len(sections):
-                research_notes = sections[i + 1].strip()
-                break
+            # Extract content after the heading within this section
+            lines = section.split("\n")
+            # Find the heading line
+            start_idx = 0
+            for idx, line in enumerate(lines):
+                if "Market Research & Analysis" in line:
+                    start_idx = idx + 1
+                    break
+            # Join all lines after the heading
+            research_notes = "\n".join(lines[start_idx:]).strip()
+            break
 
     # Extract orders (section after "Trading Decisions")
-    # This would require more sophisticated parsing in production
+    # TODO: Implement order parsing from markdown
+    # For now, returns empty list - callers should use structured input
 
     # Extract strategy updates (section after "Strategy Updates")
-    # This would require more sophisticated parsing in production
+    # TODO: Implement strategy update parsing from markdown
+    # For now, returns None - callers should use structured input
 
     return DailyDecision(
         date=date,
@@ -225,8 +255,6 @@ def create_default_strategy(agent_id: str, name: str) -> AgentStrategy:
 
     Strategies are randomized to create diversity among agents.
     """
-    import random
-
     philosophies = [
         "Value investing focused on undervalued companies with strong fundamentals",
         "Growth investing targeting high-potential technology and innovation leaders",
@@ -297,5 +325,5 @@ opportunities are too compelling to pass up despite the tax drag.
         thesis=thesis,
         rationale=rationale.strip(),
         learnings=[],
-        last_updated=datetime.now(),
+        last_updated=datetime.now(timezone.utc),
     )

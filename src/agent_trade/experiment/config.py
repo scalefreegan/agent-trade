@@ -6,12 +6,15 @@ sensible defaults for new experiments.
 """
 
 import json
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
 from .models import ExperimentConfig
+
+logger = logging.getLogger(__name__)
 
 
 # Default configuration values
@@ -58,27 +61,55 @@ def create_experiment_config(
 
 
 def save_config(config: ExperimentConfig) -> None:
-    """Save experiment config to disk."""
-    experiment_dir = get_experiment_dir(config.experiment_id)
-    experiment_dir.mkdir(parents=True, exist_ok=True)
+    """
+    Save experiment config to disk.
 
-    config_path = experiment_dir / "config.json"
-    with open(config_path, "w") as f:
-        # Use model_dump with mode="json" to convert Decimals to strings
-        json.dump(config.model_dump(mode="json"), f, indent=2, default=str)
+    Raises:
+        OSError: If directory creation or file write fails
+    """
+    try:
+        experiment_dir = get_experiment_dir(config.experiment_id)
+        experiment_dir.mkdir(parents=True, exist_ok=True)
+
+        config_path = experiment_dir / "config.json"
+        with open(config_path, "w") as f:
+            # Use model_dump with mode="json" to convert Decimals to strings
+            json.dump(config.model_dump(mode="json"), f, indent=2, default=str)
+        logger.info(f"Saved config for experiment {config.experiment_id} to {config_path}")
+    except OSError as e:
+        logger.error(f"Failed to save config for experiment {config.experiment_id}: {e}")
+        raise
 
 
 def load_config(experiment_id: str) -> Optional[ExperimentConfig]:
-    """Load experiment config from disk."""
+    """
+    Load experiment config from disk.
+
+    Returns:
+        ExperimentConfig if found and valid, None if not found
+
+    Raises:
+        OSError: If file read fails
+        json.JSONDecodeError: If config file is malformed JSON
+        pydantic.ValidationError: If config data doesn't match schema
+    """
     config_path = get_experiment_dir(experiment_id) / "config.json"
 
     if not config_path.exists():
+        logger.debug(f"Config not found for experiment {experiment_id} at {config_path}")
         return None
 
-    with open(config_path, "r") as f:
-        data = json.load(f)
-
-    return ExperimentConfig.model_validate(data)
+    try:
+        with open(config_path, "r") as f:
+            data = json.load(f)
+        logger.debug(f"Loaded config for experiment {experiment_id}")
+        return ExperimentConfig.model_validate(data)
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error(f"Failed to load config for experiment {experiment_id}: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to validate config for experiment {experiment_id}: {e}")
+        raise
 
 
 def list_experiments() -> list[tuple[str, str]]:
@@ -86,7 +117,7 @@ def list_experiments() -> list[tuple[str, str]]:
     List all experiments.
 
     Returns:
-        List of (experiment_id, name) tuples
+        List of (experiment_id, name) tuples, using directory name as canonical ID
     """
     base_dir = Path.home() / ".agent-trade" / "experiments"
 
@@ -105,17 +136,21 @@ def list_experiments() -> list[tuple[str, str]]:
         try:
             with open(config_path, "r") as f:
                 data = json.load(f)
-                experiments.append((data["experiment_id"], data["name"]))
-        except (json.JSONDecodeError, KeyError):
+                # Use directory name as canonical ID (matches get_experiment_dir)
+                experiment_id = exp_dir.name
+                name = data.get("name", experiment_id)
+                experiments.append((experiment_id, name))
+        except (json.JSONDecodeError, KeyError) as e:
             # Skip malformed configs
+            logger.debug(f"Skipping malformed config in {exp_dir}: {e}")
             continue
 
     return sorted(experiments)
 
 
-def generate_experiment_id(name: str) -> str:
+def generate_experiment_id() -> str:
     """
-    Generate a unique experiment ID from a name.
+    Generate a unique experiment ID.
 
     Format: exp_YYYYMMDD_NNN (e.g., exp_20260215_001)
     """

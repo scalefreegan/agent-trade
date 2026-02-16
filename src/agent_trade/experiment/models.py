@@ -56,7 +56,7 @@ class StockPosition(BaseModel):
     @property
     def average_cost_basis(self) -> Decimal:
         """Weighted average cost basis across all lots."""
-        if not self.lots:
+        if not self.lots or self.total_shares == 0:
             return Decimal("0")
         total_cost = sum(lot.shares * lot.cost_basis for lot in self.lots)
         return total_cost / self.total_shares
@@ -77,12 +77,31 @@ class Portfolio(BaseModel):
         """Get position for a specific symbol, or None if not held."""
         return next((p for p in self.positions if p.symbol == symbol), None)
 
-    def total_value(self, current_prices: dict[str, Decimal]) -> Decimal:
-        """Calculate total portfolio value at current market prices."""
-        stock_value = sum(
-            p.total_shares * current_prices.get(p.symbol, Decimal("0"))
-            for p in self.positions
-        )
+    def total_value(self, current_prices: dict[str, Decimal], strict: bool = True) -> Decimal:
+        """
+        Calculate total portfolio value at current market prices.
+
+        Args:
+            current_prices: Dictionary mapping symbols to current prices
+            strict: If True, raise KeyError when a held symbol has no price.
+                   If False, treat missing prices as 0 (can undervalue portfolio).
+
+        Raises:
+            KeyError: If strict=True and a held symbol is missing from current_prices
+        """
+        stock_value = Decimal("0")
+        for p in self.positions:
+            if p.symbol not in current_prices:
+                if strict:
+                    raise KeyError(
+                        f"Missing market price for held symbol {p.symbol}. "
+                        f"Cannot accurately value portfolio."
+                    )
+                # Fall back to 0 if not strict (for backward compatibility)
+                price = Decimal("0")
+            else:
+                price = current_prices[p.symbol]
+            stock_value += p.total_shares * price
         return self.cash + stock_value
 
 
