@@ -11,7 +11,7 @@ class ExperimentListItem(BaseModel):
 
     id: str
     name: str
-    start_date: date
+    created_at: datetime
     num_agents: int
     status: str
     current_day: int | None = None
@@ -22,14 +22,13 @@ class ExperimentDetail(BaseModel):
 
     id: str
     name: str
-    start_date: date
-    end_date: date
-    starting_cash: float
+    created_at: datetime
+    starting_capital: float
     num_agents: int
     status: str
     current_day: int | None = None
 
-    @field_serializer("starting_cash")
+    @field_serializer("starting_capital")
     def serialize_decimal(self, v: Any) -> float:
         """Convert Decimal to float."""
         if isinstance(v, Decimal):
@@ -105,6 +104,6 @@ class AgentStateResponse(BaseModel):
 class GameStateResponse(BaseModel):
     """Complete game state."""
 
-    current_date: date
     trading_day: int
+    last_run: datetime | None
     agents: list[AgentStateResponse]

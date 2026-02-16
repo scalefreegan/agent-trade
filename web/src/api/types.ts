@@ -3,7 +3,7 @@
 export interface ExperimentListItem {
   id: string;
   name: string;
-  start_date: string;
+  created_at: string;
   num_agents: number;
   status: string;
   current_day: number | null;
@@ -12,9 +12,8 @@ export interface ExperimentListItem {
 export interface ExperimentDetail {
   id: string;
   name: string;
-  start_date: string;
-  end_date: string;
-  starting_cash: number;
+  created_at: string;
+  starting_capital: number;
   num_agents: number;
   status: string;
   current_day: number | null;
@@ -49,7 +48,7 @@ export interface AgentState {
 }
 
 export interface GameState {
-  current_date: string;
   trading_day: number;
+  last_run: string | null;
   agents: AgentState[];
 }

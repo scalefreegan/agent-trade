@@ -3,8 +3,8 @@ import { useExperiment, useGameState } from '../api/experiments';
 
 export function ExperimentPage() {
   const { experimentId } = useParams<{ experimentId: string }>();
-  const { data: experiment, isLoading: expLoading } = useExperiment(experimentId!);
-  const { data: gameState, isLoading: stateLoading } = useGameState(experimentId!);
+  const { data: experiment, isLoading: expLoading, error: expError } = useExperiment(experimentId || '');
+  const { data: gameState, isLoading: stateLoading, error: stateError } = useGameState(experimentId || '');
 
   if (expLoading || stateLoading) {
     return (
@@ -14,10 +14,12 @@ export function ExperimentPage() {
     );
   }
 
-  if (!experiment || !gameState) {
+  if (expError || stateError || !experiment || !gameState) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-red-500">Experiment not found</div>
+        <div className="text-red-500">
+          {expError?.message || stateError?.message || 'Experiment not found'}
+        </div>
       </div>
     );
   }
@@ -27,24 +29,21 @@ export function ExperimentPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">{experiment.name}</h1>
         <p className="text-gray-600 mt-2">
-          Trading Day {gameState.trading_day} • {new Date(gameState.current_date).toLocaleDateString()}
+          Trading Day {gameState.trading_day}
+          {gameState.last_run && <> • Last run: {new Date(gameState.last_run).toLocaleDateString()}</>}
         </p>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Experiment Details</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
           <div>
-            <p className="text-sm text-gray-600">Start Date</p>
-            <p className="text-lg font-medium">{new Date(experiment.start_date).toLocaleDateString()}</p>
+            <p className="text-sm text-gray-600">Created</p>
+            <p className="text-lg font-medium">{new Date(experiment.created_at).toLocaleDateString()}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">End Date</p>
-            <p className="text-lg font-medium">{new Date(experiment.end_date).toLocaleDateString()}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Starting Cash</p>
-            <p className="text-lg font-medium">${experiment.starting_cash.toLocaleString()}</p>
+            <p className="text-sm text-gray-600">Starting Capital</p>
+            <p className="text-lg font-medium">${experiment.starting_capital.toLocaleString()}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Agents</p>

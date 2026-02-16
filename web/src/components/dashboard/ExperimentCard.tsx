@@ -25,9 +25,9 @@ export function ExperimentCard({ experiment }: ExperimentCardProps) {
       </div>
       <div className="space-y-2 text-sm text-gray-600">
         <div className="flex justify-between">
-          <span>Start Date:</span>
+          <span>Created:</span>
           <span className="font-medium text-gray-900">
-            {new Date(experiment.start_date).toLocaleDateString()}
+            {new Date(experiment.created_at).toLocaleDateString()}
           </span>
         </div>
         <div className="flex justify-between">

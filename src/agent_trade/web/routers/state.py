@@ -22,10 +22,11 @@ async def get_game_state(
     state: GameState = Depends(load_experiment_state),
 ) -> GameStateResponse:
     """Get current game state."""
-    # Collect all symbols for price lookup
+    # Collect all symbols for price lookup (Portfolio.positions is a list)
     all_symbols = set()
     for agent_state in state.agents.values():
-        all_symbols.update(agent_state.portfolio.positions.keys())
+        for position in agent_state.portfolio.positions:
+            all_symbols.add(position.symbol)
 
     # Fetch current prices
     prices = {}
@@ -36,8 +37,9 @@ async def get_game_state(
     agents = []
     for agent_id, agent_state in state.agents.items():
         positions = {}
-        for symbol, position in agent_state.portfolio.positions.items():
-            current_price = prices.get(symbol)
+        # Portfolio.positions is a list of StockPosition
+        for position in agent_state.portfolio.positions:
+            current_price = prices.get(position.symbol)
             total_shares = sum(lot.shares for lot in position.lots)
             total_cost = sum(lot.shares * lot.cost_basis for lot in position.lots)
 
@@ -47,8 +49,8 @@ async def get_game_state(
                 current_value = float(current_price * Decimal(str(total_shares)))
                 unrealized_gain = current_value - float(total_cost)
 
-            positions[symbol] = StockPositionResponse(
-                symbol=symbol,
+            positions[position.symbol] = StockPositionResponse(
+                symbol=position.symbol,
                 total_shares=float(total_shares),
                 total_cost_basis=float(total_cost),
                 current_price=float(current_price) if current_price else None,
@@ -76,5 +78,5 @@ async def get_game_state(
         )
 
     return GameStateResponse(
-        current_date=state.current_date, trading_day=state.trading_day, agents=agents
+        trading_day=state.trading_day, last_run=state.last_run, agents=agents
     )

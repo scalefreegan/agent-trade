@@ -25,8 +25,8 @@ async def get_experiments() -> list[ExperimentListItem]:
             ExperimentListItem(
                 id=exp_id,
                 name=name,
-                start_date=config.start_date,
-                num_agents=len(config.agents),
+                created_at=config.created_at,
+                num_agents=config.num_agents,
                 status=config.status,
                 current_day=current_day,
             )
@@ -47,10 +47,9 @@ async def get_experiment(
     return ExperimentDetail(
         id=experiment_id,
         name=config.name,
-        start_date=config.start_date,
-        end_date=config.end_date,
-        starting_cash=float(config.starting_cash),
-        num_agents=len(config.agents),
+        created_at=config.created_at,
+        starting_capital=float(config.starting_capital),
+        num_agents=config.num_agents,
         status=config.status,
         current_day=current_day,
     )
