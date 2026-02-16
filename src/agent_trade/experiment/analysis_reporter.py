@@ -288,6 +288,16 @@ def format_report_text(report: dict[str, Any]) -> str:
     Returns:
         Formatted text report
     """
+    # Guard against empty report (e.g., when game state not found)
+    if not report or "name" not in report:
+        return (
+            "=" * 80 + "\n"
+            "EXPERIMENT REPORT: Not Found\n"
+            "=" * 80 + "\n\n"
+            "Unable to generate report. Experiment state not found.\n"
+            "=" * 80 + "\n"
+        )
+
     lines = []
 
     # Header

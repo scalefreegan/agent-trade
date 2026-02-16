@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .config import get_experiment_dir, load_config
+from .config import get_experiment_dir, load_config, save_config
 from .coordinator import (
     load_game_state,
     process_daily_cycle,
@@ -114,6 +114,8 @@ def run_daily_cycle(
             logger.warning(f"No active agents remaining, completing experiment")
             game_state.config.status = "completed"
             save_game_state(game_state)
+            # Sync status back to config.json to prevent future runs
+            save_config(game_state.config)
 
         return True
 

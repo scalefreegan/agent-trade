@@ -128,11 +128,20 @@ def process_daily_cycle(
                     )
 
                     if new_position_value > max_position_value:
-                        raise ValueError(
-                            f"Position limit exceeded: {order.symbol} would be "
-                            f"{(new_position_value / total_value * 100):.1f}% of portfolio "
-                            f"(max: {game_state.config.max_position_pct * 100:.0f}%)"
-                        )
+                        # Calculate percentage only if total_value > 0 to avoid divide-by-zero
+                        if total_value > 0:
+                            pct = (new_position_value / total_value * 100)
+                            raise ValueError(
+                                f"Position limit exceeded: {order.symbol} would be "
+                                f"{pct:.1f}% of portfolio "
+                                f"(max: {game_state.config.max_position_pct * 100:.0f}%)"
+                            )
+                        else:
+                            raise ValueError(
+                                f"Position limit exceeded: {order.symbol} purchase of "
+                                f"${new_position_value:.2f} exceeds maximum "
+                                f"${max_position_value:.2f}"
+                            )
 
                 elif order.action == "sell":
                     # Check minimum trade value for sells
