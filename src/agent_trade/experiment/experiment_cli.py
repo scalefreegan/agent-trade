@@ -10,9 +10,13 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 from datetime import datetime
 
+from decimal import Decimal
+
 from .models import ExperimentConfig, GameState, AgentState
 from . import daily_runner
 from . import analysis_reporter
+from .market_data import get_current_prices
+from .config import create_experiment_config
 
 app = typer.Typer(
     name="agent-trade-experiment",
@@ -77,11 +81,13 @@ def init(
     exp_dir.mkdir(parents=True, exist_ok=True)
 
     # Create config
-    config = ExperimentConfig(
+    config = create_experiment_config(
+        experiment_id=experiment_id,
+        name=name,
         num_agents=agents,
-        starting_capital=capital,
-        short_term_tax_rate=short_term_tax,
-        long_term_tax_rate=long_term_tax,
+        starting_capital=Decimal(str(capital)),
+        short_term_tax_rate=Decimal(str(short_term_tax)),
+        long_term_tax_rate=Decimal(str(long_term_tax)),
         long_term_holding_days=long_term_days,
     )
 
@@ -181,23 +187,28 @@ def status(
 
         # Header info
         console.print(Panel(
-            f"[bold]{game_state.experiment_name}[/bold]\n"
+            f"[bold]{game_state.config.name}[/bold]\n"
             f"ID: {experiment_id}\n"
-            f"Day: {game_state.current_day}\n"
-            f"Status: {game_state.status}\n"
+            f"Day: {game_state.trading_day}\n"
+            f"Status: {game_state.config.status}\n"
             f"Active Agents: {len([a for a in game_state.agents.values() if a.status == 'active'])}/{game_state.config.num_agents}",
             title="Experiment Status",
             border_style="cyan"
         ))
 
-        # Leaderboard
+        # Leaderboard - get current prices for valuation
+        # Get all symbols
+        all_symbols = set()
+        for agent in game_state.agents.values():
+            for position in agent.portfolio.positions:
+                all_symbols.add(position.symbol)
+
+        current_prices = get_current_prices(list(all_symbols)) if all_symbols else {}
+
         active_agents = [a for a in game_state.agents.values() if a.status == "active"]
         sorted_agents = sorted(
             active_agents,
-            key=lambda a: a.portfolio.cash + sum(
-                p.total_shares * game_state.daily_outcomes[-1].prices.get(p.symbol, 0)
-                for p in a.portfolio.positions.values()
-            ) if game_state.daily_outcomes else a.portfolio.cash,
+            key=lambda a: a.portfolio.total_value(current_prices, strict=False),
             reverse=True
         )[:top]
 
@@ -211,16 +222,7 @@ def status(
 
         for idx, agent in enumerate(sorted_agents, 1):
             # Calculate portfolio value
-            if game_state.daily_outcomes:
-                latest_prices = game_state.daily_outcomes[-1].prices
-                holdings_value = sum(
-                    p.total_shares * latest_prices.get(p.symbol, 0)
-                    for p in agent.portfolio.positions.values()
-                )
-            else:
-                holdings_value = 0
-
-            total_value = agent.portfolio.cash + holdings_value
+            total_value = agent.portfolio.total_value(current_prices, strict=False)
             returns = ((total_value / game_state.config.starting_capital) - 1) * 100
 
             table.add_row(
@@ -323,10 +325,13 @@ def analyze(
             # Show tax metrics
             tax_metrics = analysis_reporter.calculate_tax_metrics(experiment_id)
             result_md = "# Tax Efficiency Analysis\n\n"
-            result_md += f"**Total Taxes Paid**: ${tax_metrics.get('total_taxes_paid', 0):,.2f}\n\n"
+
+            # Calculate total taxes across all agents
+            total_taxes = sum(m.get('total_tax', 0) for m in tax_metrics.values())
+            result_md += f"**Total Taxes Paid**: ${total_taxes:,.2f}\n\n"
             result_md += "## By Agent\n\n"
-            for agent_id, metrics in tax_metrics.get('by_agent', {}).items():
-                result_md += f"- **{agent_id}**: ${metrics.get('total_taxes', 0):,.2f}\n"
+            for agent_id, metrics in tax_metrics.items():
+                result_md += f"- **{agent_id}**: ${metrics.get('total_tax', 0):,.2f}\n"
 
         elif "holding" in query_lower or "period" in query_lower:
             # Show holding period distribution
@@ -334,9 +339,11 @@ def analyze(
             result_md = "# Holding Period Distribution\n\n"
             for agent_id, dist in distribution.items():
                 result_md += f"## {agent_id}\n\n"
-                result_md += f"- Short-term: {dist.get('short_term_count', 0)} positions\n"
-                result_md += f"- Long-term: {dist.get('long_term_count', 0)} positions\n"
-                result_md += f"- Avg holding period: {dist.get('avg_holding_days', 0):.1f} days\n\n"
+                result_md += f"- 0-30 days: {dist.get('0-30', 0)} trades\n"
+                result_md += f"- 31-90 days: {dist.get('31-90', 0)} trades\n"
+                result_md += f"- 91-180 days: {dist.get('91-180', 0)} trades\n"
+                result_md += f"- 181-365 days: {dist.get('181-365', 0)} trades\n"
+                result_md += f"- 365+ days (long-term): {dist.get('365+', 0)} trades\n\n"
 
         else:
             # Default to full report
@@ -365,11 +372,11 @@ def pause(
     try:
         game_state = load_game_state(experiment_id)
 
-        if game_state.status == "paused":
+        if game_state.config.status == "paused":
             console.print(f"[yellow]Warning:[/yellow] Experiment is already paused")
             return
 
-        game_state.status = "paused"
+        game_state.config.status = "paused"
         save_game_state(experiment_id, game_state)
 
         console.print(f"[green]✓[/green] Experiment paused")
@@ -392,11 +399,11 @@ def resume(
     try:
         game_state = load_game_state(experiment_id)
 
-        if game_state.status == "active":
+        if game_state.config.status == "active":
             console.print(f"[yellow]Warning:[/yellow] Experiment is already active")
             return
 
-        game_state.status = "active"
+        game_state.config.status = "active"
         save_game_state(experiment_id, game_state)
 
         console.print(f"[green]✓[/green] Experiment resumed")
@@ -442,22 +449,22 @@ def list():
         table.add_column("Active Agents", justify="right")
         table.add_column("Created", style="dim")
 
-        for exp_id, state in sorted(experiments, key=lambda x: x[1].start_date, reverse=True):
+        for exp_id, state in sorted(experiments, key=lambda x: x[1].config.created_at, reverse=True):
             active_count = len([a for a in state.agents.values() if a.status == "active"])
 
             status_style = {
                 "active": "green",
                 "paused": "yellow",
                 "completed": "cyan",
-            }.get(state.status, "white")
+            }.get(state.config.status, "white")
 
             table.add_row(
                 exp_id,
-                state.experiment_name,
-                f"[{status_style}]{state.status}[/{status_style}]",
-                str(state.current_day),
+                state.config.name,
+                f"[{status_style}]{state.config.status}[/{status_style}]",
+                str(state.trading_day),
                 f"{active_count}/{state.config.num_agents}",
-                state.start_date.strftime("%Y-%m-%d"),
+                state.config.created_at.strftime("%Y-%m-%d"),
             )
 
         console.print(table)

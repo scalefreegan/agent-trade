@@ -362,7 +362,7 @@ def create_initial_game_state(
         # Create initial portfolio with starting capital
         portfolio = Portfolio(
             cash=config.starting_capital,
-            positions={},
+            positions=[],  # positions is a list, not dict
         )
 
         # Create randomized strategy
@@ -383,17 +383,14 @@ def create_initial_game_state(
                 "total_losses": Decimal("0"),
                 "total_taxes_paid": Decimal("0"),
             },
+            created_at=datetime.now(timezone.utc),
         )
 
         agents[agent_id] = agent_state
 
     return GameState(
-        experiment_id=experiment_id,
-        experiment_name=experiment_name,
         config=config,
         agents=agents,
-        current_day=0,
-        status="active",
-        start_date=datetime.now(timezone.utc),
-        daily_outcomes=[],
+        trading_day=0,
+        last_run=None,
     )
