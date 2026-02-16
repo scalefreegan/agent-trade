@@ -107,3 +107,48 @@ class GameStateResponse(BaseModel):
     trading_day: int
     last_run: datetime | None
     agents: list[AgentStateResponse]
+
+
+class LeaderboardEntry(BaseModel):
+    """Leaderboard entry for a single agent."""
+
+    rank: int
+    agent_id: str
+    name: str
+    portfolio_value: float
+    returns_pct: float | None = None
+    status: str
+
+    @field_serializer("portfolio_value", "returns_pct")
+    def serialize_decimal(self, v: Any) -> float | None:
+        """Convert Decimal to float."""
+        if v is None:
+            return None
+        if isinstance(v, Decimal):
+            return float(v)
+        return v
+
+
+class LeaderboardResponse(BaseModel):
+    """Leaderboard response."""
+
+    entries: list[LeaderboardEntry]
+
+
+class PerformanceDataPoint(BaseModel):
+    """Single performance data point for a trading day."""
+
+    date: str  # ISO date string
+    trading_day: int
+    values: dict[str, float]  # agent_id -> portfolio_value
+
+    @field_serializer("values")
+    def serialize_values(self, v: dict[str, Any]) -> dict[str, float]:
+        """Convert Decimal values to float."""
+        return {k: float(val) if isinstance(val, Decimal) else val for k, val in v.items()}
+
+
+class PerformanceResponse(BaseModel):
+    """Performance time-series response."""
+
+    data_points: list[PerformanceDataPoint]

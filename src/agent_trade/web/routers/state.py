@@ -3,12 +3,15 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends
 
+from agent_trade.experiment.analysis_reporter import generate_leaderboard
 from agent_trade.experiment.market_data import get_current_prices
 from agent_trade.experiment.models import GameState
 from agent_trade.web.dependencies import load_experiment_state
 from agent_trade.web.schemas import (
     AgentStateResponse,
     GameStateResponse,
+    LeaderboardEntry,
+    LeaderboardResponse,
     PortfolioResponse,
     StockPositionResponse,
     TaxLotResponse,
@@ -80,3 +83,38 @@ async def get_game_state(
     return GameStateResponse(
         trading_day=state.trading_day, last_run=state.last_run, agents=agents
     )
+
+
+@router.get("/leaderboard", response_model=LeaderboardResponse)
+async def get_leaderboard(
+    state: GameState = Depends(load_experiment_state),
+) -> LeaderboardResponse:
+    """Get experiment leaderboard sorted by portfolio value."""
+    # Generate leaderboard using existing function
+    leaderboard = generate_leaderboard(state)
+
+    # Calculate returns percentage relative to starting capital
+    starting_capital = state.config.starting_capital
+
+    entries = []
+    for rank, (agent_id, name, portfolio_value, status) in enumerate(
+        leaderboard, start=1
+    ):
+        returns_pct = None
+        if starting_capital > 0:
+            returns_pct = float(
+                (portfolio_value - starting_capital) / starting_capital * 100
+            )
+
+        entries.append(
+            LeaderboardEntry(
+                rank=rank,
+                agent_id=agent_id,
+                name=name,
+                portfolio_value=float(portfolio_value),
+                returns_pct=returns_pct,
+                status=status,
+            )
+        )
+
+    return LeaderboardResponse(entries=entries)
