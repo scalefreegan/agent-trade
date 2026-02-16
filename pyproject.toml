@@ -21,6 +21,12 @@ agent = [
     "rich>=13.0.0"
 ]
 
+# Optional: for web UI backend
+web = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+]
+
 # Optional: for running tests
 dev = [
     "pytest>=7.0.0",
@@ -38,6 +44,8 @@ agent-trade-claude = "agent_trade.claude_cli:main"
 agent-trade-logs = "agent_trade.logs_cli:main"
 # Multi-agent trading experiment CLI (requires agent extra)
 agent-trade-experiment = "agent_trade.experiment.experiment_cli:main"
+# Web UI server (requires web extra)
+agent-trade-web = "agent_trade.web.api:main"
 
 [build-system]
 requires = ["hatchling"]
