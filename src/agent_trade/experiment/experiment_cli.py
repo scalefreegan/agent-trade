@@ -1,0 +1,478 @@
+"""CLI interface for the multi-agent trading experiment."""
+
+import sys
+from pathlib import Path
+from typing import Optional
+import typer
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.markdown import Markdown
+from datetime import datetime
+
+from .models import ExperimentConfig, GameState, AgentState
+from . import daily_runner
+from . import analysis_reporter
+
+app = typer.Typer(
+    name="agent-trade-experiment",
+    help="Multi-agent trading experiment CLI",
+    add_completion=False,
+)
+console = Console()
+
+
+def get_experiment_dir(experiment_id: str) -> Path:
+    """Get the directory for an experiment."""
+    base_dir = Path.home() / ".agent-trade" / "experiments"
+    exp_dir = base_dir / experiment_id
+    return exp_dir
+
+
+def load_game_state(experiment_id: str) -> GameState:
+    """Load game state from disk."""
+    exp_dir = get_experiment_dir(experiment_id)
+    state_file = exp_dir / "game_state.json"
+
+    if not state_file.exists():
+        console.print(f"[red]Error:[/red] Experiment '{experiment_id}' not found")
+        raise typer.Exit(1)
+
+    with open(state_file) as f:
+        return GameState.model_validate_json(f.read())
+
+
+def save_game_state(experiment_id: str, state: GameState):
+    """Save game state to disk."""
+    exp_dir = get_experiment_dir(experiment_id)
+    state_file = exp_dir / "game_state.json"
+
+    with open(state_file, "w") as f:
+        f.write(state.model_dump_json(indent=2))
+
+
+@app.command()
+def init(
+    name: str = typer.Option(..., "--name", "-n", help="Experiment name"),
+    agents: int = typer.Option(10, "--agents", "-a", help="Number of agents"),
+    capital: float = typer.Option(1000.0, "--capital", "-c", help="Starting capital per agent"),
+    short_term_tax: float = typer.Option(0.35, "--short-term-tax", help="Short-term capital gains tax rate"),
+    long_term_tax: float = typer.Option(0.15, "--long-term-tax", help="Long-term capital gains tax rate"),
+    long_term_days: int = typer.Option(365, "--long-term-days", help="Days for long-term holding period"),
+):
+    """Initialize a new trading experiment.
+
+    Examples:
+
+        agent-trade-experiment init --name "Q1-2026" --agents 10 --capital 1000
+
+        agent-trade-experiment init -n "Test" -a 3 -c 500
+    """
+    # Generate experiment ID from name and timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    experiment_id = f"{name.lower().replace(' ', '_')}_{timestamp}"
+
+    # Create experiment directory
+    exp_dir = get_experiment_dir(experiment_id)
+    exp_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create config
+    config = ExperimentConfig(
+        num_agents=agents,
+        starting_capital=capital,
+        short_term_tax_rate=short_term_tax,
+        long_term_tax_rate=long_term_tax,
+        long_term_holding_days=long_term_days,
+    )
+
+    # Save config
+    config_file = exp_dir / "config.json"
+    with open(config_file, "w") as f:
+        f.write(config.model_dump_json(indent=2))
+
+    # Initialize game state
+    from .templates import create_initial_game_state
+    game_state = create_initial_game_state(config, experiment_id, name)
+    save_game_state(experiment_id, game_state)
+
+    # Create agent directories with initial strategy files
+    from .strategy_manager import StrategyManager
+    strategy_mgr = StrategyManager(exp_dir)
+
+    for agent in game_state.agents.values():
+        agent_dir = exp_dir / "agents" / agent.agent_id
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        (agent_dir / "decisions").mkdir(exist_ok=True)
+
+        # Create initial strategy file
+        strategy_mgr.save_strategy(agent.agent_id, agent.strategy)
+
+        # Create initial portfolio file
+        portfolio_file = agent_dir / "portfolio.json"
+        with open(portfolio_file, "w") as f:
+            f.write(agent.portfolio.model_dump_json(indent=2))
+
+    console.print(Panel(
+        f"[green]Experiment initialized successfully![/green]\n\n"
+        f"ID: {experiment_id}\n"
+        f"Name: {name}\n"
+        f"Agents: {agents}\n"
+        f"Starting Capital: ${capital:,.2f}\n"
+        f"Short-term Tax: {short_term_tax*100:.0f}%\n"
+        f"Long-term Tax: {long_term_tax*100:.0f}%\n"
+        f"Long-term Holding Period: {long_term_days} days\n\n"
+        f"Location: {exp_dir}",
+        title="Experiment Created",
+        border_style="green"
+    ))
+
+
+@app.command()
+def run(
+    experiment_id: str = typer.Argument(..., help="Experiment ID to run"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force run even on non-trading days"),
+):
+    """Run daily cycle for an experiment.
+
+    Examples:
+
+        agent-trade-experiment run q1-2026_20260216_100000
+
+        agent-trade-experiment run default --force
+    """
+    try:
+        exp_dir = get_experiment_dir(experiment_id)
+
+        if not exp_dir.exists():
+            console.print(f"[red]Error:[/red] Experiment '{experiment_id}' not found")
+            raise typer.Exit(1)
+
+        console.print(f"[cyan]Running experiment:[/cyan] {experiment_id}")
+
+        success = daily_runner.run_daily_cycle(experiment_id, force=force)
+
+        if success:
+            console.print("[green]✓[/green] Daily cycle completed successfully")
+        else:
+            console.print("[yellow]⚠[/yellow] Daily cycle completed with warnings or was skipped")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        if "--debug" in sys.argv:
+            raise
+        raise typer.Exit(1)
+
+
+@app.command()
+def status(
+    experiment_id: str = typer.Argument(..., help="Experiment ID"),
+    top: int = typer.Option(10, "--top", "-n", help="Show top N agents"),
+):
+    """View experiment status and leaderboard.
+
+    Examples:
+
+        agent-trade-experiment status q1-2026_20260216_100000
+
+        agent-trade-experiment status default --top 5
+    """
+    try:
+        game_state = load_game_state(experiment_id)
+
+        # Header info
+        console.print(Panel(
+            f"[bold]{game_state.experiment_name}[/bold]\n"
+            f"ID: {experiment_id}\n"
+            f"Day: {game_state.current_day}\n"
+            f"Status: {game_state.status}\n"
+            f"Active Agents: {len([a for a in game_state.agents.values() if a.status == 'active'])}/{game_state.config.num_agents}",
+            title="Experiment Status",
+            border_style="cyan"
+        ))
+
+        # Leaderboard
+        active_agents = [a for a in game_state.agents.values() if a.status == "active"]
+        sorted_agents = sorted(
+            active_agents,
+            key=lambda a: a.portfolio.cash + sum(
+                p.total_shares * game_state.daily_outcomes[-1].prices.get(p.symbol, 0)
+                for p in a.portfolio.positions.values()
+            ) if game_state.daily_outcomes else a.portfolio.cash,
+            reverse=True
+        )[:top]
+
+        table = Table(title=f"Top {top} Agents", show_header=True)
+        table.add_column("Rank", style="cyan", width=6)
+        table.add_column("Agent ID", style="yellow", width=15)
+        table.add_column("Portfolio Value", justify="right", style="green")
+        table.add_column("Cash", justify="right")
+        table.add_column("Positions", justify="center")
+        table.add_column("Total Returns", justify="right", style="magenta")
+
+        for idx, agent in enumerate(sorted_agents, 1):
+            # Calculate portfolio value
+            if game_state.daily_outcomes:
+                latest_prices = game_state.daily_outcomes[-1].prices
+                holdings_value = sum(
+                    p.total_shares * latest_prices.get(p.symbol, 0)
+                    for p in agent.portfolio.positions.values()
+                )
+            else:
+                holdings_value = 0
+
+            total_value = agent.portfolio.cash + holdings_value
+            returns = ((total_value / game_state.config.starting_capital) - 1) * 100
+
+            table.add_row(
+                f"#{idx}",
+                agent.agent_id[:12],
+                f"${total_value:,.2f}",
+                f"${agent.portfolio.cash:,.2f}",
+                str(len(agent.portfolio.positions)),
+                f"{returns:+.2f}%"
+            )
+
+        console.print(table)
+
+        # Eliminated agents
+        eliminated = [a for a in game_state.agents.values() if a.status == "eliminated"]
+        if eliminated:
+            console.print(f"\n[red]Eliminated agents:[/red] {len(eliminated)}")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        if "--debug" in sys.argv:
+            raise
+        raise typer.Exit(1)
+
+
+@app.command()
+def report(
+    experiment_id: str = typer.Argument(..., help="Experiment ID"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path"),
+    format: str = typer.Option("markdown", "--format", "-f", help="Output format (markdown or json)"),
+):
+    """Generate detailed experiment report.
+
+    Examples:
+
+        agent-trade-experiment report q1-2026_20260216_100000
+
+        agent-trade-experiment report default --output report.md
+
+        agent-trade-experiment report default --format json --output report.json
+    """
+    try:
+        import json
+
+        # Generate report
+        report_data = analysis_reporter.generate_experiment_report(experiment_id)
+
+        if not report_data:
+            console.print(f"[red]Error:[/red] Could not generate report for experiment '{experiment_id}'")
+            raise typer.Exit(1)
+
+        if format == "markdown":
+            report_content = analysis_reporter.format_report_text(report_data)
+        elif format == "json":
+            report_content = json.dumps(report_data, indent=2, default=str)
+        else:
+            console.print(f"[red]Error:[/red] Unknown format '{format}'. Use 'markdown' or 'json'")
+            raise typer.Exit(1)
+
+        if output:
+            output.write_text(report_content)
+            console.print(f"[green]✓[/green] Report saved to {output}")
+        else:
+            if format == "markdown":
+                console.print(Markdown(report_content))
+            else:
+                console.print(report_content)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        if "--debug" in sys.argv:
+            raise
+        raise typer.Exit(1)
+
+
+@app.command()
+def analyze(
+    experiment_id: str = typer.Argument(..., help="Experiment ID"),
+    query: str = typer.Argument(..., help="Analysis query"),
+):
+    """Run custom analysis on experiment data.
+
+    Examples:
+
+        agent-trade-experiment analyze default "tax efficiency"
+
+        agent-trade-experiment analyze default "holding periods"
+
+        agent-trade-experiment analyze default "leaderboard"
+    """
+    try:
+        game_state = load_game_state(experiment_id)
+
+        console.print(f"[cyan]Analyzing:[/cyan] {query}\n")
+
+        # Simple keyword-based routing
+        query_lower = query.lower()
+
+        if "tax" in query_lower:
+            # Show tax metrics
+            tax_metrics = analysis_reporter.calculate_tax_metrics(experiment_id)
+            result_md = "# Tax Efficiency Analysis\n\n"
+            result_md += f"**Total Taxes Paid**: ${tax_metrics.get('total_taxes_paid', 0):,.2f}\n\n"
+            result_md += "## By Agent\n\n"
+            for agent_id, metrics in tax_metrics.get('by_agent', {}).items():
+                result_md += f"- **{agent_id}**: ${metrics.get('total_taxes', 0):,.2f}\n"
+
+        elif "holding" in query_lower or "period" in query_lower:
+            # Show holding period distribution
+            distribution = analysis_reporter.calculate_holding_period_distribution(experiment_id)
+            result_md = "# Holding Period Distribution\n\n"
+            for agent_id, dist in distribution.items():
+                result_md += f"## {agent_id}\n\n"
+                result_md += f"- Short-term: {dist.get('short_term_count', 0)} positions\n"
+                result_md += f"- Long-term: {dist.get('long_term_count', 0)} positions\n"
+                result_md += f"- Avg holding period: {dist.get('avg_holding_days', 0):.1f} days\n\n"
+
+        else:
+            # Default to full report
+            report_data = analysis_reporter.generate_experiment_report(experiment_id)
+            result_md = analysis_reporter.format_report_text(report_data)
+
+        console.print(Markdown(result_md))
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        if "--debug" in sys.argv:
+            raise
+        raise typer.Exit(1)
+
+
+@app.command()
+def pause(
+    experiment_id: str = typer.Argument(..., help="Experiment ID to pause"),
+):
+    """Pause an experiment.
+
+    Examples:
+
+        agent-trade-experiment pause q1-2026_20260216_100000
+    """
+    try:
+        game_state = load_game_state(experiment_id)
+
+        if game_state.status == "paused":
+            console.print(f"[yellow]Warning:[/yellow] Experiment is already paused")
+            return
+
+        game_state.status = "paused"
+        save_game_state(experiment_id, game_state)
+
+        console.print(f"[green]✓[/green] Experiment paused")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+
+@app.command()
+def resume(
+    experiment_id: str = typer.Argument(..., help="Experiment ID to resume"),
+):
+    """Resume a paused experiment.
+
+    Examples:
+
+        agent-trade-experiment resume q1-2026_20260216_100000
+    """
+    try:
+        game_state = load_game_state(experiment_id)
+
+        if game_state.status == "active":
+            console.print(f"[yellow]Warning:[/yellow] Experiment is already active")
+            return
+
+        game_state.status = "active"
+        save_game_state(experiment_id, game_state)
+
+        console.print(f"[green]✓[/green] Experiment resumed")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+
+@app.command()
+def list():
+    """List all experiments.
+
+    Examples:
+
+        agent-trade-experiment list
+    """
+    try:
+        base_dir = Path.home() / ".agent-trade" / "experiments"
+
+        if not base_dir.exists():
+            console.print("[yellow]No experiments found[/yellow]")
+            return
+
+        experiments = []
+        for exp_dir in base_dir.iterdir():
+            if exp_dir.is_dir():
+                state_file = exp_dir / "game_state.json"
+                if state_file.exists():
+                    with open(state_file) as f:
+                        state = GameState.model_validate_json(f.read())
+                        experiments.append((exp_dir.name, state))
+
+        if not experiments:
+            console.print("[yellow]No experiments found[/yellow]")
+            return
+
+        table = Table(title="All Experiments", show_header=True)
+        table.add_column("ID", style="yellow")
+        table.add_column("Name", style="cyan")
+        table.add_column("Status", style="green")
+        table.add_column("Day", justify="right")
+        table.add_column("Active Agents", justify="right")
+        table.add_column("Created", style="dim")
+
+        for exp_id, state in sorted(experiments, key=lambda x: x[1].start_date, reverse=True):
+            active_count = len([a for a in state.agents.values() if a.status == "active"])
+
+            status_style = {
+                "active": "green",
+                "paused": "yellow",
+                "completed": "cyan",
+            }.get(state.status, "white")
+
+            table.add_row(
+                exp_id,
+                state.experiment_name,
+                f"[{status_style}]{state.status}[/{status_style}]",
+                str(state.current_day),
+                f"{active_count}/{state.config.num_agents}",
+                state.start_date.strftime("%Y-%m-%d"),
+            )
+
+        console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        if "--debug" in sys.argv:
+            raise
+        raise typer.Exit(1)
+
+
+def main():
+    """Main entry point for the CLI."""
+    app()
+
+
+if __name__ == "__main__":
+    main()

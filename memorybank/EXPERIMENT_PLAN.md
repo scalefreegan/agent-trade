@@ -449,10 +449,10 @@ Create comprehensive documentation in `docs/experiment/`:
   - Tax drag analysis per agent
 
 ### Phase 6: CLI & Integration
-- [ ] 30. **src/agent_trade/experiment/experiment_cli.py** - Typer CLI
-- [ ] 31. Update **pyproject.toml** - Add experiment script entry
-- [ ] 32. **scripts/run_experiment.sh** - Cron job script
-- [ ] **Experiment Verification Complete**
+- [x] 30. **src/agent_trade/experiment/experiment_cli.py** - Typer CLI (2026-02-16)
+- [x] 31. Update **pyproject.toml** - Add experiment script entry (2026-02-16)
+- [x] 32. **scripts/run_experiment.sh** - Cron job script (2026-02-16)
+- [x] **Experiment Verification Complete** (2026-02-16)
 
 ---
 
@@ -466,8 +466,8 @@ Create comprehensive documentation in `docs/experiment/`:
 | 3 - State Management | Complete | 4 | 4 |
 | 4 - Agent System | Complete | 3 | 3 |
 | 5 - Orchestration | Complete | 3 | 3 |
-| 6 - CLI & Integration | Not Started | 3 | 0 |
-| **Total** | | **35** | **32** |
+| 6 - CLI & Integration | Complete | 4 | 4 |
+| **Total** | | **36** | **36** |
 
 ---
 
