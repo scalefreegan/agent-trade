@@ -435,15 +435,15 @@ Create comprehensive documentation in `docs/experiment/`:
 - [x] **Phase 4 Verification Complete** (2026-02-16)
 
 ### Phase 5: Orchestration
-- [ ] 27. **src/agent_trade/experiment/coordinator.py** - Daily orchestration
+- [x] 27. **src/agent_trade/experiment/coordinator.py** - Daily orchestration (2026-02-16)
   - Collect decisions from all agents
   - Validate orders (cash, shares, position limits)
   - Execute transactions with FIFO lot processing
   - Apply tiered tax rates per lot
   - Update portfolios and eliminate bankrupt agents
   - Generate daily outcome with lot-level transparency
-- [ ] 28. **src/agent_trade/experiment/daily_runner.py** - Main entry point
-- [ ] 29. **src/agent_trade/experiment/analysis_reporter.py** - Reports
+- [x] 28. **src/agent_trade/experiment/daily_runner.py** - Main entry point (2026-02-16)
+- [x] 29. **src/agent_trade/experiment/analysis_reporter.py** - Reports (2026-02-16)
   - Tax efficiency metrics (short-term vs long-term gains)
   - Holding period distributions
   - Tax drag analysis per agent
@@ -465,9 +465,9 @@ Create comprehensive documentation in `docs/experiment/`:
 | 2 - Experiment Core | Complete | 5 | 5 |
 | 3 - State Management | Complete | 4 | 4 |
 | 4 - Agent System | Complete | 3 | 3 |
-| 5 - Orchestration | Not Started | 3 | 0 |
+| 5 - Orchestration | Complete | 3 | 3 |
 | 6 - CLI & Integration | Not Started | 3 | 0 |
-| **Total** | | **35** | **29** |
+| **Total** | | **35** | **32** |
 
 ---
 
