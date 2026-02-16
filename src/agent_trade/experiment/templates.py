@@ -340,3 +340,57 @@ opportunities are too compelling to pass up despite the tax drag.
         learnings=[],
         last_updated=datetime.now(timezone.utc),
     )
+
+
+def create_initial_game_state(
+    config: ExperimentConfig,
+    experiment_id: str,
+    experiment_name: str,
+) -> "GameState":
+    """
+    Create initial game state for a new experiment.
+
+    Creates agents with randomized strategies and starting capital.
+    """
+    from .models import AgentState, GameState
+
+    agents = {}
+    for i in range(config.num_agents):
+        agent_id = f"agent_{i+1:03d}"
+        agent_name = f"Agent {i+1:03d}"
+
+        # Create initial portfolio with starting capital
+        portfolio = Portfolio(
+            cash=config.starting_capital,
+            positions=[],  # positions is a list, not dict
+        )
+
+        # Create randomized strategy
+        strategy = create_default_strategy(agent_id, agent_name)
+
+        # Create agent state
+        agent_state = AgentState(
+            agent_id=agent_id,
+            name=agent_name,
+            status="active",
+            portfolio=portfolio,
+            strategy=strategy,
+            stats={
+                "total_trades": 0,
+                "winning_trades": 0,
+                "losing_trades": 0,
+                "total_gains": Decimal("0"),
+                "total_losses": Decimal("0"),
+                "total_taxes_paid": Decimal("0"),
+            },
+            created_at=datetime.now(timezone.utc),
+        )
+
+        agents[agent_id] = agent_state
+
+    return GameState(
+        config=config,
+        agents=agents,
+        trading_day=0,
+        last_run=None,
+    )

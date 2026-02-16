@@ -36,6 +36,8 @@ agent-trade-query = "agent_trade.cli:main"
 agent-trade-claude = "agent_trade.claude_cli:main"
 # View tool usage logs and statistics
 agent-trade-logs = "agent_trade.logs_cli:main"
+# Multi-agent trading experiment CLI (requires agent extra)
+agent-trade-experiment = "agent_trade.experiment.experiment_cli:main"
 
 [build-system]
 requires = ["hatchling"]
