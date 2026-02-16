@@ -414,19 +414,20 @@ Create comprehensive documentation in `docs/experiment/`:
 - [x] **Phase 2 Verification Complete** (2026-02-15)
 
 ### Phase 3: State Management
-- [ ] 22. **src/agent_trade/experiment/portfolio_tracker.py** - Portfolio state
+- [x] 22. **src/agent_trade/experiment/portfolio_tracker.py** - Portfolio state (2026-02-16)
   - Track lots per position
   - Calculate total shares across lots
   - Calculate weighted average cost basis
   - Support adding new lots (buys)
   - Support removing lots via FIFO (sells)
-- [ ] 23. **src/agent_trade/experiment/strategy_manager.py** - Strategy files
-- [ ] 24. **src/agent_trade/experiment/transaction_processor.py** - Order execution
+- [x] 23. **src/agent_trade/experiment/strategy_manager.py** - Strategy files (2026-02-16)
+- [x] 24. **src/agent_trade/experiment/transaction_processor.py** - Order execution (2026-02-16)
   - FIFO lot selection for sells
   - Per-lot holding period calculation
   - Per-lot tax rate determination (short-term vs long-term)
   - Per-lot tax calculation
   - Create LotSale records for transparency
+- [x] **Phase 3 Verification Complete** (2026-02-16)
 
 ### Phase 4: Agent System
 - [ ] 25. **src/agent_trade/experiment/market_data.py** - Price fetching wrapper
@@ -461,11 +462,11 @@ Create comprehensive documentation in `docs/experiment/`:
 | 0 - Pydantic Foundation | Complete | 8 | 8 |
 | 1 - Documentation | Complete | 9 | 9 |
 | 2 - Experiment Core | Complete | 5 | 5 |
-| 3 - State Management | Not Started | 3 | 0 |
+| 3 - State Management | Complete | 4 | 4 |
 | 4 - Agent System | Not Started | 2 | 0 |
 | 5 - Orchestration | Not Started | 3 | 0 |
 | 6 - CLI & Integration | Not Started | 3 | 0 |
-| **Total** | | **33** | **22** |
+| **Total** | | **34** | **26** |
 
 ---
 
