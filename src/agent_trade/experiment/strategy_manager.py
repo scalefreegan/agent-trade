@@ -133,9 +133,17 @@ def parse_strategy_document(content: str) -> AgentStrategy:
     time_horizon = _extract_field(thesis_content, "Time Horizon")
     metrics_text = _extract_field(thesis_content, "Key Metrics")
 
-    # Parse list fields
-    preferred_sectors = _parse_list(sectors_text) if sectors_text else []
-    key_metrics = _parse_list(metrics_text) if metrics_text else []
+    # Parse list fields (treat "None specified" as empty list)
+    preferred_sectors = (
+        _parse_list(sectors_text)
+        if sectors_text and sectors_text.strip().lower() != "none specified"
+        else []
+    )
+    key_metrics = (
+        _parse_list(metrics_text)
+        if metrics_text and metrics_text.strip().lower() != "none specified"
+        else []
+    )
 
     # Validate risk tolerance
     if risk_tolerance.lower() not in ["conservative", "moderate", "aggressive"]:
@@ -169,16 +177,26 @@ def parse_strategy_document(content: str) -> AgentStrategy:
 
     if learnings_match:
         learnings_content = learnings_match.group(1).strip()
-        if learnings_content and learnings_content != "*No learnings yet*":
+        # Support both placeholder formats
+        if learnings_content and learnings_content not in ["*No learnings yet*", "*No learnings recorded yet.*"]:
             learnings = _parse_learnings(learnings_content)
 
     # Extract last updated timestamp
-    updated_match = re.search(r"\*Last Updated: (.*?)\*", content)
+    # Template format: **Last Updated**: YYYY-MM-DD HH:MM:SS UTC
+    updated_match = re.search(r"\*\*Last Updated\*\*:\s*(.+?)(?:\n|$)", content)
     if updated_match:
         try:
-            last_updated = datetime.fromisoformat(updated_match.group(1))
-        except ValueError:
-            logger.warning(f"Invalid timestamp format: {updated_match.group(1)}")
+            timestamp_str = updated_match.group(1).strip()
+            # Remove timezone suffix (e.g., " UTC") and parse
+            if timestamp_str.endswith(" UTC"):
+                timestamp_str = timestamp_str[:-4].strip()
+            elif timestamp_str.endswith(" local"):
+                timestamp_str = timestamp_str[:-6].strip()
+            # Parse as naive datetime and add UTC timezone
+            naive_dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+            last_updated = naive_dt.replace(tzinfo=timezone.utc)
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"Invalid timestamp format: {updated_match.group(1)}, error: {e}")
             last_updated = datetime.now(timezone.utc)
     else:
         last_updated = datetime.now(timezone.utc)

@@ -246,8 +246,8 @@ class TestRemoveSharesFifo:
 class TestValidatePositionLimit:
     """Tests for validate_position_limit function."""
 
-    def test_validate_position_limit_within_limit(self):
-        """Test that position within limit passes validation."""
+    def test_validate_position_limit_small_buy_exceeds_limit(self):
+        """Test that even a small buy can exceed position limit."""
         now = datetime.now(timezone.utc)
         position = StockPosition(
             symbol="AAPL",

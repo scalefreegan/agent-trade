@@ -154,9 +154,11 @@ def validate_position_limit(
         (valid, error_message) where error_message is None if valid
     """
     # Calculate total portfolio value after the purchase
+    # For cash-funded buys, total portfolio value stays the same
+    # (cash decreases as stock value increases)
     additional_value = additional_shares * share_price
     current_total_value = portfolio.total_value(current_prices, strict=False)
-    future_total_value = current_total_value + additional_value
+    future_total_value = current_total_value
 
     # Calculate position value after purchase
     current_position = portfolio.get_position(symbol)

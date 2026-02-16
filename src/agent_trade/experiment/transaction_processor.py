@@ -66,8 +66,8 @@ def execute_buy(
     shares = order.amount / current_price
     gross_amount = shares * current_price
 
-    # Verify sufficient cash (with small epsilon for rounding)
-    if portfolio.cash < gross_amount - Decimal("0.01"):
+    # Verify sufficient cash (strict check since we use Decimal)
+    if portfolio.cash < gross_amount:
         raise ValueError(
             f"Insufficient cash: need ${gross_amount:.2f}, have ${portfolio.cash:.2f}"
         )

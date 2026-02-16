@@ -420,8 +420,8 @@ class TestExecuteOrder:
         assert transaction.shares == Decimal("10")
         assert portfolio.cash > Decimal("500")
 
-    def test_execute_order_invalid_action_raises_error(self, config):
-        """Test execute_order with invalid action raises ValidationError from Pydantic."""
+    def test_order_rejects_invalid_action(self, config):
+        """Test Order model rejects invalid action during construction."""
         from pydantic import ValidationError
 
         portfolio = Portfolio(cash=Decimal("1000"))
