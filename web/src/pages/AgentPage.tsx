@@ -6,18 +6,22 @@ import {
   useAgentTransactions,
   useAgentDecisions,
 } from '../api/agents';
+import { usePerformance } from '../api/performance';
+import { useExperiment } from '../api/experiments';
 import { PortfolioBreakdown } from '../components/agent/PortfolioBreakdown';
 import { PositionAllocationChart } from '../components/agent/PositionAllocationChart';
+import { AgentPerformanceChart } from '../components/agent/AgentPerformanceChart';
 import { StrategyPanel } from '../components/agent/StrategyPanel';
 import { TransactionHistory } from '../components/agent/TransactionHistory';
 import { DecisionLog } from '../components/agent/DecisionLog';
 
-type Tab = 'portfolio' | 'strategy' | 'transactions' | 'decisions';
+type Tab = 'portfolio' | 'performance' | 'strategy' | 'transactions' | 'decisions';
 
 export function AgentPage() {
   const { experimentId, agentId } = useParams<{ experimentId: string; agentId: string }>();
   const [activeTab, setActiveTab] = useState<Tab>('portfolio');
 
+  const { data: experiment } = useExperiment(experimentId || '');
   const { data: agent, isLoading: agentLoading, error: agentError } = useAgentDetail(
     experimentId || '',
     agentId || ''
@@ -33,6 +37,9 @@ export function AgentPage() {
   const { data: decisions, isLoading: decisionsLoading } = useAgentDecisions(
     experimentId || '',
     agentId || ''
+  );
+  const { data: performance, isLoading: performanceLoading } = usePerformance(
+    experimentId || ''
   );
 
   if (agentLoading) {
@@ -189,6 +196,12 @@ export function AgentPage() {
             Portfolio
           </button>
           <button
+            className={`tab-button ${activeTab === 'performance' ? 'active' : ''}`}
+            onClick={() => setActiveTab('performance')}
+          >
+            Performance
+          </button>
+          <button
             className={`tab-button ${activeTab === 'strategy' ? 'active' : ''}`}
             onClick={() => setActiveTab('strategy')}
           >
@@ -218,6 +231,23 @@ export function AgentPage() {
             </div>
             <PortfolioBreakdown portfolio={agent.portfolio} metrics={agent.metrics} />
           </div>
+        )}
+
+        {activeTab === 'performance' && (
+          <>
+            {performanceLoading ? (
+              <div className="loading-state">Loading performance data...</div>
+            ) : performance?.data_points && experiment ? (
+              <AgentPerformanceChart
+                dataPoints={performance.data_points}
+                agentId={agent.agent_id}
+                agentName={agent.name}
+                startingCapital={experiment.starting_capital}
+              />
+            ) : (
+              <div className="loading-state">No performance data available</div>
+            )}
+          </>
         )}
 
         {activeTab === 'strategy' && (

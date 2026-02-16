@@ -12,6 +12,7 @@ from agent_trade.experiment.analysis_reporter import load_all_daily_outcomes
 from agent_trade.experiment.config import get_experiment_dir
 from agent_trade.experiment.coordinator import load_game_state
 from agent_trade.experiment.market_data import get_current_prices
+from agent_trade.experiment.portfolio_tracker import calculate_portfolio_metrics
 from agent_trade.experiment.strategy_manager import (
     get_strategy_path,
     load_strategy,
@@ -35,30 +36,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _calculate_portfolio_metrics(
-    portfolio: PortfolioResponse,
-    starting_capital: float,
+def _build_portfolio_metrics(
+    base_metrics: dict[str, Decimal],
+    portfolio_positions: list,
+    starting_capital: Decimal,
 ) -> PortfolioMetrics:
-    """Calculate portfolio metrics."""
-    total_stock_value = sum(
-        pos.current_value or 0 for pos in portfolio.positions.values()
-    )
-    total_value = portfolio.cash + total_stock_value
-    unrealized_gain = total_value - starting_capital
+    """Build PortfolioMetrics from base metrics returned by portfolio_tracker."""
+    # Calculate additional metrics not in base
+    total_value = base_metrics["total_value"]
+    unrealized_gain = base_metrics["unrealized_gain_loss"]
     unrealized_gain_pct = (
-        (unrealized_gain / starting_capital * 100) if starting_capital > 0 else 0
+        (unrealized_gain / starting_capital * 100) if starting_capital > 0 else Decimal("0")
     )
-    positions_count = len(portfolio.positions)
-    cash_pct = (portfolio.cash / total_value * 100) if total_value > 0 else 100
-    invested_pct = (total_stock_value / total_value * 100) if total_value > 0 else 0
+    positions_count = len(portfolio_positions)
+    invested_pct = (
+        (base_metrics["stock_value"] / total_value * 100) if total_value > 0 else Decimal("0")
+    )
 
     return PortfolioMetrics(
-        total_value=total_value,
-        unrealized_gain=unrealized_gain,
-        unrealized_gain_pct=unrealized_gain_pct,
+        total_value=float(total_value),
+        unrealized_gain=float(unrealized_gain),
+        unrealized_gain_pct=float(unrealized_gain_pct),
         positions_count=positions_count,
-        cash_pct=cash_pct,
-        invested_pct=invested_pct,
+        cash_pct=float(base_metrics["cash_pct"]),
+        invested_pct=float(invested_pct),
     )
 
 
@@ -179,11 +180,25 @@ async def get_agent_detail(
         positions=positions,
     )
 
-    # Calculate metrics
-    metrics = _calculate_portfolio_metrics(
-        portfolio_resp,
-        float(game_state.config.starting_capital),
-    )
+    # Calculate metrics using portfolio_tracker
+    try:
+        base_metrics = calculate_portfolio_metrics(agent.portfolio, current_prices)
+        metrics = _build_portfolio_metrics(
+            base_metrics,
+            agent.portfolio.positions,
+            game_state.config.starting_capital,
+        )
+    except KeyError as e:
+        logger.warning(f"Missing price data for portfolio metrics: {e}")
+        # Fallback: create metrics with zeros for missing data
+        metrics = PortfolioMetrics(
+            total_value=float(agent.portfolio.cash),
+            unrealized_gain=0.0,
+            unrealized_gain_pct=0.0,
+            positions_count=len(agent.portfolio.positions),
+            cash_pct=100.0,
+            invested_pct=0.0,
+        )
 
     return AgentDetailResponse(
         agent_id=agent.agent_id,

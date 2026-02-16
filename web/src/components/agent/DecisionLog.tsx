@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Markdown from 'react-markdown';
 import type { DecisionLogEntry } from '../../api/types';
 import { useAgentDecision } from '../../api/agents';
 
@@ -188,6 +189,7 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
           padding: 1.5rem;
         }
 
+        /* react-markdown styles */
         .markdown-content {
           font-size: 0.9375rem;
           line-height: 1.7;
@@ -199,6 +201,8 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
           font-weight: 700;
           color: #111827;
           margin: 1.5rem 0 1rem;
+          border-bottom: 2px solid #E5E7EB;
+          padding-bottom: 0.5rem;
         }
 
         .markdown-content h2 {
@@ -206,6 +210,8 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
           font-weight: 600;
           color: #111827;
           margin: 1.25rem 0 0.75rem;
+          border-bottom: 1px solid #F3F4F6;
+          padding-bottom: 0.375rem;
         }
 
         .markdown-content h3 {
@@ -213,6 +219,12 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
           font-weight: 600;
           color: #111827;
           margin: 1rem 0 0.5rem;
+        }
+
+        .markdown-content h4, .markdown-content h5, .markdown-content h6 {
+          font-weight: 600;
+          color: #111827;
+          margin: 0.875rem 0 0.5rem;
         }
 
         .markdown-content p {
@@ -226,6 +238,10 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
 
         .markdown-content li {
           margin: 0.375rem 0;
+        }
+
+        .markdown-content li > p {
+          margin: 0.25rem 0;
         }
 
         .markdown-content code {
@@ -248,6 +264,47 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
         .markdown-content pre code {
           background: none;
           padding: 0;
+        }
+
+        .markdown-content blockquote {
+          border-left: 4px solid #2B9348;
+          padding-left: 1rem;
+          margin: 1rem 0;
+          color: #6B7280;
+          font-style: italic;
+        }
+
+        .markdown-content a {
+          color: #2B9348;
+          text-decoration: underline;
+        }
+
+        .markdown-content a:hover {
+          color: #007F5F;
+        }
+
+        .markdown-content table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 1rem 0;
+        }
+
+        .markdown-content table th,
+        .markdown-content table td {
+          border: 1px solid #E5E7EB;
+          padding: 0.5rem;
+          text-align: left;
+        }
+
+        .markdown-content table th {
+          background: #F9FAFB;
+          font-weight: 600;
+        }
+
+        .markdown-content hr {
+          border: none;
+          border-top: 1px solid #E5E7EB;
+          margin: 1.5rem 0;
         }
 
         .empty-state {
@@ -309,22 +366,9 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
               </button>
             </div>
             <div className="modal-body">
-              <div className="markdown-content">
-                {/* Simple markdown rendering - in production, use a markdown library */}
-                {decisionDetail.markdown.split('\n').map((line, idx) => {
-                  if (line.startsWith('# ')) {
-                    return <h1 key={idx}>{line.substring(2)}</h1>;
-                  } else if (line.startsWith('## ')) {
-                    return <h2 key={idx}>{line.substring(3)}</h2>;
-                  } else if (line.startsWith('### ')) {
-                    return <h3 key={idx}>{line.substring(4)}</h3>;
-                  } else if (line.trim() === '') {
-                    return <br key={idx} />;
-                  } else {
-                    return <p key={idx}>{line}</p>;
-                  }
-                })}
-              </div>
+              <Markdown className="markdown-content">
+                {decisionDetail.markdown}
+              </Markdown>
             </div>
           </div>
         </div>
