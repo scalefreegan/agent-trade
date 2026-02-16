@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppShell } from './components/layout/AppShell';
 import { DashboardPage } from './pages/DashboardPage';
 import { ExperimentPage } from './pages/ExperimentPage';
+import { AgentPage } from './pages/AgentPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,6 +22,7 @@ function App() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/experiments/:experimentId" element={<ExperimentPage />} />
+            <Route path="/experiments/:experimentId/agents/:agentId" element={<AgentPage />} />
           </Routes>
         </AppShell>
       </BrowserRouter>
