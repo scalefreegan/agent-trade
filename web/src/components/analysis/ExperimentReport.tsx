@@ -10,6 +10,14 @@ const formatCurrency = (value: number) =>
 const formatPct = (value: number) => `${value.toFixed(2)}%`;
 
 export function ExperimentReportView({ report }: ExperimentReportViewProps) {
+  if (!report.leaderboard) {
+    return (
+      <div className="flex items-center justify-center h-32 bg-gray-50 rounded-lg">
+        <div className="text-gray-500">Report data unavailable</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Summary card */}
