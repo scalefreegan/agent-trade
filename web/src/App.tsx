@@ -4,6 +4,7 @@ import { AppShell } from './components/layout/AppShell';
 import { DashboardPage } from './pages/DashboardPage';
 import { ExperimentPage } from './pages/ExperimentPage';
 import { AgentPage } from './pages/AgentPage';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,13 +19,18 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <AppShell>
-          <Routes>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/experiments/:experimentId" element={<ExperimentPage />} />
-            <Route path="/experiments/:experimentId/agents/:agentId" element={<AgentPage />} />
-          </Routes>
-        </AppShell>
+        <ErrorBoundary>
+          <AppShell>
+            <Routes>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/experiments/:experimentId" element={<ExperimentPage />} />
+              <Route
+                path="/experiments/:experimentId/agents/:agentId"
+                element={<AgentPage />}
+              />
+            </Routes>
+          </AppShell>
+        </ErrorBoundary>
       </BrowserRouter>
     </QueryClientProvider>
   );

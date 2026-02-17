@@ -14,14 +14,13 @@ export function Leaderboard({ entries }: LeaderboardProps) {
 
   const sortedEntries = useMemo(() => {
     const sorted = [...entries].sort((a, b) => {
-      let aVal: string | number = a[sortKey];
-      let bVal: string | number = b[sortKey];
-
-      // Handle null returns_pct
-      if (sortKey === 'returns_pct') {
-        aVal = a.returns_pct ?? -Infinity;
-        bVal = b.returns_pct ?? -Infinity;
-      }
+      // Handle nullable returns_pct upfront
+      let aVal: string | number = sortKey === 'returns_pct'
+        ? (a.returns_pct ?? -Infinity)
+        : (a[sortKey] as string | number);
+      let bVal: string | number = sortKey === 'returns_pct'
+        ? (b.returns_pct ?? -Infinity)
+        : (b[sortKey] as string | number);
 
       if (typeof aVal === 'string' && typeof bVal === 'string') {
         return sortDirection === 'asc'

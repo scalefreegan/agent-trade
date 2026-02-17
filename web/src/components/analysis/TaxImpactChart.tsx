@@ -7,7 +7,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell,
 } from 'recharts';
 
 interface TaxMetrics {
@@ -122,8 +121,6 @@ export function TaxImpactChart({ taxMetrics, agentNames }: TaxImpactChartProps) 
       </div>
     );
   }
-
-  const maxTax = Math.max(...chartData.map(d => d.totalTax));
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

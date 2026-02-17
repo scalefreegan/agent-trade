@@ -1,16 +1,35 @@
 """Experiment endpoints."""
 import logging
+import shutil
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, HTTPException, Path
+from pydantic import BaseModel, Field
 
-from agent_trade.experiment.config import list_experiments
-from agent_trade.experiment.coordinator import load_game_state
+from agent_trade.experiment.config import (
+    create_experiment_config,
+    generate_experiment_id,
+    get_experiment_dir,
+    list_experiments,
+    save_config,
+)
+from agent_trade.experiment.coordinator import load_game_state, save_game_state
 from agent_trade.experiment.models import ExperimentConfig
+from agent_trade.experiment.strategy_manager import save_strategy
+from agent_trade.experiment.templates import create_initial_game_state
 from agent_trade.web.dependencies import load_experiment_config
 from agent_trade.web.schemas import ExperimentDetail, ExperimentListItem
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/experiments", tags=["experiments"])
+
+
+class CreateExperimentRequest(BaseModel):
+    """Request body for creating a new experiment."""
+
+    name: str = Field(..., min_length=1, max_length=100)
+    num_agents: int = Field(default=10, ge=1, le=50)
+    starting_capital: float = Field(default=1000.0, ge=100.0, le=1_000_000)
 
 
 @router.get("", response_model=list[ExperimentListItem])
@@ -78,3 +97,61 @@ async def get_experiment(
         status=config.status,
         current_day=current_day,
     )
+
+
+@router.post("", response_model=ExperimentDetail, status_code=201)
+async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
+    """Create a new experiment with full initialization (config, game state, agents)."""
+    try:
+        experiment_id = generate_experiment_id()
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    config = create_experiment_config(
+        experiment_id=experiment_id,
+        name=body.name,
+        num_agents=body.num_agents,
+        starting_capital=Decimal(str(body.starting_capital)),
+    )
+    exp_dir = get_experiment_dir(experiment_id)
+    try:
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        save_config(config)
+
+        # Initialize game state and per-agent directories (mirrors CLI `init` command)
+        game_state = create_initial_game_state(config, experiment_id, body.name)
+        save_game_state(game_state)
+
+        for agent in game_state.agents.values():
+            agent_dir = exp_dir / "agents" / agent.agent_id
+            agent_dir.mkdir(parents=True, exist_ok=True)
+            (agent_dir / "decisions").mkdir(exist_ok=True)
+            save_strategy(experiment_id, agent.agent_id, agent.strategy)
+            portfolio_file = agent_dir / "portfolio.json"
+            with open(portfolio_file, "w") as f:
+                f.write(agent.portfolio.model_dump_json(indent=2))
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to initialize experiment: {e}")
+
+    return ExperimentDetail(
+        id=experiment_id,
+        name=config.name,
+        created_at=config.created_at,
+        starting_capital=float(config.starting_capital),
+        num_agents=config.num_agents,
+        status=config.status,
+        current_day=game_state.trading_day,
+    )
+
+
+@router.delete("/{experiment_id}", status_code=204)
+async def delete_experiment(
+    experiment_id: str = Path(..., description="Experiment ID"),
+    config: ExperimentConfig = Depends(load_experiment_config),
+) -> None:
+    """Delete an experiment and all its data."""
+    experiment_dir = get_experiment_dir(experiment_id)
+    try:
+        shutil.rmtree(experiment_dir)
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete experiment: {e}")

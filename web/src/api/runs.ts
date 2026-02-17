@@ -68,9 +68,9 @@ export function useRunStatus(experimentId: string | null) {
     queryKey: ['runStatus', experimentId],
     queryFn: () => getRunStatus(experimentId!),
     enabled: !!experimentId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Poll every 2 seconds if running
-      return data?.status === 'running' ? 2000 : false;
+      return query.state.data?.status === 'running' ? 2000 : false;
     },
   });
 }
@@ -130,7 +130,7 @@ export function usePauseExperiment() {
 
   return useMutation({
     mutationFn: pauseExperiment,
-    onSuccess: (data, experimentId) => {
+    onSuccess: (_data, experimentId) => {
       // Invalidate experiment data
       queryClient.invalidateQueries({ queryKey: ['experiment', experimentId] });
       queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
@@ -146,7 +146,7 @@ export function useResumeExperiment() {
 
   return useMutation({
     mutationFn: resumeExperiment,
-    onSuccess: (data, experimentId) => {
+    onSuccess: (_data, experimentId) => {
       // Invalidate experiment data
       queryClient.invalidateQueries({ queryKey: ['experiment', experimentId] });
       queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });

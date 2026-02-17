@@ -1,8 +1,11 @@
 """FastAPI application for Agent Trade web UI."""
+import logging
+import time
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from agent_trade.web.routers import (
@@ -13,6 +16,8 @@ from agent_trade.web.routers import (
     runs,
     state,
 )
+
+logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -32,6 +37,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def error_handling_middleware(request: Request, call_next):
+    """Catch unhandled exceptions and return structured JSON errors."""
+    start = time.monotonic()
+    try:
+        response = await call_next(request)
+        duration_ms = (time.monotonic() - start) * 1000
+        logger.debug("%s %s -> %d (%.0fms)", request.method, request.url.path, response.status_code, duration_ms)
+        return response
+    except Exception as exc:
+        duration_ms = (time.monotonic() - start) * 1000
+        logger.exception("Unhandled error for %s %s (%.0fms)", request.method, request.url.path, duration_ms)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
 
 # Include routers
 app.include_router(experiments.router, prefix="/api/v1")
