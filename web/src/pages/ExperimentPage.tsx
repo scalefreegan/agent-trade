@@ -27,7 +27,7 @@ export function ExperimentPage() {
   if (expLoading || stateLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading experiment...</div>
+        <div className="text-muted-foreground">Loading experiment...</div>
       </div>
     );
   }
@@ -71,8 +71,8 @@ export function ExperimentPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{experiment.name}</h1>
-            <p className="text-gray-600 mt-2">
+            <h1 className="text-3xl font-bold text-foreground">{experiment.name}</h1>
+            <p className="text-muted-foreground mt-2">
               Trading Day {gameState.trading_day}
               {gameState.last_run && <> • Last run: {new Date(gameState.last_run).toLocaleDateString()}</>}
             </p>
@@ -84,7 +84,7 @@ export function ExperimentPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-border mb-6">
         <nav className="-mb-px flex space-x-8">
           {tabs.map((tab) => (
             <button
@@ -94,8 +94,8 @@ export function ExperimentPage() {
                 py-4 px-1 border-b-2 font-medium text-sm transition-colors
                 ${
                   activeTab === tab.id
-                    ? 'border-brand-700 text-brand-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }
               `}
             >
@@ -108,49 +108,49 @@ export function ExperimentPage() {
       {/* Tab Content */}
       {activeTab === 'overview' && (
         <>
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Experiment Details</h2>
+          <div className="bg-card text-card-foreground rounded-xl border border-border shadow-card p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4 text-foreground">Experiment Details</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
               <div>
-                <p className="text-sm text-gray-600">Created</p>
-                <p className="text-lg font-medium">{new Date(experiment.created_at).toLocaleDateString()}</p>
+                <p className="text-sm text-muted-foreground">Created</p>
+                <p className="text-lg font-medium text-foreground">{new Date(experiment.created_at).toLocaleDateString()}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Starting Capital</p>
-                <p className="text-lg font-medium">${experiment.starting_capital.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">Starting Capital</p>
+                <p className="text-lg font-medium text-foreground">${experiment.starting_capital.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Agents</p>
-                <p className="text-lg font-medium">{experiment.num_agents}</p>
+                <p className="text-sm text-muted-foreground">Agents</p>
+                <p className="text-lg font-medium text-foreground">{experiment.num_agents}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Agents</h2>
+          <div className="bg-card text-card-foreground rounded-xl border border-border shadow-card p-6">
+            <h2 className="text-xl font-semibold mb-4 text-foreground">Agents</h2>
             <div className="space-y-4">
               {gameState.agents.map((agent) => (
                 <Link
                   key={agent.agent_id}
                   to={`/experiments/${experimentId}/agents/${agent.agent_id}`}
-                  className="block border border-gray-200 rounded-lg p-4 hover:border-brand-600 hover:shadow-md transition-all"
+                  className="block border border-border rounded-lg p-4 hover:border-primary hover:shadow-md transition-all"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-lg text-brand-900 hover:text-brand-700">
+                    <h3 className="font-semibold text-lg text-foreground">
                       {agent.name}
                     </h3>
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-brand-600 text-white">
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary text-primary-foreground">
                       {agent.status}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="text-gray-600">Cash</p>
-                      <p className="font-medium">${agent.portfolio.cash.toLocaleString()}</p>
+                      <p className="text-muted-foreground">Cash</p>
+                      <p className="font-medium text-foreground">${agent.portfolio.cash.toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Positions</p>
-                      <p className="font-medium">{Object.keys(agent.portfolio.positions).length}</p>
+                      <p className="text-muted-foreground">Positions</p>
+                      <p className="font-medium text-foreground">{Object.keys(agent.portfolio.positions).length}</p>
                     </div>
                   </div>
                 </Link>
@@ -164,13 +164,13 @@ export function ExperimentPage() {
         <>
           {leaderboardLoading ? (
             <div className="flex items-center justify-center h-64">
-              <div className="text-gray-500">Loading leaderboard...</div>
+              <div className="text-muted-foreground">Loading leaderboard...</div>
             </div>
           ) : leaderboard?.entries ? (
             <Leaderboard entries={leaderboard.entries} />
           ) : (
-            <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
-              <div className="text-gray-500">No leaderboard data available</div>
+            <div className="flex items-center justify-center h-64 bg-muted rounded-xl">
+              <div className="text-muted-foreground">No leaderboard data available</div>
             </div>
           )}
         </>
@@ -180,7 +180,7 @@ export function ExperimentPage() {
         <>
           {performanceLoading ? (
             <div className="flex items-center justify-center h-64">
-              <div className="text-gray-500">Loading performance data...</div>
+              <div className="text-muted-foreground">Loading performance data...</div>
             </div>
           ) : performance?.data_points ? (
             <PerformanceChart
@@ -189,8 +189,8 @@ export function ExperimentPage() {
               startingCapital={experiment.starting_capital}
             />
           ) : (
-            <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
-              <div className="text-gray-500">No performance data available</div>
+            <div className="flex items-center justify-center h-64 bg-muted rounded-xl">
+              <div className="text-muted-foreground">No performance data available</div>
             </div>
           )}
         </>
@@ -200,37 +200,37 @@ export function ExperimentPage() {
         <>
           {taxMetricsLoading || holdingPeriodsLoading || reportLoading ? (
             <div className="flex items-center justify-center h-64">
-              <div className="text-gray-500">Loading analysis data...</div>
+              <div className="text-muted-foreground">Loading analysis data...</div>
             </div>
           ) : (
             <div className="space-y-6">
               {taxMetricsError ? (
-                <div className="flex items-center justify-center h-32 bg-red-50 rounded-lg border border-red-200">
-                  <div className="text-red-600">Failed to load tax metrics: {taxMetricsError.message}</div>
+                <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
+                  <div className="text-red-600 dark:text-red-400">Failed to load tax metrics: {taxMetricsError.message}</div>
                 </div>
               ) : taxMetrics && Object.keys(taxMetrics).length > 0 ? (
                 <TaxImpactChart taxMetrics={taxMetrics} agentNames={agentNames} />
               ) : (
-                <div className="flex items-center justify-center h-32 bg-gray-50 rounded-lg">
-                  <div className="text-gray-500">No tax data available — complete some sell transactions</div>
+                <div className="flex items-center justify-center h-32 bg-muted rounded-xl">
+                  <div className="text-muted-foreground">No tax data available — complete some sell transactions</div>
                 </div>
               )}
 
               {holdingPeriodsError ? (
-                <div className="flex items-center justify-center h-32 bg-red-50 rounded-lg border border-red-200">
-                  <div className="text-red-600">Failed to load holding periods: {holdingPeriodsError.message}</div>
+                <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
+                  <div className="text-red-600 dark:text-red-400">Failed to load holding periods: {holdingPeriodsError.message}</div>
                 </div>
               ) : holdingPeriods && Object.keys(holdingPeriods).length > 0 ? (
                 <HoldingPeriodChart holdingPeriods={holdingPeriods} agentNames={agentNames} />
               ) : (
-                <div className="flex items-center justify-center h-32 bg-gray-50 rounded-lg">
-                  <div className="text-gray-500">No holding period data available — complete some sell transactions</div>
+                <div className="flex items-center justify-center h-32 bg-muted rounded-xl">
+                  <div className="text-muted-foreground">No holding period data available — complete some sell transactions</div>
                 </div>
               )}
 
               {reportError ? (
-                <div className="flex items-center justify-center h-32 bg-red-50 rounded-lg border border-red-200">
-                  <div className="text-red-600">Failed to load report: {reportError.message}</div>
+                <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
+                  <div className="text-red-600 dark:text-red-400">Failed to load report: {reportError.message}</div>
                 </div>
               ) : experimentReport ? (
                 <ExperimentReportView report={experimentReport} />

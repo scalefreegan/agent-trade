@@ -171,17 +171,16 @@ export function AgentPerformanceChart({
                   padding: '0.75rem',
                 }}
                 labelStyle={{ fontWeight: 600, marginBottom: '0.5rem', color: '#111827' }}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                formatter={((value: any, name: string) => {
-                  const v = (value as number) ?? 0;
+                formatter={(value: number | undefined, name: string | undefined) => {
+                  const v = value ?? 0;
                   if (name === 'value') {
                     return [formatCurrency(v), 'Portfolio Value'];
                   }
                   if (name === 'gain') {
                     return [formatCurrency(v), 'Gain/Loss'];
                   }
-                  return [v, name];
-                }) as any}
+                  return [v, name ?? ''];
+                }}
                 labelFormatter={(day) => `Day ${day}`}
               />
               <Legend

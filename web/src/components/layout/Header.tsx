@@ -1,91 +1,34 @@
-import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useTheme } from '../../context/ThemeContext';
 
-interface HeaderProps {
-  onToggleSidebar: () => void;
-}
-
-function useDarkMode() {
-  const [dark, setDark] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    const stored = localStorage.getItem('theme');
-    if (stored) return stored === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (dark) {
-      root.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [dark]);
-
-  return [dark, setDark] as const;
-}
-
-function useBreadcrumb() {
-  const location = useLocation();
-  const parts = location.pathname.split('/').filter(Boolean);
-  if (parts.length === 0) return 'Dashboard';
-  if (parts[0] === 'experiments') {
-    if (parts.length === 1) return 'Experiments';
-    if (parts.length === 2) return `Experiment · ${parts[1]}`;
-    if (parts[2] === 'agents' && parts[3]) return `Agent · ${parts[3]}`;
-  }
-  return parts[parts.length - 1];
-}
-
-export function Header({ onToggleSidebar }: HeaderProps) {
-  const [dark, setDark] = useDarkMode();
-  const label = useBreadcrumb();
+export function Header() {
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center gap-4 flex-shrink-0">
-      {/* Sidebar toggle */}
-      <button
-        onClick={onToggleSidebar}
-        className="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-        aria-label="Toggle sidebar"
-      >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      </button>
-
-      {/* Breadcrumb */}
-      <p className="text-sm font-mono text-gray-500 dark:text-gray-400 truncate flex-1">
-        {label}
-      </p>
+    <header className="bg-card border-b border-border px-4 py-3 flex items-center gap-4 flex-shrink-0">
+      <div className="flex-1" />
 
       {/* Dark mode toggle */}
       <button
-        onClick={() => setDark((d) => !d)}
-        className="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-        aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-        title={dark ? 'Light mode' : 'Dark mode'}
+        onClick={toggleTheme}
+        className="p-1.5 rounded text-muted-foreground hover:bg-muted transition-colors"
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
       >
-        {dark ? (
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <circle cx="9" cy="9" r="4" stroke="currentColor" strokeWidth="1.5" />
-            <path
-              d="M9 1v2M9 15v2M1 9h2M15 9h2M3.22 3.22l1.42 1.42M13.36 13.36l1.42 1.42M3.22 14.78l1.42-1.42M13.36 4.64l1.42-1.42"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
+        {theme === 'dark' ? (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
           </svg>
         ) : (
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M15 10.5A6 6 0 017.5 3a6.5 6.5 0 100 12A6 6 0 0115 10.5z"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
         )}
       </button>

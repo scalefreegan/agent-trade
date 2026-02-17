@@ -1,71 +1,80 @@
 import { Link, useLocation } from 'react-router-dom';
+import { DashboardIcon } from '../../assets/icons/DashboardIcon';
 
 interface SidebarProps {
-  onClose?: () => void;
+  collapsed: boolean;
+  onToggle: () => void;
 }
 
-export function Sidebar({ onClose }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
 
   const isActive = (path: string) =>
     location.pathname === path
-      ? 'bg-brand-800 text-white'
-      : 'text-gray-300 hover:bg-brand-900 hover:text-white';
+      ? 'bg-white/15 text-white'
+      : 'text-white/70 hover:bg-white/10 hover:text-white';
 
   return (
-    <div className="w-64 h-full bg-brand-900 dark:bg-gray-950 text-white flex flex-col">
+    <div
+      className={`
+        flex-shrink-0 h-full bg-sidebar-bg text-sidebar-foreground flex flex-col
+        transition-all duration-200 ease-in-out overflow-hidden
+        ${collapsed ? 'w-12' : 'w-64'}
+      `}
+    >
       {/* Logo */}
-      <div className="p-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-brand-400">Agent Trade</h1>
-          <p className="text-xs font-mono text-brand-300 mt-0.5 uppercase tracking-widest">
-            Multi-Agent Trading
-          </p>
-        </div>
-        {/* Close button (mobile only) */}
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="lg:hidden text-brand-300 hover:text-white transition-colors p-1 rounded"
-            aria-label="Close sidebar"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path
-                d="M2 2l14 14M16 2L2 16"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+      <div className={`flex items-center flex-shrink-0 ${collapsed ? 'justify-center px-0 py-6' : 'p-6'}`}>
+        {collapsed ? (
+          <span className="text-xl font-bold text-white leading-none">A</span>
+        ) : (
+          <div>
+            <h1 className="text-2xl font-bold text-white">Agent Trade</h1>
+            <p className="text-xs text-white/60 mt-0.5 uppercase tracking-widest">Multi-Agent Trading</p>
+          </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-4 space-y-1">
+      <nav className="flex-1 flex flex-col px-1.5 space-y-1 overflow-hidden">
         <Link
           to="/"
-          className={`flex items-center px-4 py-3 rounded-lg transition-colors ${isActive('/')}`}
-          onClick={onClose}
+          title={collapsed ? 'Dashboard' : undefined}
+          className={`flex items-center rounded-lg transition-colors ${isActive('/')} ${
+            collapsed ? 'justify-center px-0 py-3' : 'px-4 py-3'
+          }`}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 18 18"
-            fill="none"
-            className="mr-3 flex-shrink-0"
-          >
-            <rect x="1" y="9" width="4" height="8" rx="1" fill="currentColor" opacity="0.6" />
-            <rect x="7" y="5" width="4" height="12" rx="1" fill="currentColor" opacity="0.8" />
-            <rect x="13" y="1" width="4" height="16" rx="1" fill="currentColor" />
-          </svg>
-          <span className="text-sm font-medium">Dashboard</span>
+          <DashboardIcon className="w-5 h-5 shrink-0" />
+          {!collapsed && <span className="ml-3 text-sm font-medium whitespace-nowrap">Dashboard</span>}
         </Link>
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-brand-800 dark:border-gray-800">
-        <p className="text-xs font-mono text-brand-300 dark:text-gray-600">Agent Trade v1.0</p>
+      {/* Collapse toggle */}
+      <div className={`flex-shrink-0 border-t border-white/10 ${collapsed ? 'p-1.5' : 'p-3'}`}>
+        <button
+          onClick={onToggle}
+          className="w-full flex items-center justify-center rounded-lg py-2 text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            className={`transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`}
+          >
+            <path
+              d="M10 3L5 8l5 5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {!collapsed && (
+            <span className="ml-2 text-xs font-mono">Collapse</span>
+          )}
+        </button>
       </div>
     </div>
   );

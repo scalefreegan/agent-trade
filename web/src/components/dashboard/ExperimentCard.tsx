@@ -8,50 +8,40 @@ interface ExperimentCardProps {
 
 export function ExperimentCard({ experiment, onDelete }: ExperimentCardProps) {
   const statusColor = {
-    active: 'bg-brand-600 text-white',
-    paused: 'bg-yellow-500 text-white',
-    completed: 'bg-gray-500 text-white',
-  }[experiment.status] ?? 'bg-gray-400 text-white';
+    active: 'bg-primary text-primary-foreground',
+    paused: 'bg-warning text-warning-foreground',
+    completed: 'bg-muted text-muted-foreground',
+  }[experiment.status] || 'bg-muted text-muted-foreground';
 
   return (
-    <div className="relative group bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-brand-600 dark:hover:border-brand-700 transition-all">
+    <div className="relative group bg-card text-card-foreground rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary/40 transition-all">
       <Link
         to={`/experiments/${experiment.id}`}
         className="block p-6"
       >
         <div className="flex items-start justify-between mb-4">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 leading-tight pr-2">
+          <h3 className="text-base font-semibold text-foreground leading-tight pr-2">
             {experiment.name}
           </h3>
           <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium ${statusColor}`}>
             {experiment.status}
           </span>
         </div>
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 text-sm text-muted-foreground">
           <div className="flex justify-between items-center">
-            <span className="text-gray-500 dark:text-gray-400 font-mono text-xs uppercase tracking-wide">
-              Created
-            </span>
-            <span className="font-mono text-gray-700 dark:text-gray-300 text-xs">
+            <span className="font-mono text-xs uppercase tracking-wide">Created</span>
+            <span className="font-mono text-foreground text-xs">
               {new Date(experiment.created_at).toLocaleDateString()}
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-gray-500 dark:text-gray-400 font-mono text-xs uppercase tracking-wide">
-              Agents
-            </span>
-            <span className="font-mono text-gray-700 dark:text-gray-300 text-xs">
-              {experiment.num_agents}
-            </span>
+            <span className="font-mono text-xs uppercase tracking-wide">Agents</span>
+            <span className="font-mono text-foreground text-xs">{experiment.num_agents}</span>
           </div>
           {experiment.current_day !== null && (
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 dark:text-gray-400 font-mono text-xs uppercase tracking-wide">
-                Trading Day
-              </span>
-              <span className="font-mono text-gray-700 dark:text-gray-300 text-xs">
-                {experiment.current_day}
-              </span>
+              <span className="font-mono text-xs uppercase tracking-wide">Trading Day</span>
+              <span className="font-mono text-foreground text-xs">{experiment.current_day}</span>
             </div>
           )}
         </div>
@@ -67,8 +57,7 @@ export function ExperimentCard({ experiment, onDelete }: ExperimentCardProps) {
           }}
           className="
             absolute top-3 right-3 p-1.5 rounded
-            text-gray-300 dark:text-gray-600
-            hover:text-red-500 dark:hover:text-red-400
+            text-muted-foreground/30 hover:text-red-500
             hover:bg-red-50 dark:hover:bg-red-900/20
             opacity-0 group-hover:opacity-100
             transition-all focus:opacity-100
