@@ -9,7 +9,7 @@ interface ExperimentCardProps {
 export function ExperimentCard({ experiment, onDelete }: ExperimentCardProps) {
   const statusColor = {
     active: 'bg-primary text-primary-foreground',
-    paused: 'bg-yellow-500 text-white',
+    paused: 'bg-warning text-warning-foreground',
     completed: 'bg-muted text-muted-foreground',
   }[experiment.status] || 'bg-muted text-muted-foreground';
 

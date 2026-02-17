@@ -16,6 +16,8 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-gain: var(--gain);
   --color-loss: var(--loss);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
 
   /* Brand palette */
   --color-brand-50: #FFFF3F;
@@ -48,6 +50,8 @@
   --sidebar-foreground: #ffffff;
   --gain: #059669;
   --loss: #dc2626;
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
 }
 
 /* Dark theme */
@@ -65,6 +69,8 @@
   --sidebar-foreground: #f1f5f9;
   --gain: #34d399;
   --loss: #f87171;
+  --warning: #f59e0b;
+  --warning-foreground: #1c1917;
 }
 
 @layer base {
