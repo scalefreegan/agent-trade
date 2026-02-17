@@ -34,6 +34,7 @@ def process_daily_cycle(
     date: str,
     decisions_base_dir: Path,
     timeout: int = 300,
+    progress_callback: Optional[callable] = None,
 ) -> DailyOutcome:
     """
     Process a complete daily trading cycle.
@@ -48,6 +49,8 @@ def process_daily_cycle(
         date: Trading date (YYYY-MM-DD)
         decisions_base_dir: Base directory for agent decisions
         timeout: Maximum time per agent in seconds
+        progress_callback: Optional callback for progress events.
+            Called with (event_type: str, agent_id: Optional[str], message: Optional[str])
 
     Returns:
         DailyOutcome with transactions, portfolio values, eliminations
@@ -77,6 +80,7 @@ def process_daily_cycle(
             date=date,
             decisions_base_dir=decisions_base_dir,
             timeout=timeout,
+            progress_callback=progress_callback,
         )
     )
 
