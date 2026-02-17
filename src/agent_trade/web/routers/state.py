@@ -4,9 +4,8 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends
 
 from agent_trade.experiment.analysis_reporter import generate_leaderboard
-from agent_trade.experiment.market_data import get_current_prices
 from agent_trade.experiment.models import GameState
-from agent_trade.web.dependencies import load_experiment_state
+from agent_trade.web.dependencies import get_cached_prices, load_experiment_state
 from agent_trade.web.schemas import (
     AgentStateResponse,
     GameStateResponse,
@@ -31,10 +30,10 @@ async def get_game_state(
         for position in agent_state.portfolio.positions:
             all_symbols.add(position.symbol)
 
-    # Fetch current prices
+    # Fetch current prices (30s TTL cache)
     prices = {}
     if all_symbols:
-        prices = get_current_prices(list(all_symbols))
+        prices = get_cached_prices(list(all_symbols))
 
     # Build response
     agents = []
@@ -90,8 +89,16 @@ async def get_leaderboard(
     state: GameState = Depends(load_experiment_state),
 ) -> LeaderboardResponse:
     """Get experiment leaderboard sorted by portfolio value."""
-    # Generate leaderboard using existing function
-    leaderboard = generate_leaderboard(state)
+    # Collect all symbols and fetch via 30s TTL cache
+    all_symbols: set[str] = set()
+    for agent in state.agents.values():
+        for position in agent.portfolio.positions:
+            all_symbols.add(position.symbol)
+
+    prices = get_cached_prices(list(all_symbols)) if all_symbols else {}
+
+    # Generate leaderboard using pre-fetched cached prices
+    leaderboard = generate_leaderboard(state, current_prices=prices)
 
     # Calculate returns percentage relative to starting capital
     starting_capital = state.config.starting_capital

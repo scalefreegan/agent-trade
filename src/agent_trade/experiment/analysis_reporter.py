@@ -23,12 +23,15 @@ logger = logging.getLogger(__name__)
 
 def generate_leaderboard(
     game_state: GameState,
+    current_prices: dict | None = None,
 ) -> list[tuple[str, str, Decimal, str]]:
     """
     Generate leaderboard ranking agents by portfolio value.
 
     Args:
         game_state: Current game state
+        current_prices: Optional pre-fetched price map (symbol -> price).
+            If not provided, prices are fetched fresh via get_current_prices().
 
     Returns:
         List of (agent_id, name, portfolio_value, status) tuples,
@@ -40,7 +43,8 @@ def generate_leaderboard(
         for position in agent.portfolio.positions:
             all_symbols.add(position.symbol)
 
-    current_prices = get_current_prices(list(all_symbols))
+    if current_prices is None:
+        current_prices = get_current_prices(list(all_symbols))
 
     # Calculate rankings
     rankings = []
