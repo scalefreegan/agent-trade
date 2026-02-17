@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -16,7 +16,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
-  useEffect(() => {
+  // useLayoutEffect ensures the .dark class is applied synchronously before the
+  // browser paints, preventing a flash of the wrong theme on both initial mount
+  // and subsequent toggles. The index.html inline script handles the very first
+  // render (before React mounts), so these two mechanisms together give
+  // zero-flash dark mode across all load and toggle scenarios.
+  useLayoutEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');

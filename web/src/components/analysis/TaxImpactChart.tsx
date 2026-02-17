@@ -43,7 +43,8 @@ interface ChartDataPoint {
   taxDragPct: number;
 }
 
-const formatCurrency = (value: number): string => {
+const formatCurrency = (value: number | null | undefined): string => {
+  if (value == null || !isFinite(value)) return '—';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -89,7 +90,7 @@ export function TaxImpactChart({ taxMetrics, agentNames }: TaxImpactChartProps) 
           </div>
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground text-xs">Tax Drag</span>
-            <span className="font-medium" style={{ color: ct.shortTermColor }}>{data.taxDragPct.toFixed(2)}%</span>
+            <span className="font-medium" style={{ color: ct.shortTermColor }}>{(data.taxDragPct ?? 0).toFixed(2)}%</span>
           </div>
         </div>
       </div>
@@ -113,10 +114,10 @@ export function TaxImpactChart({ taxMetrics, agentNames }: TaxImpactChartProps) 
   const chartData: ChartDataPoint[] = Object.entries(taxMetrics).map(([agentId, metrics]) => ({
     agentId,
     agentName: agentNames[agentId] || agentId,
-    shortTermTax: metrics.short_term_tax,
-    longTermTax: metrics.long_term_tax,
-    totalTax: metrics.total_tax,
-    taxDragPct: metrics.tax_drag_pct,
+    shortTermTax: metrics.short_term_tax ?? 0,
+    longTermTax: metrics.long_term_tax ?? 0,
+    totalTax: metrics.total_tax ?? 0,
+    taxDragPct: metrics.tax_drag_pct ?? 0,
   }));
 
   // Sort by total tax descending for better visual hierarchy

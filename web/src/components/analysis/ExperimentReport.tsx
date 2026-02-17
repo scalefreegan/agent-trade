@@ -6,10 +6,15 @@ interface ExperimentReportViewProps {
   report: ExperimentReport;
 }
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+const formatCurrency = (value: number | null | undefined): string => {
+  if (value == null || !isFinite(value)) return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+};
 
-const formatPct = (value: number) => `${value.toFixed(2)}%`;
+const formatPct = (value: number | null | undefined): string => {
+  if (value == null || !isFinite(value)) return '—';
+  return `${value.toFixed(2)}%`;
+};
 
 export function ExperimentReportView({ report }: ExperimentReportViewProps) {
   if (!report.leaderboard) {
@@ -156,7 +161,7 @@ export function ExperimentReportView({ report }: ExperimentReportViewProps) {
                         {formatPct(metrics.tax_drag_pct)}
                       </td>
                       <td className="py-3 text-right tabular-nums text-muted-foreground">
-                        {metrics.avg_holding_period_days.toFixed(1)}d
+                        {(metrics.avg_holding_period_days ?? 0).toFixed(1)}d
                       </td>
                     </tr>
                   );

@@ -68,14 +68,16 @@ function buildTheme(): ChartTheme {
 export function useChartTheme(): ChartTheme {
   const { theme } = useTheme();
 
-  // Initialize by reading the DOM directly so that if ThemeProvider has already
-  // applied the .dark class (e.g. from localStorage on mount), we pick it up
-  // immediately rather than defaulting to light colors until the rAF fires.
+  // On cold load, the index.html inline script has already applied the .dark
+  // class synchronously, so buildTheme() reads the correct class here.
+  // On toggle, ThemeProvider.useLayoutEffect applies the class synchronously
+  // before paint; the rAF below fires after that, so it too reads correctly.
   const [chartTheme, setChartTheme] = useState<ChartTheme>(buildTheme);
 
   useEffect(() => {
-    // ThemeProvider updates the DOM class in its own effect. Schedule our
-    // re-read one frame later so the class change is guaranteed to be applied.
+    // ThemeProvider uses useLayoutEffect, so the .dark class is always set
+    // before this effect fires. The rAF defers the DOM read until after the
+    // current paint cycle, ensuring getComputedStyle sees the updated values.
     const id = requestAnimationFrame(() => setChartTheme(buildTheme()));
     return () => cancelAnimationFrame(id);
   }, [theme]);
