@@ -109,6 +109,11 @@ class GameStateResponse(BaseModel):
     agents: list[AgentStateResponse]
 
 
+# ==============================================================================
+# Leaderboard & Performance Schemas
+# ==============================================================================
+
+
 class LeaderboardEntry(BaseModel):
     """Leaderboard entry for a single agent."""
 
@@ -152,3 +157,118 @@ class PerformanceResponse(BaseModel):
     """Performance time-series response."""
 
     data_points: list[PerformanceDataPoint]
+
+
+# ==============================================================================
+# Agent Detail Schemas
+# ==============================================================================
+
+
+class PortfolioMetrics(BaseModel):
+    """Calculated metrics for a portfolio."""
+
+    total_value: float
+    unrealized_gain: float
+    unrealized_gain_pct: float
+    positions_count: int
+    cash_pct: float
+    invested_pct: float
+
+    @field_serializer(
+        "total_value",
+        "unrealized_gain",
+        "unrealized_gain_pct",
+        "cash_pct",
+        "invested_pct",
+    )
+    def serialize_decimal(self, v: Any) -> float:
+        """Convert Decimal to float."""
+        if isinstance(v, Decimal):
+            return float(v)
+        return v
+
+
+class InvestmentThesisResponse(BaseModel):
+    """Investment thesis information."""
+
+    philosophy: str
+    risk_tolerance: str
+    preferred_sectors: list[str]
+    time_horizon: str
+    key_metrics: list[str]
+
+
+class StrategyLearningResponse(BaseModel):
+    """Strategy learning entry."""
+
+    date: str
+    observation: str
+    outcome: str
+    lesson: str
+
+
+class StrategyResponse(BaseModel):
+    """Agent strategy information."""
+
+    thesis: InvestmentThesisResponse
+    rationale: str
+    learnings: list[StrategyLearningResponse]
+    last_updated: datetime
+
+
+class TransactionRecord(BaseModel):
+    """Single transaction record."""
+
+    date: str
+    action: str  # "BUY" or "SELL"
+    symbol: str
+    shares: float
+    price: float
+    total: float
+    tax_paid: float | None = None
+
+    @field_serializer("shares", "price", "total", "tax_paid")
+    def serialize_decimal(self, v: Any) -> float | None:
+        """Convert Decimal to float."""
+        if v is None:
+            return None
+        if isinstance(v, Decimal):
+            return float(v)
+        return v
+
+
+class TransactionHistoryResponse(BaseModel):
+    """Transaction history for an agent."""
+
+    transactions: list[TransactionRecord]
+    total_buy_volume: float
+    total_sell_volume: float
+    total_tax_paid: float
+
+    @field_serializer("total_buy_volume", "total_sell_volume", "total_tax_paid")
+    def serialize_decimal(self, v: Any) -> float:
+        """Convert Decimal to float."""
+        if isinstance(v, Decimal):
+            return float(v)
+        return v
+
+
+class DecisionLogEntry(BaseModel):
+    """Decision log entry."""
+
+    date: str
+    trading_day: int
+    has_orders: bool
+    order_count: int
+
+
+class AgentDetailResponse(BaseModel):
+    """Complete agent details."""
+
+    agent_id: str
+    name: str
+    status: str
+    portfolio: PortfolioResponse
+    metrics: PortfolioMetrics
+    created_at: datetime
+    eliminated_at: datetime | None = None

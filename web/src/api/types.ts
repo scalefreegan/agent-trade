@@ -53,6 +53,10 @@ export interface GameState {
   agents: AgentState[];
 }
 
+// ==============================================================================
+// Leaderboard & Performance Types
+// ==============================================================================
+
 export interface LeaderboardEntry {
   rank: number;
   agent_id: string;
@@ -74,4 +78,73 @@ export interface PerformanceDataPoint {
 
 export interface PerformanceResponse {
   data_points: PerformanceDataPoint[];
+}
+
+// ==============================================================================
+// Agent Detail Types
+// ==============================================================================
+
+export interface PortfolioMetrics {
+  total_value: number;
+  unrealized_gain: number;
+  unrealized_gain_pct: number;
+  positions_count: number;
+  cash_pct: number;
+  invested_pct: number;
+}
+
+export interface InvestmentThesis {
+  philosophy: string;
+  risk_tolerance: string;
+  preferred_sectors: string[];
+  time_horizon: string;
+  key_metrics: string[];
+}
+
+export interface StrategyLearning {
+  date: string;
+  observation: string;
+  outcome: string;
+  lesson: string;
+}
+
+export interface AgentStrategy {
+  thesis: InvestmentThesis;
+  rationale: string;
+  learnings: StrategyLearning[];
+  last_updated: string;
+}
+
+export interface TransactionRecord {
+  date: string;
+  action: 'BUY' | 'SELL';
+  symbol: string;
+  shares: number;
+  price: number;
+  total: number;
+  tax_paid: number | null;
+}
+
+export interface TransactionHistory {
+  transactions: TransactionRecord[];
+  total_buy_volume: number;
+  total_sell_volume: number;
+  total_tax_paid: number;
+}
+
+export interface DecisionLogEntry {
+  date: string;
+  trading_day: number;
+  has_orders: boolean;
+  order_count: number;
+}
+
+export interface AgentDetail {
+  agent_id: string;
+  name: string;
+  status: string;
+  portfolio: Portfolio;
+  metrics: PortfolioMetrics;
+  created_at: string;
+  eliminated_at: string | null;
 }

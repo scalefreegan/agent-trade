@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useExperiment, useGameState } from '../api/experiments';
 import { useLeaderboard, usePerformance } from '../api/performance';
 import { Leaderboard } from '../components/experiment/Leaderboard';
@@ -106,9 +106,15 @@ export function ExperimentPage() {
             <h2 className="text-xl font-semibold mb-4">Agents</h2>
             <div className="space-y-4">
               {gameState.agents.map((agent) => (
-                <div key={agent.agent_id} className="border border-gray-200 rounded-lg p-4">
+                <Link
+                  key={agent.agent_id}
+                  to={`/experiments/${experimentId}/agents/${agent.agent_id}`}
+                  className="block border border-gray-200 rounded-lg p-4 hover:border-brand-600 hover:shadow-md transition-all"
+                >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-lg">{agent.name}</h3>
+                    <h3 className="font-semibold text-lg text-brand-900 hover:text-brand-700">
+                      {agent.name}
+                    </h3>
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-brand-600 text-white">
                       {agent.status}
                     </span>
@@ -123,7 +129,7 @@ export function ExperimentPage() {
                       <p className="font-medium">{Object.keys(agent.portfolio.positions).length}</p>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
