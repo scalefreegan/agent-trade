@@ -11,6 +11,7 @@ import {
 import type { PerformanceDataPoint } from '../../api/types';
 import { getChartColor } from '../../lib/colors';
 import { Card } from '../ui/Card';
+import { useChartTheme } from '../../hooks/useChartTheme';
 
 interface PerformanceChartProps {
   dataPoints: PerformanceDataPoint[];
@@ -23,6 +24,7 @@ export function PerformanceChart({
   agentRankings,
   startingCapital = 100000,
 }: PerformanceChartProps) {
+  const ct = useChartTheme();
   if (dataPoints.length === 0) {
     return (
       <Card>
@@ -104,22 +106,22 @@ export function PerformanceChart({
 
       <ResponsiveContainer width="100%" height={400}>
         <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+          <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
           <XAxis
             dataKey="day"
-            label={{ value: 'Trading Day', position: 'insideBottom', offset: -5 }}
-            tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
-            stroke="var(--border-color)"
+            label={{ value: 'Trading Day', position: 'insideBottom', offset: -5, style: { fill: ct.axis } }}
+            tick={{ fill: ct.axis, fontSize: 12 }}
+            stroke={ct.axisStroke}
           />
           <YAxis
             label={{
               value: 'Net Gain ($)',
               angle: -90,
               position: 'insideLeft',
-              style: { textAnchor: 'middle', fill: 'var(--muted-foreground)' },
+              style: { textAnchor: 'middle', fill: ct.axis },
             }}
-            tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
-            stroke="var(--border-color)"
+            tick={{ fill: ct.axis, fontSize: 12 }}
+            stroke={ct.axisStroke}
             tickFormatter={(value) =>
               `${value >= 0 ? '+' : ''}${(value / 1000).toFixed(0)}k`
             }
@@ -136,7 +138,7 @@ export function PerformanceChart({
           <Line
             type="monotone"
             dataKey={() => 0}
-            stroke="var(--border-color)"
+            stroke={ct.grid}
             strokeWidth={1}
             strokeDasharray="5 5"
             dot={false}
@@ -156,7 +158,7 @@ export function PerformanceChart({
                 stroke={color}
                 strokeWidth={rank === 1 ? 3 : 2}
                 dot={false}
-                activeDot={{ r: 5, fill: color, stroke: 'var(--card)', strokeWidth: 2 }}
+                activeDot={{ r: 5, fill: color, stroke: ct.tooltip.bg, strokeWidth: 2 }}
                 style={{
                   filter: rank === 1 ? 'drop-shadow(0 0 4px rgba(0, 127, 95, 0.3))' : 'none',
                 }}
