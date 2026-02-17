@@ -83,6 +83,7 @@ export function Leaderboard({ entries }: LeaderboardProps) {
                     className={`px-6 py-4 ${isRight ? 'text-right' : isCenter ? 'text-center' : 'text-left'}`}
                   >
                     <button
+                      type="button"
                       onClick={() => handleSort(key)}
                       className={`flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors group ${isRight ? 'ml-auto' : isCenter ? 'mx-auto' : ''}`}
                     >

@@ -92,7 +92,7 @@ export function ExperimentPage() {
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
-        <>
+        <div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview">
           <Card className="mb-6">
             <h2 className="text-xl font-semibold mb-4 text-foreground">Experiment Details</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
@@ -129,11 +129,11 @@ export function ExperimentPage() {
               ))}
             </div>
           </Card>
-        </>
+        </div>
       )}
 
       {activeTab === 'leaderboard' && (
-        <>
+        <div role="tabpanel" id="panel-leaderboard" aria-labelledby="tab-leaderboard">
           {leaderboardLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-muted-foreground">Loading leaderboard...</div>
@@ -145,11 +145,11 @@ export function ExperimentPage() {
               <div className="text-muted-foreground">No leaderboard data available</div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {activeTab === 'performance' && (
-        <>
+        <div role="tabpanel" id="panel-performance" aria-labelledby="tab-performance">
           {performanceLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-muted-foreground">Loading performance data...</div>
@@ -165,11 +165,11 @@ export function ExperimentPage() {
               <div className="text-muted-foreground">No performance data available</div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {activeTab === 'analysis' && (
-        <>
+        <div role="tabpanel" id="panel-analysis" aria-labelledby="tab-analysis">
           {taxMetricsLoading || holdingPeriodsLoading || reportLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-muted-foreground">Loading analysis data...</div>
@@ -209,7 +209,7 @@ export function ExperimentPage() {
               ) : null}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

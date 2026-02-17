@@ -91,6 +91,7 @@ export default function RunControls({ experimentId }: RunControlsProps) {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <button
+          type="button"
           onClick={handleStartRun}
           disabled={isRunning || isPaused || isCompleted || startRunMutation.isPending}
           className={isRunning || isPaused || isCompleted || startRunMutation.isPending ? disabledBtn : primaryBtn}
@@ -101,6 +102,7 @@ export default function RunControls({ experimentId }: RunControlsProps) {
 
         {!isPaused && !isCompleted && (
           <button
+            type="button"
             onClick={handlePause}
             disabled={isRunning || pauseMutation.isPending}
             className={isRunning || pauseMutation.isPending ? disabledBtn : warningBtn}
@@ -111,6 +113,7 @@ export default function RunControls({ experimentId }: RunControlsProps) {
 
         {isPaused && (
           <button
+            type="button"
             onClick={handleResume}
             disabled={isRunning || resumeMutation.isPending}
             className={isRunning || resumeMutation.isPending ? disabledBtn : gainBtn}

@@ -35,8 +35,11 @@ export function Tabs<T extends string>({ tabs, active, onChange, className = '' 
           <button
             key={tab.id}
             ref={(el) => { tabRefs.current[index] = el; }}
+            type="button"
+            id={`tab-${tab.id}`}
             role="tab"
             aria-selected={active === tab.id}
+            aria-controls={`panel-${tab.id}`}
             tabIndex={active === tab.id ? 0 : -1}
             onClick={() => onChange(tab.id)}
             onKeyDown={(e) => handleKeyDown(e, index)}
