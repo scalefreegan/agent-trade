@@ -9,6 +9,10 @@ import { TaxImpactChart } from '../components/analysis/TaxImpactChart';
 import { HoldingPeriodChart } from '../components/analysis/HoldingPeriodChart';
 import { ExperimentReportView } from '../components/analysis/ExperimentReport';
 import RunControls from '../components/experiment/RunControls';
+import { Card } from '../components/ui/Card';
+import { Tabs } from '../components/ui/Tabs';
+import { Badge, statusVariant } from '../components/ui/Badge';
+import { MetricCard } from '../components/ui/MetricCard';
 
 type Tab = 'overview' | 'leaderboard' | 'performance' | 'analysis';
 
@@ -84,49 +88,27 @@ export function ExperimentPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="border-b border-border mb-6">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                ${
-                  activeTab === tab.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                }
-              `}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} className="mb-6" />
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
         <>
-          <div className="bg-card text-card-foreground rounded-xl border border-border shadow-card p-6 mb-6">
+          <Card className="mb-6">
             <h2 className="text-xl font-semibold mb-4 text-foreground">Experiment Details</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              <div>
-                <p className="text-sm text-muted-foreground">Created</p>
-                <p className="text-lg font-medium text-foreground">{new Date(experiment.created_at).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Starting Capital</p>
-                <p className="text-lg font-medium text-foreground">${experiment.starting_capital.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Agents</p>
-                <p className="text-lg font-medium text-foreground">{experiment.num_agents}</p>
-              </div>
+              <MetricCard
+                label="Created"
+                value={new Date(experiment.created_at).toLocaleDateString()}
+              />
+              <MetricCard
+                label="Starting Capital"
+                value={`$${experiment.starting_capital.toLocaleString()}`}
+              />
+              <MetricCard label="Agents" value={experiment.num_agents} />
             </div>
-          </div>
+          </Card>
 
-          <div className="bg-card text-card-foreground rounded-xl border border-border shadow-card p-6">
+          <Card>
             <h2 className="text-xl font-semibold mb-4 text-foreground">Agents</h2>
             <div className="space-y-4">
               {gameState.agents.map((agent) => (
@@ -136,27 +118,17 @@ export function ExperimentPage() {
                   className="block border border-border rounded-lg p-4 hover:border-primary hover:shadow-md transition-all"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-lg text-foreground">
-                      {agent.name}
-                    </h3>
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary text-primary-foreground">
-                      {agent.status}
-                    </span>
+                    <h3 className="font-semibold text-lg text-foreground">{agent.name}</h3>
+                    <Badge variant={statusVariant(agent.status)}>{agent.status}</Badge>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Cash</p>
-                      <p className="font-medium text-foreground">${agent.portfolio.cash.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Positions</p>
-                      <p className="font-medium text-foreground">{Object.keys(agent.portfolio.positions).length}</p>
-                    </div>
+                    <MetricCard label="Cash" value={`$${agent.portfolio.cash.toLocaleString()}`} />
+                    <MetricCard label="Positions" value={Object.keys(agent.portfolio.positions).length} />
                   </div>
                 </Link>
               ))}
             </div>
-          </div>
+          </Card>
         </>
       )}
 

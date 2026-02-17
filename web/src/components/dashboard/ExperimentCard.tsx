@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { ExperimentListItem } from '../../api/types';
+import { Badge, statusVariant } from '../ui/Badge';
+import { Card } from '../ui/Card';
 
 interface ExperimentCardProps {
   experiment: ExperimentListItem;
@@ -7,25 +9,16 @@ interface ExperimentCardProps {
 }
 
 export function ExperimentCard({ experiment, onDelete }: ExperimentCardProps) {
-  const statusColor = {
-    active: 'bg-primary text-primary-foreground',
-    paused: 'bg-warning text-warning-foreground',
-    completed: 'bg-muted text-muted-foreground',
-  }[experiment.status] || 'bg-muted text-muted-foreground';
-
   return (
-    <div className="relative group bg-card text-card-foreground rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary/40 transition-all">
-      <Link
-        to={`/experiments/${experiment.id}`}
-        className="block p-6"
-      >
+    <Card className="relative group hover:shadow-card-hover hover:border-primary/40 transition-all" padding={false}>
+      <Link to={`/experiments/${experiment.id}`} className="block p-6">
         <div className="flex items-start justify-between mb-4">
           <h3 className="text-base font-semibold text-foreground leading-tight pr-2">
             {experiment.name}
           </h3>
-          <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium ${statusColor}`}>
+          <Badge variant={statusVariant(experiment.status)} className="flex-shrink-0 font-mono">
             {experiment.status}
-          </span>
+          </Badge>
         </div>
         <div className="space-y-2 text-sm text-muted-foreground">
           <div className="flex justify-between items-center">
@@ -47,7 +40,6 @@ export function ExperimentCard({ experiment, onDelete }: ExperimentCardProps) {
         </div>
       </Link>
 
-      {/* Delete button (visible on hover) */}
       {onDelete && (
         <button
           onClick={(e) => {
@@ -57,8 +49,8 @@ export function ExperimentCard({ experiment, onDelete }: ExperimentCardProps) {
           }}
           className="
             absolute top-3 right-3 p-1.5 rounded
-            text-muted-foreground/30 hover:text-red-500
-            hover:bg-red-50 dark:hover:bg-red-900/20
+            text-muted-foreground/30 hover:text-loss
+            hover:bg-loss/10
             opacity-0 group-hover:opacity-100
             transition-all focus:opacity-100
           "
@@ -76,6 +68,6 @@ export function ExperimentCard({ experiment, onDelete }: ExperimentCardProps) {
           </svg>
         </button>
       )}
-    </div>
+    </Card>
   );
 }
