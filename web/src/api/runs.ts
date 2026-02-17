@@ -37,7 +37,15 @@ export async function getRunStatus(experimentId: string): Promise<RunStatus> {
 
   if (!response.ok) {
     if (response.status === 404) {
-      // No job found - return idle status
+      // 404 could mean either "no job" or "experiment not found"
+      // Verify the experiment exists before returning idle status
+      const expResponse = await fetch(`/api/v1/experiments/${experimentId}`);
+      if (!expResponse.ok) {
+        // Experiment doesn't exist
+        throw new Error('Experiment not found');
+      }
+
+      // Experiment exists, just no job - return idle status
       return {
         job_id: '',
         experiment_id: experimentId,
@@ -78,6 +86,70 @@ export function useStartRun() {
     onSuccess: (data) => {
       // Invalidate run status
       queryClient.invalidateQueries({ queryKey: ['runStatus', data.experiment_id] });
+    },
+  });
+}
+
+/**
+ * Pause an experiment.
+ */
+export async function pauseExperiment(experimentId: string): Promise<{ status: string; new_status: string }> {
+  const response = await fetch(`/api/v1/experiments/${experimentId}/pause`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error);
+  }
+
+  return response.json();
+}
+
+/**
+ * Resume an experiment.
+ */
+export async function resumeExperiment(experimentId: string): Promise<{ status: string; new_status: string }> {
+  const response = await fetch(`/api/v1/experiments/${experimentId}/resume`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error);
+  }
+
+  return response.json();
+}
+
+/**
+ * Hook to pause an experiment.
+ */
+export function usePauseExperiment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: pauseExperiment,
+    onSuccess: (data, experimentId) => {
+      // Invalidate experiment data
+      queryClient.invalidateQueries({ queryKey: ['experiment', experimentId] });
+      queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
+    },
+  });
+}
+
+/**
+ * Hook to resume an experiment.
+ */
+export function useResumeExperiment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: resumeExperiment,
+    onSuccess: (data, experimentId) => {
+      // Invalidate experiment data
+      queryClient.invalidateQueries({ queryKey: ['experiment', experimentId] });
+      queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
     },
   });
 }

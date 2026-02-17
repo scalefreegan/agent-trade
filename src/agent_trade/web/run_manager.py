@@ -135,7 +135,25 @@ class RunManager:
                 job.events.put(event)
 
             # Run the daily cycle with progress callback
-            run_daily_cycle(job.experiment_id, progress_callback=progress_callback)
+            success = run_daily_cycle(job.experiment_id, progress_callback=progress_callback)
+
+            if not success:
+                # Run was skipped or failed (e.g., non-trading day, missing config)
+                with self._job_lock:
+                    job.status = RunStatus.FAILED
+                    job.completed_at = datetime.now()
+                    job.error = "Run failed or was skipped (check logs for details)"
+
+                # Emit error event
+                error_event = RunEvent(
+                    type="run_error",
+                    timestamp=datetime.now(),
+                    error="Run failed or was skipped",
+                )
+                job.events.put(error_event)
+
+                logger.warning(f"Run failed or was skipped for experiment {job.experiment_id}")
+                return
 
             # Mark as completed
             with self._job_lock:

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+from datetime import datetime
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException
@@ -10,6 +11,8 @@ from fastapi.responses import StreamingResponse
 
 from ..run_manager import RunStatus, run_manager
 from ..schemas import RunStatusResponse
+from ...experiment.coordinator import load_game_state, save_game_state
+from ...experiment.config import save_config
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -111,7 +114,18 @@ async def event_stream(experiment_id: str) -> AsyncGenerator[str, None]:
 
         # Check job status
         current_job = run_manager.get_job(experiment_id)
-        if not current_job or current_job.status in (RunStatus.COMPLETED, RunStatus.FAILED):
+        if not current_job:
+            # Job disappeared (should not happen, but handle gracefully)
+            if not events or events[-1].type not in ("run_complete", "run_error"):
+                error_event = {
+                    "type": "run_error",
+                    "timestamp": datetime.now().isoformat(),
+                    "error": "Job not found",
+                }
+                yield f"data: {json.dumps(error_event)}\n\n"
+            return
+
+        if current_job.status in (RunStatus.COMPLETED, RunStatus.FAILED):
             # Send final status event if we haven't already
             if not events or events[-1].type not in ("run_complete", "run_error"):
                 status_event = {
@@ -146,3 +160,89 @@ async def stream_run(experiment_id: str):
             "X-Accel-Buffering": "no",  # Disable nginx buffering
         },
     )
+
+
+@router.post("/experiments/{experiment_id}/pause")
+async def pause_experiment(experiment_id: str) -> dict:
+    """
+    Pause an experiment.
+
+    Sets the experiment status to 'paused', preventing future runs.
+
+    Args:
+        experiment_id: ID of the experiment to pause
+
+    Returns:
+        Success message with new status
+
+    Raises:
+        HTTPException: 404 if experiment not found, 500 on failure
+    """
+    try:
+        # Load game state
+        game_state = load_game_state(experiment_id)
+        if not game_state:
+            raise HTTPException(status_code=404, detail="Experiment not found")
+
+        # Update status to paused
+        game_state.config.status = "paused"
+
+        # Save game state and config
+        save_game_state(game_state)
+        save_config(game_state.config)
+
+        logger.info(f"Paused experiment {experiment_id}")
+        return {
+            "status": "success",
+            "experiment_id": experiment_id,
+            "new_status": "paused",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to pause experiment {experiment_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/experiments/{experiment_id}/resume")
+async def resume_experiment(experiment_id: str) -> dict:
+    """
+    Resume a paused experiment.
+
+    Sets the experiment status to 'active', allowing runs to proceed.
+
+    Args:
+        experiment_id: ID of the experiment to resume
+
+    Returns:
+        Success message with new status
+
+    Raises:
+        HTTPException: 404 if experiment not found, 500 on failure
+    """
+    try:
+        # Load game state
+        game_state = load_game_state(experiment_id)
+        if not game_state:
+            raise HTTPException(status_code=404, detail="Experiment not found")
+
+        # Update status to active
+        game_state.config.status = "active"
+
+        # Save game state and config
+        save_game_state(game_state)
+        save_config(game_state.config)
+
+        logger.info(f"Resumed experiment {experiment_id}")
+        return {
+            "status": "success",
+            "experiment_id": experiment_id,
+            "new_status": "active",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to resume experiment {experiment_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

@@ -10,7 +10,7 @@ import logging
 import time
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from ..claude_wrapper import query_claude_code
 from .market_data import get_current_prices
@@ -114,7 +114,7 @@ async def spawn_all_agents(
     date: str,
     decisions_base_dir: Path,
     timeout: int = 300,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[str, Optional[str], Optional[str]], None]] = None,
 ) -> dict[str, DailyDecision]:
     """
     Spawn all active agents in parallel for daily decisions.

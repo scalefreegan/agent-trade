@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from .agent_runner import spawn_all_agents
 from .market_data import get_current_prices
@@ -34,7 +34,7 @@ def process_daily_cycle(
     date: str,
     decisions_base_dir: Path,
     timeout: int = 300,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[str, Optional[str], Optional[str]], None]] = None,
 ) -> DailyOutcome:
     """
     Process a complete daily trading cycle.

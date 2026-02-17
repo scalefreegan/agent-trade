@@ -8,6 +8,7 @@ a single day's trading cycle for an experiment.
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable, Optional
 
 from .config import get_experiment_dir, load_config, save_config
 from .coordinator import (
@@ -39,7 +40,7 @@ def run_daily_cycle(
     experiment_id: str,
     force: bool = False,
     timeout: int = 300,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[str, Optional[str], Optional[str]], None]] = None,
 ) -> bool:
     """
     Run a single daily trading cycle for an experiment.
