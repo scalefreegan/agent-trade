@@ -42,6 +42,7 @@ export function ExperimentCard({ experiment, onDelete }: ExperimentCardProps) {
 
       {onDelete && (
         <button
+          type="button"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();

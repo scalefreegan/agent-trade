@@ -90,127 +90,119 @@ export function ExperimentPage() {
       {/* Tab Navigation */}
       <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} className="mb-6" />
 
-      {/* Tab Content */}
-      {activeTab === 'overview' && (
-        <div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview">
-          <Card className="mb-6">
-            <h2 className="text-xl font-semibold mb-4 text-foreground">Experiment Details</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              <MetricCard
-                label="Created"
-                value={new Date(experiment.created_at).toLocaleDateString()}
-              />
-              <MetricCard
-                label="Starting Capital"
-                value={`$${experiment.starting_capital.toLocaleString()}`}
-              />
-              <MetricCard label="Agents" value={experiment.num_agents} />
-            </div>
-          </Card>
-
-          <Card>
-            <h2 className="text-xl font-semibold mb-4 text-foreground">Agents</h2>
-            <div className="space-y-4">
-              {gameState.agents.map((agent) => (
-                <Link
-                  key={agent.agent_id}
-                  to={`/experiments/${experimentId}/agents/${agent.agent_id}`}
-                  className="block border border-border rounded-lg p-4 hover:border-primary hover:shadow-md transition-all"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-lg text-foreground">{agent.name}</h3>
-                    <Badge variant={statusVariant(agent.status)}>{agent.status}</Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <MetricCard label="Cash" value={`$${agent.portfolio.cash.toLocaleString()}`} />
-                    <MetricCard label="Positions" value={Object.keys(agent.portfolio.positions).length} />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === 'leaderboard' && (
-        <div role="tabpanel" id="panel-leaderboard" aria-labelledby="tab-leaderboard">
-          {leaderboardLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-muted-foreground">Loading leaderboard...</div>
-            </div>
-          ) : leaderboard?.entries ? (
-            <Leaderboard entries={leaderboard.entries} />
-          ) : (
-            <div className="flex items-center justify-center h-64 bg-muted rounded-xl">
-              <div className="text-muted-foreground">No leaderboard data available</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'performance' && (
-        <div role="tabpanel" id="panel-performance" aria-labelledby="tab-performance">
-          {performanceLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-muted-foreground">Loading performance data...</div>
-            </div>
-          ) : performance?.data_points ? (
-            <PerformanceChart
-              dataPoints={performance.data_points}
-              agentRankings={agentRankings}
-              startingCapital={experiment.starting_capital}
+      {/* Tab panels — always mounted so aria-controls always resolves; inactive panels hidden */}
+      <div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" hidden={activeTab !== 'overview'}>
+        <Card className="mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-foreground">Experiment Details</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            <MetricCard
+              label="Created"
+              value={new Date(experiment.created_at).toLocaleDateString()}
             />
-          ) : (
-            <div className="flex items-center justify-center h-64 bg-muted rounded-xl">
-              <div className="text-muted-foreground">No performance data available</div>
-            </div>
-          )}
-        </div>
-      )}
+            <MetricCard
+              label="Starting Capital"
+              value={`$${experiment.starting_capital.toLocaleString()}`}
+            />
+            <MetricCard label="Agents" value={experiment.num_agents} />
+          </div>
+        </Card>
 
-      {activeTab === 'analysis' && (
-        <div role="tabpanel" id="panel-analysis" aria-labelledby="tab-analysis">
-          {taxMetricsLoading || holdingPeriodsLoading || reportLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-muted-foreground">Loading analysis data...</div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {taxMetricsError ? (
-                <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
-                  <div className="text-red-600 dark:text-red-400">Failed to load tax metrics: {taxMetricsError.message}</div>
+        <Card>
+          <h2 className="text-xl font-semibold mb-4 text-foreground">Agents</h2>
+          <div className="space-y-4">
+            {gameState.agents.map((agent) => (
+              <Link
+                key={agent.agent_id}
+                to={`/experiments/${experimentId}/agents/${agent.agent_id}`}
+                className="block border border-border rounded-lg p-4 hover:border-primary hover:shadow-md transition-all"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-lg text-foreground">{agent.name}</h3>
+                  <Badge variant={statusVariant(agent.status)}>{agent.status}</Badge>
                 </div>
-              ) : taxMetrics && Object.keys(taxMetrics).length > 0 ? (
-                <TaxImpactChart taxMetrics={taxMetrics} agentNames={agentNames} />
-              ) : (
-                <div className="flex items-center justify-center h-32 bg-muted rounded-xl">
-                  <div className="text-muted-foreground">No tax data available — complete some sell transactions</div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <MetricCard label="Cash" value={`$${agent.portfolio.cash.toLocaleString()}`} />
+                  <MetricCard label="Positions" value={Object.keys(agent.portfolio.positions).length} />
                 </div>
-              )}
+              </Link>
+            ))}
+          </div>
+        </Card>
+      </div>
 
-              {holdingPeriodsError ? (
-                <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
-                  <div className="text-red-600 dark:text-red-400">Failed to load holding periods: {holdingPeriodsError.message}</div>
-                </div>
-              ) : holdingPeriods && Object.keys(holdingPeriods).length > 0 ? (
-                <HoldingPeriodChart holdingPeriods={holdingPeriods} agentNames={agentNames} />
-              ) : (
-                <div className="flex items-center justify-center h-32 bg-muted rounded-xl">
-                  <div className="text-muted-foreground">No holding period data available — complete some sell transactions</div>
-                </div>
-              )}
+      <div role="tabpanel" id="panel-leaderboard" aria-labelledby="tab-leaderboard" hidden={activeTab !== 'leaderboard'}>
+        {leaderboardLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-muted-foreground">Loading leaderboard...</div>
+          </div>
+        ) : leaderboard?.entries ? (
+          <Leaderboard entries={leaderboard.entries} />
+        ) : (
+          <div className="flex items-center justify-center h-64 bg-muted rounded-xl">
+            <div className="text-muted-foreground">No leaderboard data available</div>
+          </div>
+        )}
+      </div>
 
-              {reportError ? (
-                <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
-                  <div className="text-red-600 dark:text-red-400">Failed to load report: {reportError.message}</div>
-                </div>
-              ) : experimentReport ? (
-                <ExperimentReportView report={experimentReport} />
-              ) : null}
-            </div>
-          )}
-        </div>
-      )}
+      <div role="tabpanel" id="panel-performance" aria-labelledby="tab-performance" hidden={activeTab !== 'performance'}>
+        {performanceLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-muted-foreground">Loading performance data...</div>
+          </div>
+        ) : performance?.data_points ? (
+          <PerformanceChart
+            dataPoints={performance.data_points}
+            agentRankings={agentRankings}
+            startingCapital={experiment.starting_capital}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-64 bg-muted rounded-xl">
+            <div className="text-muted-foreground">No performance data available</div>
+          </div>
+        )}
+      </div>
+
+      <div role="tabpanel" id="panel-analysis" aria-labelledby="tab-analysis" hidden={activeTab !== 'analysis'}>
+        {taxMetricsLoading || holdingPeriodsLoading || reportLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-muted-foreground">Loading analysis data...</div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {taxMetricsError ? (
+              <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
+                <div className="text-red-600 dark:text-red-400">Failed to load tax metrics: {taxMetricsError.message}</div>
+              </div>
+            ) : taxMetrics && Object.keys(taxMetrics).length > 0 ? (
+              <TaxImpactChart taxMetrics={taxMetrics} agentNames={agentNames} />
+            ) : (
+              <div className="flex items-center justify-center h-32 bg-muted rounded-xl">
+                <div className="text-muted-foreground">No tax data available — complete some sell transactions</div>
+              </div>
+            )}
+
+            {holdingPeriodsError ? (
+              <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
+                <div className="text-red-600 dark:text-red-400">Failed to load holding periods: {holdingPeriodsError.message}</div>
+              </div>
+            ) : holdingPeriods && Object.keys(holdingPeriods).length > 0 ? (
+              <HoldingPeriodChart holdingPeriods={holdingPeriods} agentNames={agentNames} />
+            ) : (
+              <div className="flex items-center justify-center h-32 bg-muted rounded-xl">
+                <div className="text-muted-foreground">No holding period data available — complete some sell transactions</div>
+              </div>
+            )}
+
+            {reportError ? (
+              <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
+                <div className="text-red-600 dark:text-red-400">Failed to load report: {reportError.message}</div>
+              </div>
+            ) : experimentReport ? (
+              <ExperimentReportView report={experimentReport} />
+            ) : null}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
