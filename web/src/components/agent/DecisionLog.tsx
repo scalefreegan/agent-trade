@@ -367,9 +367,7 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
             </div>
             <div className="modal-body">
               <div className="markdown-content">
-                <Markdown>
-                  {decisionDetail.markdown}
-                </Markdown>
+                <Markdown>{decisionDetail.markdown}</Markdown>
               </div>
             </div>
           </div>

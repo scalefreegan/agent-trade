@@ -33,10 +33,8 @@ export function DashboardPage() {
       {/* Page header */}
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
-            Experiments
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm font-mono">
+          <h1 className="text-3xl font-bold text-foreground tracking-tight">Experiments</h1>
+          <p className="text-muted-foreground mt-1 text-sm font-mono">
             Manage and monitor your multi-agent trading experiments
           </p>
         </div>
@@ -44,9 +42,9 @@ export function DashboardPage() {
           onClick={() => setDialogOpen(true)}
           className="
             flex items-center gap-2 px-4 py-2 rounded text-sm font-mono font-semibold
-            bg-brand-700 hover:bg-brand-800 text-white
-            transition-colors focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2
-            dark:focus:ring-offset-gray-950 whitespace-nowrap flex-shrink-0
+            bg-primary hover:bg-primary/90 text-primary-foreground
+            transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+            whitespace-nowrap flex-shrink-0
           "
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

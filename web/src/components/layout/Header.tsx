@@ -1,30 +1,8 @@
-import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useTheme } from '../../context/ThemeContext';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
-}
-
-function useDarkMode() {
-  const [dark, setDark] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    const stored = localStorage.getItem('theme');
-    if (stored) return stored === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (dark) {
-      root.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [dark]);
-
-  return [dark, setDark] as const;
 }
 
 function useBreadcrumb() {
@@ -40,15 +18,15 @@ function useBreadcrumb() {
 }
 
 export function Header({ onToggleSidebar }: HeaderProps) {
-  const [dark, setDark] = useDarkMode();
+  const { theme, toggleTheme } = useTheme();
   const label = useBreadcrumb();
 
   return (
-    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center gap-4 flex-shrink-0">
+    <header className="bg-card border-b border-border px-4 py-3 flex items-center gap-4 flex-shrink-0">
       {/* Sidebar toggle */}
       <button
         onClick={onToggleSidebar}
-        className="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        className="p-1.5 rounded text-muted-foreground hover:bg-muted transition-colors"
         aria-label="Toggle sidebar"
       >
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -57,18 +35,16 @@ export function Header({ onToggleSidebar }: HeaderProps) {
       </button>
 
       {/* Breadcrumb */}
-      <p className="text-sm font-mono text-gray-500 dark:text-gray-400 truncate flex-1">
-        {label}
-      </p>
+      <p className="text-sm font-mono text-muted-foreground truncate flex-1">{label}</p>
 
       {/* Dark mode toggle */}
       <button
-        onClick={() => setDark((d) => !d)}
-        className="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-        aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-        title={dark ? 'Light mode' : 'Dark mode'}
+        onClick={toggleTheme}
+        className="p-1.5 rounded text-muted-foreground hover:bg-muted transition-colors"
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
       >
-        {dark ? (
+        {theme === 'dark' ? (
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <circle cx="9" cy="9" r="4" stroke="currentColor" strokeWidth="1.5" />
             <path

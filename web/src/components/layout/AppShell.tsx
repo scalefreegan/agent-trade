@@ -10,7 +10,7 @@ export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="flex h-screen bg-background">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -33,9 +33,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <Header
-          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-        />
+        <Header onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
