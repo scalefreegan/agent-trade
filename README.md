@@ -22,6 +22,9 @@ uv sync
 
 # Optional: Install with Claude Agent SDK support
 uv sync --extra agent
+
+# Optional: Install with Web UI backend support
+uv sync --extra web
 ```
 
 ## Setup
@@ -174,6 +177,40 @@ Add to Cursor's MCP settings (Settings > MCP):
 | `get_stock_splits` | yfinance | Stock split history |
 | `get_stock_news` | Tiingo | Financial news for specific tickers |
 | `search_news` | NewsAPI | General keyword news search |
+
+## Web UI (Local Development)
+
+React-based web UI for visualizing and controlling multi-agent trading experiments.
+
+### One-time setup
+
+```bash
+make web-install
+```
+
+Or manually: `uv sync --extra web` and `cd web && npm install`.
+
+### Run both servers
+
+**Option A – single command** (Ctrl+C stops both):
+```bash
+make web
+```
+
+**Option B – two terminals:**
+```bash
+# Terminal 1 – backend
+make web-backend
+
+# Terminal 2 – frontend
+make web-frontend
+```
+
+Backend runs at **http://localhost:8000**, frontend at **http://localhost:5173** with hot reload.
+
+### Open the app
+
+Visit **http://localhost:5173** in your browser. Vite proxies `/api` to the backend automatically.
 
 ## Example Queries
 

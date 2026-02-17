@@ -92,7 +92,7 @@ const CustomLegend = () => {
       </div>
       <div className="flex items-center gap-2">
         <div className="w-4 h-4 rounded bg-emerald-600"></div>
-        <span className="text-gray-700">Long-term Capital Gains Tax (>365 days)</span>
+        <span className="text-gray-700">Long-term Capital Gains Tax ({'>'}365 days)</span>
       </div>
     </div>
   );
