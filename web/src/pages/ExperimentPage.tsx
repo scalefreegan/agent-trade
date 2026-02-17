@@ -39,7 +39,7 @@ export function ExperimentPage() {
   if (expError || stateError || !experiment || !gameState) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-red-500">
+        <div className="text-loss">
           {expError?.message || stateError?.message || 'Experiment not found'}
         </div>
       </div>
@@ -136,8 +136,8 @@ export function ExperimentPage() {
             <div className="text-muted-foreground">Loading leaderboard...</div>
           </div>
         ) : leaderboardError ? (
-          <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
-            <div className="text-red-600 dark:text-red-400">Failed to load leaderboard: {leaderboardError.message}</div>
+          <div className="flex items-center justify-center h-64 bg-loss/10 rounded-xl border border-loss/30">
+            <div className="text-loss">Failed to load leaderboard: {leaderboardError.message}</div>
           </div>
         ) : leaderboard?.entries ? (
           <Leaderboard entries={leaderboard.entries} />
@@ -154,8 +154,8 @@ export function ExperimentPage() {
             <div className="text-muted-foreground">Loading performance data...</div>
           </div>
         ) : performanceError ? (
-          <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
-            <div className="text-red-600 dark:text-red-400">Failed to load performance data: {performanceError.message}</div>
+          <div className="flex items-center justify-center h-64 bg-loss/10 rounded-xl border border-loss/30">
+            <div className="text-loss">Failed to load performance data: {performanceError.message}</div>
           </div>
         ) : performance?.data_points ? (
           <PerformanceChart
@@ -178,8 +178,8 @@ export function ExperimentPage() {
         ) : (
           <div className="space-y-6">
             {taxMetricsError ? (
-              <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
-                <div className="text-red-600 dark:text-red-400">Failed to load tax metrics: {taxMetricsError.message}</div>
+              <div className="flex items-center justify-center h-32 bg-loss/10 rounded-xl border border-loss/30">
+                <div className="text-loss">Failed to load tax metrics: {taxMetricsError.message}</div>
               </div>
             ) : taxMetrics && Object.keys(taxMetrics).length > 0 ? (
               <TaxImpactChart taxMetrics={taxMetrics} agentNames={agentNames} />
@@ -190,8 +190,8 @@ export function ExperimentPage() {
             )}
 
             {holdingPeriodsError ? (
-              <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
-                <div className="text-red-600 dark:text-red-400">Failed to load holding periods: {holdingPeriodsError.message}</div>
+              <div className="flex items-center justify-center h-32 bg-loss/10 rounded-xl border border-loss/30">
+                <div className="text-loss">Failed to load holding periods: {holdingPeriodsError.message}</div>
               </div>
             ) : holdingPeriods && Object.keys(holdingPeriods).length > 0 ? (
               <HoldingPeriodChart holdingPeriods={holdingPeriods} agentNames={agentNames} />
@@ -202,8 +202,8 @@ export function ExperimentPage() {
             )}
 
             {reportError ? (
-              <div className="flex items-center justify-center h-32 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
-                <div className="text-red-600 dark:text-red-400">Failed to load report: {reportError.message}</div>
+              <div className="flex items-center justify-center h-32 bg-loss/10 rounded-xl border border-loss/30">
+                <div className="text-loss">Failed to load report: {reportError.message}</div>
               </div>
             ) : experimentReport ? (
               <ExperimentReportView report={experimentReport} />
