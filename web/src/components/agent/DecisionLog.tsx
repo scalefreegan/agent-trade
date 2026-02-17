@@ -3,6 +3,7 @@ import Markdown from 'react-markdown';
 import type { DecisionLogEntry } from '../../api/types';
 import { useAgentDecision } from '../../api/agents';
 import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
 
 interface DecisionLogProps {
   experimentId: string;
@@ -27,14 +28,15 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
           {decisions.map((decision) => {
             const isSelected = selectedDate === decision.date;
             return (
-              <div
+              <Card
                 key={decision.date}
+                padding={false}
                 className={`
-                  bg-card border rounded-xl px-5 py-4 cursor-pointer transition-all
+                  px-5 py-4 cursor-pointer transition-all
                   grid items-center gap-4
                   ${isSelected
                     ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-brand-800 hover:shadow-card-hover'
+                    : 'hover:border-brand-800 hover:shadow-card-hover'
                   }
                 `}
                 style={{ gridTemplateColumns: 'auto 1fr auto' }}
@@ -64,7 +66,7 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-              </div>
+              </Card>
             );
           })}
         </div>
@@ -94,7 +96,7 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
             </div>
             <div className="overflow-y-auto px-6 py-6">
               <div className="
-                prose prose-sm max-w-none
+                prose prose-sm max-w-none dark:prose-invert
                 prose-headings:text-foreground prose-headings:font-semibold
                 prose-h1:text-2xl prose-h1:border-b prose-h1:border-border prose-h1:pb-2
                 prose-h2:text-xl prose-h2:border-b prose-h2:border-border/50 prose-h2:pb-1.5
