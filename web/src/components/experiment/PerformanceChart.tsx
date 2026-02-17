@@ -55,8 +55,20 @@ export function PerformanceChart({
     (a, b) => agentRankings[a] - agentRankings[b]
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  interface TooltipEntry {
+    dataKey?: string;
+    name?: string;
+    value?: unknown;
+    color?: string;
+  }
+
+  interface TooltipCallbackProps {
+    active?: boolean;
+    payload?: readonly TooltipEntry[];
+    label?: string | number;
+  }
+
+  const CustomTooltip = ({ active, payload, label }: TooltipCallbackProps) => {
     if (!active || !payload || payload.length === 0) return null;
 
     return (
@@ -72,29 +84,28 @@ export function PerformanceChart({
         </p>
         <div className="space-y-1.5">
           {[...payload]
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .sort((a: any, b: any) => ((b.value as number) ?? 0) - ((a.value as number) ?? 0))
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .map((entry: any) => (
-              <div key={entry.dataKey} className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-                  <span className="text-xs truncate max-w-[120px]" style={{ color: ct.axis }}>
-                    {entry.name}
+            .sort((a, b) => (typeof b.value === 'number' ? b.value : 0) - (typeof a.value === 'number' ? a.value : 0))
+            .map((entry) => {
+              const v = typeof entry.value === 'number' && isFinite(entry.value) ? entry.value : null;
+              return (
+                <div key={entry.dataKey} className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                    <span className="text-xs truncate max-w-[120px]" style={{ color: ct.axis }}>
+                      {entry.name}
+                    </span>
+                  </div>
+                  <span
+                    className="text-xs font-bold font-mono tabular-nums"
+                    style={{ color: v !== null && v >= 0 ? ct.gainColor : ct.lossColor }}
+                  >
+                    {v !== null
+                      ? `${v >= 0 ? '+' : ''}$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '—'}
                   </span>
                 </div>
-                <span
-                  className="text-xs font-bold font-mono tabular-nums"
-                  style={{ color: (entry.value as number) >= 0 ? ct.gainColor : ct.lossColor }}
-                >
-                  {(entry.value as number) >= 0 ? '+' : ''}
-                  ${(entry.value as number).toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            ))}
+              );
+            })}
         </div>
       </div>
     );
