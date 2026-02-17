@@ -1,16 +1,80 @@
+import { useLocation, useParams, Link } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick: () => void;
+}
+
+interface Crumb {
+  label: string;
+  to?: string;
+}
+
+function useBreadcrumbs(): Crumb[] {
+  const { experimentId, agentId } = useParams<{ experimentId?: string; agentId?: string }>();
+
+  const crumbs: Crumb[] = [{ label: 'Dashboard', to: '/' }];
+
+  if (experimentId) {
+    crumbs.push({ label: `Experiment ${experimentId}`, to: agentId ? `/experiments/${experimentId}` : undefined });
+  }
+
+  if (agentId) {
+    crumbs.push({ label: `Agent ${agentId}` });
+  }
+
+  return crumbs;
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
+  const crumbs = useBreadcrumbs();
+  const isRoot = useLocation().pathname === '/';
 
   return (
-    <header className="bg-card border-b border-border px-4 py-3 flex items-center gap-4 flex-shrink-0">
+    <header className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 flex-shrink-0">
+      {/* Hamburger — mobile only */}
+      <button
+        onClick={onMenuClick}
+        className="xl:hidden p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        aria-label="Open menu"
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {/* Breadcrumbs */}
+      {!isRoot && (
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm min-w-0">
+          {crumbs.map((crumb, i) => (
+            <span key={i} className="flex items-center gap-1.5 min-w-0">
+              {i > 0 && (
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0 text-muted-foreground">
+                  <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              {crumb.to ? (
+                <Link
+                  to={crumb.to}
+                  className="text-muted-foreground hover:text-foreground transition-colors truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                >
+                  {crumb.label}
+                </Link>
+              ) : (
+                <span className="text-foreground font-medium truncate">{crumb.label}</span>
+              )}
+            </span>
+          ))}
+        </nav>
+      )}
+
       <div className="flex-1" />
 
       {/* Dark mode toggle */}
       <button
         onClick={toggleTheme}
-        className="p-1.5 rounded text-muted-foreground hover:bg-muted transition-colors"
+        className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
       >
