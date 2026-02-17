@@ -1,26 +1,11 @@
-import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
-
-function useBreadcrumb() {
-  const location = useLocation();
-  const parts = location.pathname.split('/').filter(Boolean);
-  if (parts.length === 0) return 'Dashboard';
-  if (parts[0] === 'experiments') {
-    if (parts.length === 1) return 'Experiments';
-    if (parts.length === 2) return `Experiment · ${parts[1]}`;
-    if (parts[2] === 'agents' && parts[3]) return `Agent · ${parts[3]}`;
-  }
-  return parts[parts.length - 1];
-}
 
 export function Header() {
   const { theme, toggleTheme } = useTheme();
-  const label = useBreadcrumb();
 
   return (
     <header className="bg-card border-b border-border px-4 py-3 flex items-center gap-4 flex-shrink-0">
-      {/* Breadcrumb */}
-      <p className="text-sm font-mono text-muted-foreground truncate flex-1">{label}</p>
+      <div className="flex-1" />
 
       {/* Dark mode toggle */}
       <button
