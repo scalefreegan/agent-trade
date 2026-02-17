@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useExperiment, useGameState } from '../api/experiments';
 import { useLeaderboard, usePerformance } from '../api/performance';
-import { useTaxMetrics, useHoldingPeriods } from '../api/analysis';
+import { useTaxMetrics, useHoldingPeriods, useExperimentReport } from '../api/analysis';
 import { Leaderboard } from '../components/experiment/Leaderboard';
 import { PerformanceChart } from '../components/experiment/PerformanceChart';
 import { TaxImpactChart } from '../components/analysis/TaxImpactChart';
 import { HoldingPeriodChart } from '../components/analysis/HoldingPeriodChart';
+import { ExperimentReportView } from '../components/analysis/ExperimentReport';
 import RunControls from '../components/experiment/RunControls';
 
 type Tab = 'overview' | 'leaderboard' | 'performance' | 'analysis';
@@ -19,8 +20,9 @@ export function ExperimentPage() {
   const { data: gameState, isLoading: stateLoading, error: stateError } = useGameState(experimentId || '');
   const { data: leaderboard, isLoading: leaderboardLoading } = useLeaderboard(experimentId || '');
   const { data: performance, isLoading: performanceLoading } = usePerformance(experimentId || '');
-  const { data: taxMetrics, isLoading: taxMetricsLoading } = useTaxMetrics(experimentId || '');
-  const { data: holdingPeriods, isLoading: holdingPeriodsLoading } = useHoldingPeriods(experimentId || '');
+  const { data: taxMetrics, isLoading: taxMetricsLoading, error: taxMetricsError } = useTaxMetrics(experimentId || '');
+  const { data: holdingPeriods, isLoading: holdingPeriodsLoading, error: holdingPeriodsError } = useHoldingPeriods(experimentId || '');
+  const { data: experimentReport, isLoading: reportLoading, error: reportError } = useExperimentReport(experimentId || '');
 
   if (expLoading || stateLoading) {
     return (
@@ -196,27 +198,43 @@ export function ExperimentPage() {
 
       {activeTab === 'analysis' && (
         <>
-          {taxMetricsLoading || holdingPeriodsLoading ? (
+          {taxMetricsLoading || holdingPeriodsLoading || reportLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-gray-500">Loading analysis data...</div>
             </div>
           ) : (
             <div className="space-y-6">
-              {taxMetrics && Object.keys(taxMetrics).length > 0 ? (
+              {taxMetricsError ? (
+                <div className="flex items-center justify-center h-32 bg-red-50 rounded-lg border border-red-200">
+                  <div className="text-red-600">Failed to load tax metrics: {taxMetricsError.message}</div>
+                </div>
+              ) : taxMetrics && Object.keys(taxMetrics).length > 0 ? (
                 <TaxImpactChart taxMetrics={taxMetrics} agentNames={agentNames} />
               ) : (
-                <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
-                  <div className="text-gray-500">No tax data available - complete some sell transactions</div>
+                <div className="flex items-center justify-center h-32 bg-gray-50 rounded-lg">
+                  <div className="text-gray-500">No tax data available — complete some sell transactions</div>
                 </div>
               )}
 
-              {holdingPeriods && Object.keys(holdingPeriods).length > 0 ? (
+              {holdingPeriodsError ? (
+                <div className="flex items-center justify-center h-32 bg-red-50 rounded-lg border border-red-200">
+                  <div className="text-red-600">Failed to load holding periods: {holdingPeriodsError.message}</div>
+                </div>
+              ) : holdingPeriods && Object.keys(holdingPeriods).length > 0 ? (
                 <HoldingPeriodChart holdingPeriods={holdingPeriods} agentNames={agentNames} />
               ) : (
-                <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
-                  <div className="text-gray-500">No holding period data available - complete some sell transactions</div>
+                <div className="flex items-center justify-center h-32 bg-gray-50 rounded-lg">
+                  <div className="text-gray-500">No holding period data available — complete some sell transactions</div>
                 </div>
               )}
+
+              {reportError ? (
+                <div className="flex items-center justify-center h-32 bg-red-50 rounded-lg border border-red-200">
+                  <div className="text-red-600">Failed to load report: {reportError.message}</div>
+                </div>
+              ) : experimentReport ? (
+                <ExperimentReportView report={experimentReport} />
+              ) : null}
             </div>
           )}
         </>

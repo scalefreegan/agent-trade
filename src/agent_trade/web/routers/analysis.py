@@ -8,6 +8,7 @@ from agent_trade.experiment.analysis_reporter import (
     calculate_tax_metrics,
     generate_experiment_report,
 )
+from agent_trade.web.dependencies import validate_experiment_exists
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ async def get_tax_metrics(experiment_id: str) -> dict[str, dict[str, float]]:
     - Average holding period per agent
     - Number of trades
     """
+    validate_experiment_exists(experiment_id)
     try:
         metrics = calculate_tax_metrics(experiment_id)
         return metrics
@@ -46,6 +48,7 @@ async def get_holding_periods(experiment_id: str) -> dict[str, dict[str, int]]:
     - 181-365 days
     - 365+ days (long-term)
     """
+    validate_experiment_exists(experiment_id)
     try:
         distribution = calculate_holding_period_distribution(experiment_id)
         return distribution

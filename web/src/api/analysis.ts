@@ -53,35 +53,24 @@ export interface ExperimentReport {
   holding_period_distribution?: HoldingPeriodResponse;
 }
 
-/**
- * Fetch tax efficiency metrics for all agents
- */
 export function useTaxMetrics(experimentId: string) {
-  return useQuery<TaxMetricsResponse>({
+  return useQuery({
     queryKey: ['tax-metrics', experimentId],
-    queryFn: () =>
-      fetchApi<TaxMetricsResponse>(`/experiments/${experimentId}/tax-metrics`),
+    queryFn: () => fetchApi<TaxMetricsResponse>(`/experiments/${experimentId}/tax-metrics`),
     enabled: !!experimentId,
   });
 }
 
-/**
- * Fetch holding period distribution for all agents
- */
 export function useHoldingPeriods(experimentId: string) {
-  return useQuery<HoldingPeriodResponse>({
+  return useQuery({
     queryKey: ['holding-periods', experimentId],
-    queryFn: () =>
-      fetchApi<HoldingPeriodResponse>(`/experiments/${experimentId}/holding-periods`),
+    queryFn: () => fetchApi<HoldingPeriodResponse>(`/experiments/${experimentId}/holding-periods`),
     enabled: !!experimentId,
   });
 }
 
-/**
- * Fetch comprehensive experiment report
- */
 export function useExperimentReport(experimentId: string, includeTaxMetrics = true) {
-  return useQuery<ExperimentReport>({
+  return useQuery({
     queryKey: ['experiment-report', experimentId, includeTaxMetrics],
     queryFn: () =>
       fetchApi<ExperimentReport>(
