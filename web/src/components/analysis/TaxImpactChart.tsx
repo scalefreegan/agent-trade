@@ -8,6 +8,11 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+
+interface TooltipCallbackProps {
+  active?: boolean;
+  payload?: Array<{ payload?: unknown }>;
+}
 import { useChartTheme } from '../../hooks/useChartTheme';
 import { Card } from '../ui/Card';
 import { MetricCard } from '../ui/MetricCard';
@@ -50,9 +55,10 @@ const formatCurrency = (value: number): string => {
 export function TaxImpactChart({ taxMetrics, agentNames }: TaxImpactChartProps) {
   const ct = useChartTheme();
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (!active || !payload || !payload.length) return null;
-    const data = payload[0].payload as ChartDataPoint;
+  const CustomTooltip = ({ active, payload }: TooltipCallbackProps) => {
+    if (!active || !payload?.length) return null;
+    const data = payload[0]?.payload as ChartDataPoint | undefined;
+    if (!data) return null;
 
     return (
       <div

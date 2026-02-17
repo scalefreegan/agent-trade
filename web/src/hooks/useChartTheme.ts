@@ -22,21 +22,22 @@ interface ChartTheme {
   holdingBucketColors: Record<string, string>;
 }
 
-function resolveVar(varName: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+function resolveVar(varName: string, fallback = '#000000'): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  return value || fallback;
 }
 
 function buildTheme(): ChartTheme {
   const isDark = document.documentElement.classList.contains('dark');
 
   return {
-    grid: resolveVar('--border-color'),
-    axis: resolveVar('--muted-foreground'),
-    axisStroke: resolveVar('--border-color'),
+    grid: resolveVar('--border-color', '#e5e7eb'),
+    axis: resolveVar('--muted-foreground', '#6b7280'),
+    axisStroke: resolveVar('--border-color', '#e5e7eb'),
     tooltip: {
-      bg: resolveVar('--card'),
-      border: resolveVar('--border-color'),
-      text: resolveVar('--foreground'),
+      bg: resolveVar('--card', '#ffffff'),
+      border: resolveVar('--border-color', '#e5e7eb'),
+      text: resolveVar('--foreground', '#111827'),
     },
     // Brand color palette — same hex in both themes (colors are perceptually distinct)
     brandColors: [
@@ -49,8 +50,8 @@ function buildTheme(): ChartTheme {
     ],
     cashColor: isDark ? '#64748b' : '#6B7280',
     primaryColor: isDark ? '#55A630' : '#007F5F',
-    gainColor: resolveVar('--gain'),
-    lossColor: resolveVar('--loss'),
+    gainColor: resolveVar('--gain', '#059669'),
+    lossColor: resolveVar('--loss', '#dc2626'),
     // Tax chart colors — adjusted for dark mode readability
     shortTermColor: isDark ? '#fbbf24' : '#f59e0b',
     longTermColor: isDark ? '#34d399' : '#059669',
@@ -66,10 +67,15 @@ function buildTheme(): ChartTheme {
 
 export function useChartTheme(): ChartTheme {
   const { theme } = useTheme();
+
+  // Initialize by reading the DOM directly so that if ThemeProvider has already
+  // applied the .dark class (e.g. from localStorage on mount), we pick it up
+  // immediately rather than defaulting to light colors until the rAF fires.
   const [chartTheme, setChartTheme] = useState<ChartTheme>(buildTheme);
 
   useEffect(() => {
-    // Re-resolve after the DOM has applied the new class
+    // ThemeProvider updates the DOM class in its own effect. Schedule our
+    // re-read one frame later so the class change is guaranteed to be applied.
     const id = requestAnimationFrame(() => setChartTheme(buildTheme()));
     return () => cancelAnimationFrame(id);
   }, [theme]);

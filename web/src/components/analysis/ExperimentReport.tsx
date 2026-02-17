@@ -1,6 +1,6 @@
 import type { ExperimentReport } from '../../api/analysis';
 import { Card } from '../ui/Card';
-import { Badge } from '../ui/Badge';
+import { Badge, statusVariant } from '../ui/Badge';
 
 interface ExperimentReportViewProps {
   report: ExperimentReport;
@@ -71,7 +71,7 @@ export function ExperimentReportView({ report }: ExperimentReportViewProps) {
                     {formatCurrency(entry.portfolio_value)}
                   </td>
                   <td className="py-3">
-                    <Badge variant={entry.status === 'active' ? 'success' : 'neutral'}>
+                    <Badge variant={statusVariant(entry.status)}>
                       {entry.status}
                     </Badge>
                   </td>

@@ -60,8 +60,14 @@ export function PerformanceChart({
     if (!active || !payload || payload.length === 0) return null;
 
     return (
-      <div className="bg-card border border-border rounded-lg shadow-card-hover p-4">
-        <p className="text-sm font-semibold text-foreground mb-2 border-b border-border pb-2">
+      <div
+        className="rounded-lg shadow-card-hover p-4"
+        style={{ backgroundColor: ct.tooltip.bg, border: `1px solid ${ct.tooltip.border}`, color: ct.tooltip.text }}
+      >
+        <p
+          className="text-sm font-semibold mb-2 pb-2 border-b"
+          style={{ color: ct.tooltip.text, borderColor: ct.tooltip.border }}
+        >
           Day {label}
         </p>
         <div className="space-y-1.5">
@@ -73,14 +79,13 @@ export function PerformanceChart({
               <div key={entry.dataKey} className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-                  <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                  <span className="text-xs truncate max-w-[120px]" style={{ color: ct.axis }}>
                     {entry.name}
                   </span>
                 </div>
                 <span
-                  className={`text-xs font-bold font-mono tabular-nums ${
-                    (entry.value as number) >= 0 ? 'text-gain' : 'text-loss'
-                  }`}
+                  className="text-xs font-bold font-mono tabular-nums"
+                  style={{ color: (entry.value as number) >= 0 ? ct.gainColor : ct.lossColor }}
                 >
                   {(entry.value as number) >= 0 ? '+' : ''}
                   ${(entry.value as number).toLocaleString('en-US', {
