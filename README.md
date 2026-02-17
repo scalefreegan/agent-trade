@@ -212,6 +212,39 @@ Backend runs at **http://localhost:8000**, frontend at **http://localhost:5173**
 
 Visit **http://localhost:5173** in your browser. Vite proxies `/api` to the backend automatically.
 
+### Creating an experiment (CLI)
+
+The Web UI displays experiments; create them first with the CLI:
+
+1. **Install the agent extra** (required for experiments):
+```bash
+uv sync --extra agent
+```
+
+2. **Set API keys** (for market data and AI agents):
+```bash
+export ANTHROPIC_API_KEY="your_anthropic_key"
+export TIINGO_API_KEY="your_tiingo_key"    # optional
+export NEWSAPI_KEY="your_newsapi_key"      # optional
+```
+
+3. **Create an experiment**:
+```bash
+# Create with defaults (10 agents, $1,000 each)
+agent-trade-experiment init --name "Q1-2026"
+
+# Or with custom settings
+agent-trade-experiment init --name "Test" --agents 5 --capital 500
+```
+
+4. **Run a trading day** (agents make decisions and execute trades):
+```bash
+agent-trade-experiment run default
+```
+Use `default` for the most recent experiment, or the experiment ID from step 3.
+
+5. **View in the Web UI** – Refresh http://localhost:5173 to see the experiment.
+
 ## Example Queries
 
 Once connected to Claude Code or Cursor, try:
