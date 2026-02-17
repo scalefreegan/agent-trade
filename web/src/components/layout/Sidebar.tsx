@@ -34,6 +34,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose, closeB
 
       {/* Mobile sidebar — slide-in drawer */}
       <div
+        id="mobile-nav"
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"

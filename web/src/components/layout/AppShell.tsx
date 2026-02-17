@@ -56,7 +56,7 @@ export function AppShell({ children }: AppShellProps) {
         aria-hidden={mobileOpen ? true : undefined}
         inert={mobileOpen ? true : undefined}
       >
-        <Header onMenuClick={() => setMobileOpen((o) => !o)} hamburgerRef={hamburgerRef} />
+        <Header onMenuClick={() => setMobileOpen((o) => !o)} hamburgerRef={hamburgerRef} mobileOpen={mobileOpen} />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-7xl mx-auto">{children}</div>
         </main>

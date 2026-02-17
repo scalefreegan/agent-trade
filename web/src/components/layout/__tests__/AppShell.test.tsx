@@ -73,10 +73,30 @@ describe('AppShell — mobile drawer', () => {
     expect(drawer).toHaveClass('-translate-x-full');
   });
 
-  it('drawer has role="dialog" and aria-modal="true"', () => {
+  it('drawer has role="dialog", aria-modal="true", and id="mobile-nav"', () => {
     renderAppShell();
     const drawer = screen.getByRole('dialog', { name: /navigation menu/i });
     expect(drawer).toHaveAttribute('aria-modal', 'true');
+    expect(drawer).toHaveAttribute('id', 'mobile-nav');
+  });
+
+  it('hamburger aria-expanded reflects drawer state', () => {
+    renderAppShell();
+    const hamburger = screen.getByRole('button', { name: /open menu/i });
+    expect(hamburger).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(hamburger);
+    expect(hamburger).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: /close menu/i }));
+    expect(hamburger).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('hamburger aria-controls points to the mobile drawer id', () => {
+    renderAppShell();
+    const hamburger = screen.getByRole('button', { name: /open menu/i });
+    expect(hamburger).toHaveAttribute('aria-controls', 'mobile-nav');
+    expect(document.getElementById('mobile-nav')).toBeInTheDocument();
   });
 
   it('main content gets inert attribute while drawer is open', () => {

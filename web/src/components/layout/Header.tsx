@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 interface HeaderProps {
   onMenuClick: () => void;
   hamburgerRef: RefObject<HTMLButtonElement | null>;
+  mobileOpen: boolean;
 }
 
 interface Crumb {
@@ -33,7 +34,7 @@ function useBreadcrumbs(): Crumb[] {
   return crumbs;
 }
 
-export function Header({ onMenuClick, hamburgerRef }: HeaderProps) {
+export function Header({ onMenuClick, hamburgerRef, mobileOpen }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const crumbs = useBreadcrumbs();
   const isRoot = useLocation().pathname === '/';
@@ -46,7 +47,7 @@ export function Header({ onMenuClick, hamburgerRef }: HeaderProps) {
         onClick={onMenuClick}
         className="xl:hidden p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label="Open menu"
-        aria-expanded={false}
+        aria-expanded={mobileOpen}
         aria-controls="mobile-nav"
       >
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
