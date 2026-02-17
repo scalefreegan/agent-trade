@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useExperiment, useGameState } from '../api/experiments';
 import { useLeaderboard, usePerformance } from '../api/performance';
+import { useTaxMetrics, useHoldingPeriods } from '../api/analysis';
 import { Leaderboard } from '../components/experiment/Leaderboard';
 import { PerformanceChart } from '../components/experiment/PerformanceChart';
+import { TaxImpactChart } from '../components/analysis/TaxImpactChart';
+import { HoldingPeriodChart } from '../components/analysis/HoldingPeriodChart';
 import RunControls from '../components/experiment/RunControls';
 
-type Tab = 'overview' | 'leaderboard' | 'performance';
+type Tab = 'overview' | 'leaderboard' | 'performance' | 'analysis';
 
 export function ExperimentPage() {
   const { experimentId } = useParams<{ experimentId: string }>();
@@ -16,6 +19,8 @@ export function ExperimentPage() {
   const { data: gameState, isLoading: stateLoading, error: stateError } = useGameState(experimentId || '');
   const { data: leaderboard, isLoading: leaderboardLoading } = useLeaderboard(experimentId || '');
   const { data: performance, isLoading: performanceLoading } = usePerformance(experimentId || '');
+  const { data: taxMetrics, isLoading: taxMetricsLoading } = useTaxMetrics(experimentId || '');
+  const { data: holdingPeriods, isLoading: holdingPeriodsLoading } = useHoldingPeriods(experimentId || '');
 
   if (expLoading || stateLoading) {
     return (
@@ -43,10 +48,19 @@ export function ExperimentPage() {
     });
   }
 
+  // Build agent names mapping for analysis charts
+  const agentNames: Record<string, string> = {};
+  if (gameState?.agents) {
+    gameState.agents.forEach((agent) => {
+      agentNames[agent.agent_id] = agent.name;
+    });
+  }
+
   const tabs = [
     { id: 'overview' as Tab, label: 'Overview' },
     { id: 'leaderboard' as Tab, label: 'Leaderboard' },
     { id: 'performance' as Tab, label: 'Performance' },
+    { id: 'analysis' as Tab, label: 'Analysis' },
   ];
 
   return (
@@ -175,6 +189,34 @@ export function ExperimentPage() {
           ) : (
             <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
               <div className="text-gray-500">No performance data available</div>
+            </div>
+          )}
+        </>
+      )}
+
+      {activeTab === 'analysis' && (
+        <>
+          {taxMetricsLoading || holdingPeriodsLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-gray-500">Loading analysis data...</div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {taxMetrics && Object.keys(taxMetrics).length > 0 ? (
+                <TaxImpactChart taxMetrics={taxMetrics} agentNames={agentNames} />
+              ) : (
+                <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
+                  <div className="text-gray-500">No tax data available - complete some sell transactions</div>
+                </div>
+              )}
+
+              {holdingPeriods && Object.keys(holdingPeriods).length > 0 ? (
+                <HoldingPeriodChart holdingPeriods={holdingPeriods} agentNames={agentNames} />
+              ) : (
+                <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
+                  <div className="text-gray-500">No holding period data available - complete some sell transactions</div>
+                </div>
+              )}
             </div>
           )}
         </>
