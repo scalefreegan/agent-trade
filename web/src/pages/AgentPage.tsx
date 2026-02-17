@@ -14,8 +14,18 @@ import { AgentPerformanceChart } from '../components/agent/AgentPerformanceChart
 import { StrategyPanel } from '../components/agent/StrategyPanel';
 import { TransactionHistory } from '../components/agent/TransactionHistory';
 import { DecisionLog } from '../components/agent/DecisionLog';
+import { Badge, statusVariant } from '../components/ui/Badge';
+import { Tabs } from '../components/ui/Tabs';
 
 type Tab = 'portfolio' | 'performance' | 'strategy' | 'transactions' | 'decisions';
+
+const TABS = [
+  { id: 'portfolio' as Tab, label: 'Portfolio' },
+  { id: 'performance' as Tab, label: 'Performance' },
+  { id: 'strategy' as Tab, label: 'Strategy' },
+  { id: 'transactions' as Tab, label: 'Transactions' },
+  { id: 'decisions' as Tab, label: 'Decisions' },
+];
 
 export function AgentPage() {
   const { experimentId, agentId } = useParams<{ experimentId: string; agentId: string }>();
@@ -45,7 +55,7 @@ export function AgentPage() {
   if (agentLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading agent...</div>
+        <div className="text-muted-foreground">Loading agent...</div>
       </div>
     );
   }
@@ -53,7 +63,7 @@ export function AgentPage() {
   if (agentError || !agent) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-red-500">
+        <div className="text-loss">
           {agentError?.message || 'Agent not found'}
         </div>
       </div>
@@ -61,172 +71,26 @@ export function AgentPage() {
   }
 
   return (
-    <div className="agent-page">
-      <style>{`
-        .agent-page {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-        }
-
-        .agent-header {
-          margin-bottom: 2rem;
-          padding-bottom: 1.5rem;
-          border-bottom: 2px solid #E5E7EB;
-        }
-
-        .agent-title-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 0.75rem;
-        }
-
-        .agent-title {
-          font-size: 2rem;
-          font-weight: 700;
-          color: #111827;
-        }
-
-        .agent-status-badge {
-          padding: 0.375rem 0.875rem;
-          border-radius: 0.375rem;
-          font-size: 0.75rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .agent-status-badge.active {
-          background: #D1FAE5;
-          color: #065F46;
-        }
-
-        .agent-status-badge.eliminated {
-          background: #FEE2E2;
-          color: #991B1B;
-        }
-
-        .agent-id {
-          font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-          font-size: 0.875rem;
-          color: #6B7280;
-        }
-
-        /* Tabs */
-        .tabs-container {
-          border-bottom: 1px solid #E5E7EB;
-          margin-bottom: 2rem;
-        }
-
-        .tabs-list {
-          display: flex;
-          gap: 2rem;
-        }
-
-        .tab-button {
-          padding: 0.75rem 0;
-          border: none;
-          background: none;
-          font-size: 0.9375rem;
-          font-weight: 600;
-          color: #6B7280;
-          cursor: pointer;
-          position: relative;
-          transition: color 0.15s ease;
-        }
-
-        .tab-button:hover {
-          color: #374151;
-        }
-
-        .tab-button.active {
-          color: #007F5F;
-        }
-
-        .tab-button.active::after {
-          content: '';
-          position: absolute;
-          bottom: -1px;
-          left: 0;
-          right: 0;
-          height: 2px;
-          background: #007F5F;
-        }
-
-        /* Tab Content */
-        .tab-content {
-          animation: fadeIn 0.2s ease;
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .loading-state {
-          text-align: center;
-          padding: 3rem;
-          color: #9CA3AF;
-        }
-      `}</style>
-
+    <div>
       {/* Agent Header */}
-      <div className="agent-header">
-        <div className="agent-title-row">
-          <h1 className="agent-title">{agent.name}</h1>
-          <span className={`agent-status-badge ${agent.status}`}>
+      <div className="mb-8 pb-6 border-b-2 border-border">
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="text-3xl font-bold text-foreground">{agent.name}</h1>
+          <Badge variant={statusVariant(agent.status)} className="uppercase tracking-wide text-xs px-3 py-1">
             {agent.status}
-          </span>
+          </Badge>
         </div>
-        <div className="agent-id">{agent.agent_id}</div>
+        <div className="font-mono text-sm text-muted-foreground">{agent.agent_id}</div>
       </div>
 
       {/* Tabs */}
-      <div className="tabs-container">
-        <div className="tabs-list">
-          <button
-            className={`tab-button ${activeTab === 'portfolio' ? 'active' : ''}`}
-            onClick={() => setActiveTab('portfolio')}
-          >
-            Portfolio
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'performance' ? 'active' : ''}`}
-            onClick={() => setActiveTab('performance')}
-          >
-            Performance
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'strategy' ? 'active' : ''}`}
-            onClick={() => setActiveTab('strategy')}
-          >
-            Strategy
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'transactions' ? 'active' : ''}`}
-            onClick={() => setActiveTab('transactions')}
-          >
-            Transactions
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'decisions' ? 'active' : ''}`}
-            onClick={() => setActiveTab('decisions')}
-          >
-            Decisions
-          </button>
-        </div>
-      </div>
+      <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} className="mb-8" />
 
       {/* Tab Content */}
-      <div className="tab-content">
+      <div className="animate-fade-in">
         {activeTab === 'portfolio' && (
           <div>
-            <div style={{ marginBottom: '2rem' }}>
+            <div className="mb-8">
               <PositionAllocationChart portfolio={agent.portfolio} />
             </div>
             <PortfolioBreakdown portfolio={agent.portfolio} metrics={agent.metrics} />
@@ -236,7 +100,7 @@ export function AgentPage() {
         {activeTab === 'performance' && (
           <>
             {performanceLoading ? (
-              <div className="loading-state">Loading performance data...</div>
+              <div className="text-center py-12 text-muted-foreground">Loading performance data...</div>
             ) : performance?.data_points && experiment ? (
               <AgentPerformanceChart
                 dataPoints={performance.data_points}
@@ -245,7 +109,7 @@ export function AgentPage() {
                 startingCapital={experiment.starting_capital}
               />
             ) : (
-              <div className="loading-state">No performance data available</div>
+              <div className="text-center py-12 text-muted-foreground">No performance data available</div>
             )}
           </>
         )}
@@ -253,11 +117,11 @@ export function AgentPage() {
         {activeTab === 'strategy' && (
           <>
             {strategyLoading ? (
-              <div className="loading-state">Loading strategy...</div>
+              <div className="text-center py-12 text-muted-foreground">Loading strategy...</div>
             ) : strategy ? (
               <StrategyPanel strategy={strategy} />
             ) : (
-              <div className="loading-state">No strategy data available</div>
+              <div className="text-center py-12 text-muted-foreground">No strategy data available</div>
             )}
           </>
         )}
@@ -265,11 +129,11 @@ export function AgentPage() {
         {activeTab === 'transactions' && (
           <>
             {transactionsLoading ? (
-              <div className="loading-state">Loading transactions...</div>
+              <div className="text-center py-12 text-muted-foreground">Loading transactions...</div>
             ) : transactions ? (
               <TransactionHistory history={transactions} />
             ) : (
-              <div className="loading-state">No transaction data available</div>
+              <div className="text-center py-12 text-muted-foreground">No transaction data available</div>
             )}
           </>
         )}
@@ -277,7 +141,7 @@ export function AgentPage() {
         {activeTab === 'decisions' && (
           <>
             {decisionsLoading ? (
-              <div className="loading-state">Loading decisions...</div>
+              <div className="text-center py-12 text-muted-foreground">Loading decisions...</div>
             ) : decisions ? (
               <DecisionLog
                 experimentId={experimentId || ''}
@@ -285,7 +149,7 @@ export function AgentPage() {
                 decisions={decisions}
               />
             ) : (
-              <div className="loading-state">No decision data available</div>
+              <div className="text-center py-12 text-muted-foreground">No decision data available</div>
             )}
           </>
         )}
