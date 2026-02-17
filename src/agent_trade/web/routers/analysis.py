@@ -71,20 +71,12 @@ async def get_experiment_report(
     - Tax efficiency metrics (if include_tax_metrics=true)
     - Holding period distribution (if include_tax_metrics=true)
     """
+    validate_experiment_exists(experiment_id)
     try:
         report = generate_experiment_report(
             experiment_id, include_tax_metrics=include_tax_metrics
         )
-
-        if not report:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Experiment {experiment_id} not found or has no data",
-            )
-
         return report
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Failed to generate experiment report: {e}")
         raise HTTPException(status_code=500, detail=str(e))
