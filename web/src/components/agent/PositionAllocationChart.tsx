@@ -1,21 +1,14 @@
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import type { Portfolio } from '../../api/types';
 import { Card } from '../ui/Card';
+import { useChartTheme } from '../../hooks/useChartTheme';
 
 interface PositionAllocationChartProps {
   portfolio: Portfolio;
 }
 
 export function PositionAllocationChart({ portfolio }: PositionAllocationChartProps) {
-  const BRAND_COLORS = [
-    '#007F5F', // brand-900
-    '#2B9348', // brand-800
-    '#55A630', // brand-700
-    '#80B918', // brand-600
-    '#AACC00', // brand-500
-    '#BFD200', // brand-400
-  ];
-  const CASH_COLOR = '#6B7280';
+  const ct = useChartTheme();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -54,7 +47,7 @@ export function PositionAllocationChart({ portfolio }: PositionAllocationChartPr
   // Assign colors
   const dataWithColors = chartData.map((item, idx) => ({
     ...item,
-    color: item.isCash ? CASH_COLOR : BRAND_COLORS[idx % BRAND_COLORS.length],
+    color: item.isCash ? ct.cashColor : ct.brandColors[idx % ct.brandColors.length],
     percentage: totalValue > 0 ? (item.value / totalValue) * 100 : 0,
   }));
 
@@ -94,7 +87,7 @@ export function PositionAllocationChart({ portfolio }: PositionAllocationChartPr
                   <Cell
                     key={`cell-${index}`}
                     fill={entry.color}
-                    stroke="var(--card)"
+                    stroke={ct.tooltip.bg}
                     strokeWidth={2}
                   />
                 ))}

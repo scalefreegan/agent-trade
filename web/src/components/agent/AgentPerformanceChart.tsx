@@ -2,6 +2,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import type { PerformanceDataPoint } from '../../api/types';
 import { Card } from '../ui/Card';
 import { MetricCard } from '../ui/MetricCard';
+import { useChartTheme } from '../../hooks/useChartTheme';
 
 interface AgentPerformanceChartProps {
   dataPoints: PerformanceDataPoint[];
@@ -16,6 +17,8 @@ export function AgentPerformanceChart({
   agentName,
   startingCapital,
 }: AgentPerformanceChartProps) {
+  const ct = useChartTheme();
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -86,28 +89,28 @@ export function AgentPerformanceChart({
           <div className="text-sm font-semibold text-foreground mb-4">Portfolio Value Over Time</div>
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+              <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
               <XAxis
                 dataKey="trading_day"
-                stroke="var(--muted-foreground)"
-                style={{ fontSize: '0.75rem' }}
-                label={{ value: 'Trading Day', position: 'insideBottom', offset: -5, style: { fontSize: '0.75rem', fill: 'var(--muted-foreground)' } }}
+                stroke={ct.axisStroke}
+                tick={{ fill: ct.axis, fontSize: 12 }}
+                label={{ value: 'Trading Day', position: 'insideBottom', offset: -5, style: { fontSize: '0.75rem', fill: ct.axis } }}
               />
               <YAxis
-                stroke="var(--muted-foreground)"
-                style={{ fontSize: '0.75rem' }}
+                stroke={ct.axisStroke}
+                tick={{ fill: ct.axis, fontSize: 12 }}
                 tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
-                label={{ value: 'Portfolio Value', angle: -90, position: 'insideLeft', style: { fontSize: '0.75rem', fill: 'var(--muted-foreground)' } }}
+                label={{ value: 'Portfolio Value', angle: -90, position: 'insideLeft', style: { fontSize: '0.75rem', fill: ct.axis } }}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'var(--card)',
-                  border: '1px solid var(--border-color)',
+                  backgroundColor: ct.tooltip.bg,
+                  border: `1px solid ${ct.tooltip.border}`,
                   borderRadius: '0.375rem',
                   padding: '0.75rem',
-                  color: 'var(--foreground)',
+                  color: ct.tooltip.text,
                 }}
-                labelStyle={{ fontWeight: 600, marginBottom: '0.5rem', color: 'var(--foreground)' }}
+                labelStyle={{ fontWeight: 600, marginBottom: '0.5rem', color: ct.tooltip.text }}
                 formatter={(value: number | undefined, name: string | undefined) => {
                   const v = value ?? 0;
                   if (name === 'value') {
@@ -127,10 +130,10 @@ export function AgentPerformanceChart({
               <Line
                 type="monotone"
                 dataKey="value"
-                stroke="#2B9348"
+                stroke={ct.primaryColor}
                 strokeWidth={2}
-                dot={{ fill: '#2B9348', r: 3 }}
-                activeDot={{ r: 5 }}
+                dot={{ fill: ct.primaryColor, r: 3 }}
+                activeDot={{ r: 5, fill: ct.primaryColor, stroke: ct.tooltip.bg, strokeWidth: 2 }}
                 name={agentName}
               />
             </LineChart>

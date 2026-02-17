@@ -11,6 +11,7 @@ import {
 import type { PerformanceDataPoint } from '../../api/types';
 import { getChartColor } from '../../lib/colors';
 import { Card } from '../ui/Card';
+import { useChartTheme } from '../../hooks/useChartTheme';
 
 interface PerformanceChartProps {
   dataPoints: PerformanceDataPoint[];
@@ -23,6 +24,7 @@ export function PerformanceChart({
   agentRankings,
   startingCapital = 100000,
 }: PerformanceChartProps) {
+  const ct = useChartTheme();
   if (dataPoints.length === 0) {
     return (
       <Card>
@@ -53,41 +55,57 @@ export function PerformanceChart({
     (a, b) => agentRankings[a] - agentRankings[b]
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  interface TooltipEntry {
+    dataKey?: string;
+    name?: string;
+    value?: unknown;
+    color?: string;
+  }
+
+  interface TooltipCallbackProps {
+    active?: boolean;
+    payload?: readonly TooltipEntry[];
+    label?: string | number;
+  }
+
+  const CustomTooltip = ({ active, payload, label }: TooltipCallbackProps) => {
     if (!active || !payload || payload.length === 0) return null;
 
     return (
-      <div className="bg-card border border-border rounded-lg shadow-card-hover p-4">
-        <p className="text-sm font-semibold text-foreground mb-2 border-b border-border pb-2">
+      <div
+        className="rounded-lg shadow-card-hover p-4"
+        style={{ backgroundColor: ct.tooltip.bg, border: `1px solid ${ct.tooltip.border}`, color: ct.tooltip.text }}
+      >
+        <p
+          className="text-sm font-semibold mb-2 pb-2 border-b"
+          style={{ color: ct.tooltip.text, borderColor: ct.tooltip.border }}
+        >
           Day {label}
         </p>
         <div className="space-y-1.5">
           {[...payload]
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .sort((a: any, b: any) => ((b.value as number) ?? 0) - ((a.value as number) ?? 0))
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .map((entry: any) => (
-              <div key={entry.dataKey} className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-                  <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-                    {entry.name}
+            .sort((a, b) => (typeof b.value === 'number' ? b.value : 0) - (typeof a.value === 'number' ? a.value : 0))
+            .map((entry) => {
+              const v = typeof entry.value === 'number' && isFinite(entry.value) ? entry.value : null;
+              return (
+                <div key={entry.dataKey} className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                    <span className="text-xs truncate max-w-[120px]" style={{ color: ct.axis }}>
+                      {entry.name}
+                    </span>
+                  </div>
+                  <span
+                    className="text-xs font-bold font-mono tabular-nums"
+                    style={{ color: v !== null && v >= 0 ? ct.gainColor : ct.lossColor }}
+                  >
+                    {v !== null
+                      ? `${v >= 0 ? '+' : ''}$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '—'}
                   </span>
                 </div>
-                <span
-                  className={`text-xs font-bold font-mono tabular-nums ${
-                    (entry.value as number) >= 0 ? 'text-gain' : 'text-loss'
-                  }`}
-                >
-                  {(entry.value as number) >= 0 ? '+' : ''}
-                  ${(entry.value as number).toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            ))}
+              );
+            })}
         </div>
       </div>
     );
@@ -104,22 +122,22 @@ export function PerformanceChart({
 
       <ResponsiveContainer width="100%" height={400}>
         <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+          <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
           <XAxis
             dataKey="day"
-            label={{ value: 'Trading Day', position: 'insideBottom', offset: -5 }}
-            tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
-            stroke="var(--border-color)"
+            label={{ value: 'Trading Day', position: 'insideBottom', offset: -5, style: { fill: ct.axis } }}
+            tick={{ fill: ct.axis, fontSize: 12 }}
+            stroke={ct.axisStroke}
           />
           <YAxis
             label={{
               value: 'Net Gain ($)',
               angle: -90,
               position: 'insideLeft',
-              style: { textAnchor: 'middle', fill: 'var(--muted-foreground)' },
+              style: { textAnchor: 'middle', fill: ct.axis },
             }}
-            tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
-            stroke="var(--border-color)"
+            tick={{ fill: ct.axis, fontSize: 12 }}
+            stroke={ct.axisStroke}
             tickFormatter={(value) =>
               `${value >= 0 ? '+' : ''}${(value / 1000).toFixed(0)}k`
             }
@@ -136,7 +154,7 @@ export function PerformanceChart({
           <Line
             type="monotone"
             dataKey={() => 0}
-            stroke="var(--border-color)"
+            stroke={ct.grid}
             strokeWidth={1}
             strokeDasharray="5 5"
             dot={false}
@@ -156,7 +174,7 @@ export function PerformanceChart({
                 stroke={color}
                 strokeWidth={rank === 1 ? 3 : 2}
                 dot={false}
-                activeDot={{ r: 5, fill: color, stroke: 'var(--card)', strokeWidth: 2 }}
+                activeDot={{ r: 5, fill: color, stroke: ct.tooltip.bg, strokeWidth: 2 }}
                 style={{
                   filter: rank === 1 ? 'drop-shadow(0 0 4px rgba(0, 127, 95, 0.3))' : 'none',
                 }}

@@ -1,6 +1,13 @@
 /**
  * Brand color palette for agent chart lines.
  * Top-ranked agents get the deepest green.
+ *
+ * These hex values work in both light and dark mode because Recharts renders
+ * them as SVG fill/stroke attributes (not CSS), so they cannot reference CSS
+ * variables. The palette was chosen to be perceptually distinct on both the
+ * light (#f8fafc) and dark (#0f172a) backgrounds used in this app.
+ *
+ * For theme-aware chart colors use the `useChartTheme` hook instead.
  */
 export const CHART_COLORS = [
   '#007F5F', // brand-900: deep green
