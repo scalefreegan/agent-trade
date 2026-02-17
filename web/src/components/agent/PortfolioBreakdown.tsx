@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import type { Portfolio, PortfolioMetrics } from '../../api/types';
 import { Card } from '../ui/Card';
 import { MetricCard } from '../ui/MetricCard';
@@ -110,9 +110,8 @@ export function PortfolioBreakdown({ portfolio, metrics }: PortfolioBreakdownPro
               const glColor = gainLoss >= 0 ? 'text-gain' : 'text-loss';
 
               return (
-                <>
+                <React.Fragment key={position.symbol}>
                   <tr
-                    key={position.symbol}
                     className={`cursor-pointer transition-colors border-b border-border ${isExpanded ? 'bg-muted' : 'hover:bg-muted'}`}
                     onClick={() => setExpandedPosition(isExpanded ? null : position.symbol)}
                   >
@@ -188,7 +187,7 @@ export function PortfolioBreakdown({ portfolio, metrics }: PortfolioBreakdownPro
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               );
             })}
 
