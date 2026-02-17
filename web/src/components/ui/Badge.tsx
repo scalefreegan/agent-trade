@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
+
 type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
 interface BadgeProps {
   variant?: BadgeVariant;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }
 
@@ -24,9 +26,9 @@ export function Badge({ variant = 'neutral', children, className = '' }: BadgePr
   );
 }
 
-/** Map a status string to a badge variant */
-export function statusVariant(status: string): BadgeVariant {
-  switch (status.toLowerCase()) {
+/** Map a status string to a badge variant. Safe against null/undefined inputs. */
+export function statusVariant(status: string | null | undefined): BadgeVariant {
+  switch ((status ?? '').toLowerCase()) {
     case 'active':
     case 'complete':
     case 'completed':
