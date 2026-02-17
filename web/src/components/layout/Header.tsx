@@ -1,10 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 
-interface HeaderProps {
-  onToggleSidebar: () => void;
-}
-
 function useBreadcrumb() {
   const location = useLocation();
   const parts = location.pathname.split('/').filter(Boolean);
@@ -17,23 +13,12 @@ function useBreadcrumb() {
   return parts[parts.length - 1];
 }
 
-export function Header({ onToggleSidebar }: HeaderProps) {
+export function Header() {
   const { theme, toggleTheme } = useTheme();
   const label = useBreadcrumb();
 
   return (
     <header className="bg-card border-b border-border px-4 py-3 flex items-center gap-4 flex-shrink-0">
-      {/* Sidebar toggle */}
-      <button
-        onClick={onToggleSidebar}
-        className="p-1.5 rounded text-muted-foreground hover:bg-muted transition-colors"
-        aria-label="Toggle sidebar"
-      >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      </button>
-
       {/* Breadcrumb */}
       <p className="text-sm font-mono text-muted-foreground truncate flex-1">{label}</p>
 
