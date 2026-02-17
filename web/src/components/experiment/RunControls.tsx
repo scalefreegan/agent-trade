@@ -8,6 +8,7 @@ import { useRunStream } from '../../hooks/useRunStream';
 import { useQueryClient } from '@tanstack/react-query';
 import { useExperiment } from '../../api/experiments';
 import RunProgress from './RunProgress';
+import { Badge, statusVariant } from '../ui/Badge';
 
 interface RunControlsProps {
   experimentId: string;
@@ -23,7 +24,6 @@ export default function RunControls({ experimentId }: RunControlsProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Stable callbacks for useRunStream
   const onComplete = useCallback(() => {
     setIsStreaming(false);
     setError(null);
@@ -37,7 +37,6 @@ export default function RunControls({ experimentId }: RunControlsProps) {
     queryClient.invalidateQueries();
   }, [queryClient]);
 
-  // Use run stream when a run is active
   const { events } = useRunStream(
     runStatus?.status === 'running' ? experimentId : null,
     { onComplete, onError }
@@ -83,93 +82,64 @@ export default function RunControls({ experimentId }: RunControlsProps) {
   const isPaused = experiment?.status === 'paused';
   const isCompleted = experiment?.status === 'completed';
 
+  const disabledBtn = 'px-6 py-2 rounded-lg font-medium bg-muted text-muted-foreground cursor-not-allowed';
+  const primaryBtn = 'px-6 py-2 rounded-lg font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity';
+  const warningBtn = 'px-6 py-2 rounded-lg font-medium bg-warning text-warning-foreground hover:opacity-90 transition-opacity';
+  const gainBtn = 'px-6 py-2 rounded-lg font-medium bg-gain text-white hover:opacity-90 transition-opacity';
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        {/* Run Day button */}
         <button
+          type="button"
           onClick={handleStartRun}
           disabled={isRunning || isPaused || isCompleted || startRunMutation.isPending}
-          className={`
-            px-6 py-2 rounded-lg font-medium transition-colors
-            ${
-              isRunning || isPaused || isCompleted || startRunMutation.isPending
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-brand-700 text-white hover:bg-brand-600'
-            }
-          `}
+          className={isRunning || isPaused || isCompleted || startRunMutation.isPending ? disabledBtn : primaryBtn}
           title={isPaused ? 'Resume the experiment to run' : isCompleted ? 'Experiment is completed' : undefined}
         >
           {isRunning ? 'Running...' : 'Run Day'}
         </button>
 
-        {/* Pause button */}
         {!isPaused && !isCompleted && (
           <button
+            type="button"
             onClick={handlePause}
             disabled={isRunning || pauseMutation.isPending}
-            className={`
-              px-6 py-2 rounded-lg font-medium transition-colors
-              ${
-                isRunning || pauseMutation.isPending
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-yellow-600 text-white hover:bg-yellow-500'
-              }
-            `}
+            className={isRunning || pauseMutation.isPending ? disabledBtn : warningBtn}
           >
             {pauseMutation.isPending ? 'Pausing...' : 'Pause'}
           </button>
         )}
 
-        {/* Resume button */}
         {isPaused && (
           <button
+            type="button"
             onClick={handleResume}
             disabled={isRunning || resumeMutation.isPending}
-            className={`
-              px-6 py-2 rounded-lg font-medium transition-colors
-              ${
-                isRunning || resumeMutation.isPending
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-500'
-              }
-            `}
+            className={isRunning || resumeMutation.isPending ? disabledBtn : gainBtn}
           >
             {resumeMutation.isPending ? 'Resuming...' : 'Resume'}
           </button>
         )}
 
-        {/* Status badge */}
         {experiment && (
-          <div className={`
-            px-3 py-1 rounded-full text-xs font-medium
-            ${experiment.status === 'active' ? 'bg-green-100 text-green-700' : ''}
-            ${experiment.status === 'paused' ? 'bg-yellow-100 text-yellow-700' : ''}
-            ${experiment.status === 'completed' ? 'bg-gray-100 text-gray-700' : ''}
-          `}>
-            {experiment.status}
-          </div>
+          <Badge variant={statusVariant(experiment.status)}>{experiment.status}</Badge>
         )}
       </div>
 
-      {/* Error message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+        <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">
           {error}
         </div>
       )}
 
-      {/* Run status error */}
       {runStatus?.error && !error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+        <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">
           {runStatus.error}
         </div>
       )}
 
-      {/* Show progress if running */}
-      {isRunning && (
-        <RunProgress events={events} />
-      )}
+      {isRunning && <RunProgress events={events} />}
     </div>
   );
 }

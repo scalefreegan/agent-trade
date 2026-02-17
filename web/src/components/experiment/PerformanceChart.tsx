@@ -10,10 +10,11 @@ import {
 } from 'recharts';
 import type { PerformanceDataPoint } from '../../api/types';
 import { getChartColor } from '../../lib/colors';
+import { Card } from '../ui/Card';
 
 interface PerformanceChartProps {
   dataPoints: PerformanceDataPoint[];
-  agentRankings: Record<string, number>; // agent_id -> rank
+  agentRankings: Record<string, number>;
   startingCapital?: number;
 }
 
@@ -24,46 +25,41 @@ export function PerformanceChart({
 }: PerformanceChartProps) {
   if (dataPoints.length === 0) {
     return (
-      <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-        <div className="text-center">
-          <p className="text-gray-500 font-medium">No performance data yet</p>
-          <p className="text-sm text-gray-400 mt-1">
-            Chart will appear after the first trading day
-          </p>
+      <Card>
+        <div className="flex items-center justify-center h-80">
+          <div className="text-center">
+            <p className="text-muted-foreground font-medium">No performance data yet</p>
+            <p className="text-sm text-muted-foreground/60 mt-1">
+              Chart will appear after the first trading day
+            </p>
+          </div>
         </div>
-      </div>
+      </Card>
     );
   }
 
-  // Transform data: calculate net gains and structure for Recharts
   const chartData = dataPoints.map((point) => {
     const dataPoint: Record<string, number | string> = {
       day: point.trading_day,
       date: point.date,
     };
-
-    // Calculate net gain for each agent
     Object.entries(point.values).forEach(([agentId, value]) => {
       dataPoint[agentId] = value - startingCapital;
     });
-
     return dataPoint;
   });
 
-  // Get all unique agent IDs and sort by ranking
   const agentIds = Object.keys(agentRankings).sort(
     (a, b) => agentRankings[a] - agentRankings[b]
   );
 
-  // Custom tooltip
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
 
     return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 backdrop-blur-sm bg-white/95">
-        <p className="text-sm font-semibold text-gray-900 mb-2 border-b border-gray-100 pb-2">
+      <div className="bg-card border border-border rounded-lg shadow-card-hover p-4">
+        <p className="text-sm font-semibold text-foreground mb-2 border-b border-border pb-2">
           Day {label}
         </p>
         <div className="space-y-1.5">
@@ -74,17 +70,14 @@ export function PerformanceChart({
             .map((entry: any) => (
               <div key={entry.dataKey} className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: entry.color }}
-                  />
-                  <span className="text-xs text-gray-600 truncate max-w-[120px]">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                  <span className="text-xs text-muted-foreground truncate max-w-[120px]">
                     {entry.name}
                   </span>
                 </div>
                 <span
                   className={`text-xs font-bold font-mono tabular-nums ${
-                    (entry.value as number) >= 0 ? 'text-emerald-600' : 'text-red-600'
+                    (entry.value as number) >= 0 ? 'text-gain' : 'text-loss'
                   }`}
                 >
                   {(entry.value as number) >= 0 ? '+' : ''}
@@ -101,35 +94,32 @@ export function PerformanceChart({
   };
 
   return (
-    <div className="w-full bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+    <Card>
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Performance Over Time</h3>
-        <p className="text-sm text-gray-500 mt-1">
+        <h3 className="text-lg font-semibold text-foreground">Performance Over Time</h3>
+        <p className="text-sm text-muted-foreground mt-1">
           Net gain relative to ${startingCapital.toLocaleString()} starting capital
         </p>
       </div>
 
       <ResponsiveContainer width="100%" height={400}>
-        <LineChart
-          data={chartData}
-          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+        <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis
             dataKey="day"
             label={{ value: 'Trading Day', position: 'insideBottom', offset: -5 }}
-            tick={{ fill: '#6b7280', fontSize: 12 }}
-            stroke="#d1d5db"
+            tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+            stroke="var(--border-color)"
           />
           <YAxis
             label={{
               value: 'Net Gain ($)',
               angle: -90,
               position: 'insideLeft',
-              style: { textAnchor: 'middle' },
+              style: { textAnchor: 'middle', fill: 'var(--muted-foreground)' },
             }}
-            tick={{ fill: '#6b7280', fontSize: 12 }}
-            stroke="#d1d5db"
+            tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+            stroke="var(--border-color)"
             tickFormatter={(value) =>
               `${value >= 0 ? '+' : ''}${(value / 1000).toFixed(0)}k`
             }
@@ -139,22 +129,20 @@ export function PerformanceChart({
             wrapperStyle={{ paddingTop: '20px' }}
             iconType="line"
             formatter={(value) => (
-              <span className="text-sm text-gray-700">{value}</span>
+              <span className="text-sm text-muted-foreground">{value}</span>
             )}
           />
 
-          {/* Reference line at zero */}
           <Line
             type="monotone"
             dataKey={() => 0}
-            stroke="#9ca3af"
+            stroke="var(--border-color)"
             strokeWidth={1}
             strokeDasharray="5 5"
             dot={false}
             legendType="none"
           />
 
-          {/* Agent performance lines */}
           {agentIds.map((agentId) => {
             const rank = agentRankings[agentId];
             const color = getChartColor(rank);
@@ -168,12 +156,7 @@ export function PerformanceChart({
                 stroke={color}
                 strokeWidth={rank === 1 ? 3 : 2}
                 dot={false}
-                activeDot={{
-                  r: 5,
-                  fill: color,
-                  stroke: '#fff',
-                  strokeWidth: 2,
-                }}
+                activeDot={{ r: 5, fill: color, stroke: 'var(--card)', strokeWidth: 2 }}
                 style={{
                   filter: rank === 1 ? 'drop-shadow(0 0 4px rgba(0, 127, 95, 0.3))' : 'none',
                 }}
@@ -182,6 +165,6 @@ export function PerformanceChart({
           })}
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }
