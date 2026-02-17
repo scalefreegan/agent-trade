@@ -5,7 +5,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from agent_trade.web.routers import agents, experiments, performance, runs, state
+from agent_trade.web.routers import (
+    agents,
+    analysis,
+    experiments,
+    performance,
+    runs,
+    state,
+)
 
 # Create FastAPI app
 app = FastAPI(
@@ -32,6 +39,7 @@ app.include_router(state.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(performance.router, prefix="/api/v1")
 app.include_router(runs.router, prefix="/api/v1")
+app.include_router(analysis.router, prefix="/api/v1")
 
 
 @app.get("/api/health")
