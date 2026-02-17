@@ -41,9 +41,9 @@ export function AgentPerformanceChart({
 
   // Calculate current stats
   const currentData = chartData[chartData.length - 1];
-  const currentValue = currentData?.value || startingCapital;
-  const currentGain = currentData?.gain || 0;
-  const currentGainPct = currentData?.gainPct || 0;
+  const currentValue = currentData?.value ?? startingCapital;
+  const currentGain = currentData?.gain ?? 0;
+  const currentGainPct = currentData?.gainPct ?? 0;
 
   return (
     <div className="agent-performance-chart">
