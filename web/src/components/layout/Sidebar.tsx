@@ -1,3 +1,4 @@
+import { type RefObject } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { DashboardIcon } from '../../assets/icons/DashboardIcon';
 
@@ -6,9 +7,10 @@ interface SidebarProps {
   onToggle: () => void;
   mobileOpen: boolean;
   onMobileClose: () => void;
+  closeButtonRef: RefObject<HTMLButtonElement | null>;
 }
 
-export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose, closeButtonRef }: SidebarProps) {
   const location = useLocation();
 
   const isActive = (path: string) =>
@@ -32,6 +34,9 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
 
       {/* Mobile sidebar — slide-in drawer */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
         className={`
           fixed inset-y-0 left-0 z-30 xl:hidden
           flex flex-col w-64 bg-sidebar-bg text-sidebar-foreground
@@ -46,6 +51,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
             <p className="text-xs text-white/60 uppercase tracking-widest">Multi-Agent Trading</p>
           </div>
           <button
+            ref={closeButtonRef}
             onClick={onMobileClose}
             className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
             aria-label="Close menu"
@@ -56,10 +62,11 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
           </button>
         </div>
 
-        <nav className="flex-1 flex flex-col px-1.5 pt-3 space-y-1 overflow-hidden">
+        <nav aria-label="Mobile navigation" className="flex-1 flex flex-col px-1.5 pt-3 space-y-1 overflow-hidden">
           <Link
             to="/"
             onClick={onMobileClose}
+            aria-current={location.pathname === '/' ? 'page' : undefined}
             className={`flex items-center rounded-lg px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isActive('/')}`}
           >
             <DashboardIcon className="w-5 h-5 shrink-0" />
@@ -78,6 +85,8 @@ interface SidebarContentProps {
 }
 
 function SidebarContent({ collapsed, onToggle, isActive }: SidebarContentProps) {
+  const location = useLocation();
+
   return (
     <>
       {/* Logo */}
@@ -93,10 +102,11 @@ function SidebarContent({ collapsed, onToggle, isActive }: SidebarContentProps) 
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 flex flex-col px-1.5 space-y-1 overflow-hidden">
+      <nav aria-label="Desktop navigation" className="flex-1 flex flex-col px-1.5 space-y-1 overflow-hidden">
         <Link
           to="/"
           title={collapsed ? 'Dashboard' : undefined}
+          aria-current={location.pathname === '/' ? 'page' : undefined}
           className={`flex items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isActive('/')} ${
             collapsed ? 'justify-center px-0 py-3' : 'px-4 py-3'
           }`}
