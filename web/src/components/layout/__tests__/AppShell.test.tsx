@@ -16,28 +16,29 @@ function renderAppShell(initialPath = '/') {
   );
 }
 
+/** Returns the mobile drawer element directly — works when aria-hidden hides it from role queries. */
+function getDrawer() {
+  return document.getElementById('mobile-nav') as HTMLElement;
+}
+
 describe('AppShell — mobile drawer', () => {
   it('hamburger button opens the mobile drawer', () => {
     renderAppShell();
-    const drawer = screen.getByRole('dialog', { name: /navigation menu/i });
-    expect(drawer).toHaveClass('-translate-x-full');
+    expect(getDrawer()).toHaveClass('-translate-x-full');
 
-    const hamburger = screen.getByRole('button', { name: /open menu/i });
-    fireEvent.click(hamburger);
+    fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
 
-    expect(drawer).not.toHaveClass('-translate-x-full');
-    expect(drawer).toHaveClass('translate-x-0');
+    expect(getDrawer()).not.toHaveClass('-translate-x-full');
+    expect(getDrawer()).toHaveClass('translate-x-0');
   });
 
   it('backdrop click closes the drawer', () => {
     renderAppShell();
     fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
 
-    const backdrop = document.querySelector('[aria-hidden="true"]') as HTMLElement;
-    fireEvent.click(backdrop);
+    fireEvent.click(screen.getByTestId('mobile-overlay'));
 
-    const drawer = screen.getByRole('dialog', { name: /navigation menu/i });
-    expect(drawer).toHaveClass('-translate-x-full');
+    expect(getDrawer()).toHaveClass('-translate-x-full');
   });
 
   it('close button inside drawer closes the drawer', () => {
@@ -46,8 +47,7 @@ describe('AppShell — mobile drawer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /close menu/i }));
 
-    const drawer = screen.getByRole('dialog', { name: /navigation menu/i });
-    expect(drawer).toHaveClass('-translate-x-full');
+    expect(getDrawer()).toHaveClass('-translate-x-full');
   });
 
   it('Escape key closes the drawer', () => {
@@ -56,28 +56,40 @@ describe('AppShell — mobile drawer', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' });
 
-    const drawer = screen.getByRole('dialog', { name: /navigation menu/i });
-    expect(drawer).toHaveClass('-translate-x-full');
+    expect(getDrawer()).toHaveClass('-translate-x-full');
   });
 
   it('mobile dashboard link closes the drawer', () => {
     renderAppShell();
     fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
 
-    // Click the Dashboard link inside the mobile nav
-    const mobileNav = screen.getByRole('navigation', { name: /mobile navigation/i });
-    const dashboardLink = mobileNav.querySelector('a') as HTMLAnchorElement;
-    fireEvent.click(dashboardLink);
+    const mobileNav = getDrawer().querySelector('nav') as HTMLElement;
+    fireEvent.click(mobileNav.querySelector('a') as HTMLAnchorElement);
 
-    const drawer = screen.getByRole('dialog', { name: /navigation menu/i });
-    expect(drawer).toHaveClass('-translate-x-full');
+    expect(getDrawer()).toHaveClass('-translate-x-full');
   });
 
   it('drawer has role="dialog", aria-modal="true", and id="mobile-nav"', () => {
     renderAppShell();
-    const drawer = screen.getByRole('dialog', { name: /navigation menu/i });
+    const drawer = getDrawer();
+    expect(drawer).toHaveAttribute('role', 'dialog');
     expect(drawer).toHaveAttribute('aria-modal', 'true');
-    expect(drawer).toHaveAttribute('id', 'mobile-nav');
+  });
+
+  it('drawer is aria-hidden and inert when closed', () => {
+    renderAppShell();
+    const drawer = getDrawer();
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
+    expect(drawer).toHaveAttribute('inert');
+  });
+
+  it('drawer is not aria-hidden when open', () => {
+    renderAppShell();
+    fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
+
+    const drawer = getDrawer();
+    expect(drawer).toHaveAttribute('aria-hidden', 'false');
+    expect(drawer).not.toHaveAttribute('inert');
   });
 
   it('hamburger aria-expanded reflects drawer state', () => {
@@ -104,7 +116,6 @@ describe('AppShell — mobile drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
 
     const main = document.querySelector('main')?.parentElement as HTMLElement;
-    // The flex wrapper div around header+main gets inert
     expect(main.hasAttribute('inert')).toBe(true);
   });
 });

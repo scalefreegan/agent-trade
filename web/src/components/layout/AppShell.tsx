@@ -37,6 +37,7 @@ export function AppShell({ children }: AppShellProps) {
       {/* Mobile overlay backdrop */}
       {mobileOpen && (
         <div
+          data-testid="mobile-overlay"
           className="fixed inset-0 z-20 bg-black/50 xl:hidden"
           onClick={() => setMobileOpen(false)}
           aria-hidden="true"

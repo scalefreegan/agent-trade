@@ -38,6 +38,8 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose, closeB
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
+        aria-hidden={!mobileOpen}
+        inert={!mobileOpen ? true : undefined}
         className={`
           fixed inset-y-0 left-0 z-30 xl:hidden
           flex flex-col w-64 bg-sidebar-bg text-sidebar-foreground
