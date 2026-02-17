@@ -2,6 +2,8 @@ import { useState } from 'react';
 import Markdown from 'react-markdown';
 import type { DecisionLogEntry } from '../../api/types';
 import { useAgentDecision } from '../../api/agents';
+import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
 
 interface DecisionLogProps {
   experimentId: string;
@@ -18,345 +20,72 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
   );
 
   return (
-    <div className="decision-log">
-      <style>{`
-        .decision-log {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-        }
-
-        .decisions-list {
-          display: grid;
-          gap: 0.75rem;
-          margin-bottom: 1.5rem;
-        }
-
-        .decision-card {
-          background: white;
-          border: 1px solid #E5E7EB;
-          border-radius: 0.5rem;
-          padding: 1rem 1.25rem;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          display: grid;
-          grid-template-columns: auto 1fr auto;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .decision-card:hover {
-          border-color: #2B9348;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-
-        .decision-card.selected {
-          border-color: #007F5F;
-          background: #F0FDF4;
-        }
-
-        .decision-date-col {
-          display: flex;
-          flex-direction: column;
-          gap: 0.25rem;
-        }
-
-        .decision-date {
-          font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-          font-size: 0.9375rem;
-          font-weight: 700;
-          color: #111827;
-        }
-
-        .decision-day {
-          font-size: 0.6875rem;
-          color: #6B7280;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .decision-info {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-        }
-
-        .order-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.375rem;
-          padding: 0.25rem 0.625rem;
-          border-radius: 0.25rem;
-          font-size: 0.6875rem;
-          font-weight: 600;
-        }
-
-        .order-badge.has-orders {
-          background: #D1FAE5;
-          color: #065F46;
-        }
-
-        .order-badge.no-orders {
-          background: #F3F4F6;
-          color: #6B7280;
-        }
-
-        .decision-arrow {
-          width: 20px;
-          height: 20px;
-          color: #9CA3AF;
-          transition: transform 0.2s ease;
-        }
-
-        .decision-card:hover .decision-arrow {
-          color: #2B9348;
-          transform: translateX(4px);
-        }
-
-        /* Modal */
-        .modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 50;
-          padding: 1rem;
-          animation: fadeIn 0.2s ease;
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        .modal-content {
-          background: white;
-          border-radius: 0.75rem;
-          max-width: 900px;
-          width: 100%;
-          max-height: 90vh;
-          display: flex;
-          flex-direction: column;
-          animation: slideUp 0.3s ease;
-        }
-
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .modal-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 1.5rem;
-          border-bottom: 1px solid #E5E7EB;
-        }
-
-        .modal-title {
-          font-size: 1.125rem;
-          font-weight: 700;
-          color: #111827;
-        }
-
-        .modal-close {
-          width: 32px;
-          height: 32px;
-          border-radius: 0.375rem;
-          border: none;
-          background: #F3F4F6;
-          color: #6B7280;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.15s ease;
-        }
-
-        .modal-close:hover {
-          background: #E5E7EB;
-          color: #374151;
-        }
-
-        .modal-body {
-          overflow-y: auto;
-          padding: 1.5rem;
-        }
-
-        /* react-markdown styles */
-        .markdown-content {
-          font-size: 0.9375rem;
-          line-height: 1.7;
-          color: #374151;
-        }
-
-        .markdown-content h1 {
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: #111827;
-          margin: 1.5rem 0 1rem;
-          border-bottom: 2px solid #E5E7EB;
-          padding-bottom: 0.5rem;
-        }
-
-        .markdown-content h2 {
-          font-size: 1.25rem;
-          font-weight: 600;
-          color: #111827;
-          margin: 1.25rem 0 0.75rem;
-          border-bottom: 1px solid #F3F4F6;
-          padding-bottom: 0.375rem;
-        }
-
-        .markdown-content h3 {
-          font-size: 1.0625rem;
-          font-weight: 600;
-          color: #111827;
-          margin: 1rem 0 0.5rem;
-        }
-
-        .markdown-content h4, .markdown-content h5, .markdown-content h6 {
-          font-weight: 600;
-          color: #111827;
-          margin: 0.875rem 0 0.5rem;
-        }
-
-        .markdown-content p {
-          margin: 0.75rem 0;
-        }
-
-        .markdown-content ul, .markdown-content ol {
-          margin: 0.75rem 0;
-          padding-left: 1.5rem;
-        }
-
-        .markdown-content li {
-          margin: 0.375rem 0;
-        }
-
-        .markdown-content li > p {
-          margin: 0.25rem 0;
-        }
-
-        .markdown-content code {
-          font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-          background: #F3F4F6;
-          padding: 0.125rem 0.375rem;
-          border-radius: 0.25rem;
-          font-size: 0.875rem;
-        }
-
-        .markdown-content pre {
-          background: #F9FAFB;
-          border: 1px solid #E5E7EB;
-          border-radius: 0.375rem;
-          padding: 1rem;
-          overflow-x: auto;
-          margin: 1rem 0;
-        }
-
-        .markdown-content pre code {
-          background: none;
-          padding: 0;
-        }
-
-        .markdown-content blockquote {
-          border-left: 4px solid #2B9348;
-          padding-left: 1rem;
-          margin: 1rem 0;
-          color: #6B7280;
-          font-style: italic;
-        }
-
-        .markdown-content a {
-          color: #2B9348;
-          text-decoration: underline;
-        }
-
-        .markdown-content a:hover {
-          color: #007F5F;
-        }
-
-        .markdown-content table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 1rem 0;
-        }
-
-        .markdown-content table th,
-        .markdown-content table td {
-          border: 1px solid #E5E7EB;
-          padding: 0.5rem;
-          text-align: left;
-        }
-
-        .markdown-content table th {
-          background: #F9FAFB;
-          font-weight: 600;
-        }
-
-        .markdown-content hr {
-          border: none;
-          border-top: 1px solid #E5E7EB;
-          margin: 1.5rem 0;
-        }
-
-        .empty-state {
-          text-align: center;
-          padding: 3rem;
-          color: #9CA3AF;
-        }
-      `}</style>
-
+    <div>
       {decisions.length === 0 ? (
-        <div className="empty-state">No decisions recorded yet</div>
+        <div className="text-center py-12 text-muted-foreground">No decisions recorded yet</div>
       ) : (
-        <div className="decisions-list">
-          {decisions.map((decision) => (
-            <div
-              key={decision.date}
-              className={`decision-card ${selectedDate === decision.date ? 'selected' : ''}`}
-              onClick={() => setSelectedDate(decision.date)}
-            >
-              <div className="decision-date-col">
-                <div className="decision-date">{decision.date}</div>
-                <div className="decision-day">Day {decision.trading_day}</div>
-              </div>
-
-              <div className="decision-info">
-                <div className={`order-badge ${decision.has_orders ? 'has-orders' : 'no-orders'}`}>
-                  {decision.has_orders ? (
-                    <>
-                      ✓ {decision.order_count} order{decision.order_count !== 1 ? 's' : ''}
-                    </>
-                  ) : (
-                    'No orders'
-                  )}
+        <div className="grid gap-3 mb-6">
+          {decisions.map((decision) => {
+            const isSelected = selectedDate === decision.date;
+            return (
+              <Card
+                key={decision.date}
+                padding={false}
+                className={`
+                  px-5 py-4 cursor-pointer transition-all
+                  grid items-center gap-4
+                  ${isSelected
+                    ? 'border-primary bg-primary/5'
+                    : 'hover:border-brand-800 hover:shadow-card-hover'
+                  }
+                `}
+                style={{ gridTemplateColumns: 'auto 1fr auto' }}
+                onClick={() => setSelectedDate(decision.date)}
+              >
+                <div className="flex flex-col gap-1">
+                  <div className="font-mono text-[0.9375rem] font-bold text-foreground">{decision.date}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">Day {decision.trading_day}</div>
                 </div>
-              </div>
 
-              <svg className="decision-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-          ))}
+                <div className="flex items-center gap-3">
+                  <Badge
+                    variant={decision.has_orders ? 'success' : 'neutral'}
+                    className="text-[0.6875rem] font-semibold"
+                  >
+                    {decision.has_orders ? (
+                      <>✓ {decision.order_count} order{decision.order_count !== 1 ? 's' : ''}</>
+                    ) : (
+                      'No orders'
+                    )}
+                  </Badge>
+                </div>
+
+                <svg
+                  className={`w-5 h-5 transition-all duration-200 ${isSelected ? 'text-primary translate-x-1' : 'text-muted-foreground'}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Card>
+            );
+          })}
         </div>
       )}
 
       {/* Decision Detail Modal */}
       {selectedDate && decisionDetail && (
-        <div className="modal-overlay" onClick={() => setSelectedDate(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">Decision for {selectedDate}</div>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in"
+          onClick={() => setSelectedDate(null)}
+        >
+          <div
+            className="bg-card rounded-xl max-w-[900px] w-full max-h-[90vh] flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center px-6 py-5 border-b border-border">
+              <div className="text-lg font-bold text-foreground">Decision for {selectedDate}</div>
               <button
-                className="modal-close"
+                className="w-8 h-8 rounded-md border-none bg-muted text-muted-foreground cursor-pointer flex items-center justify-center transition-colors hover:bg-border hover:text-foreground"
                 onClick={() => setSelectedDate(null)}
                 aria-label="Close"
               >
@@ -365,8 +94,25 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
                 </svg>
               </button>
             </div>
-            <div className="modal-body">
-              <div className="markdown-content">
+            <div className="overflow-y-auto px-6 py-6">
+              <div className="
+                prose prose-sm max-w-none dark:prose-invert
+                prose-headings:text-foreground prose-headings:font-semibold
+                prose-h1:text-2xl prose-h1:border-b prose-h1:border-border prose-h1:pb-2
+                prose-h2:text-xl prose-h2:border-b prose-h2:border-border/50 prose-h2:pb-1.5
+                prose-h3:text-base
+                prose-p:text-foreground prose-p:leading-relaxed
+                prose-a:text-brand-800 hover:prose-a:text-primary
+                prose-strong:text-foreground
+                prose-code:bg-muted prose-code:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono
+                prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-pre:rounded-md
+                prose-blockquote:border-l-4 prose-blockquote:border-brand-800 prose-blockquote:text-muted-foreground prose-blockquote:not-italic
+                prose-table:border-collapse
+                prose-th:border prose-th:border-border prose-th:bg-muted prose-th:px-2 prose-th:py-2
+                prose-td:border prose-td:border-border prose-td:px-2 prose-td:py-2
+                prose-hr:border-border
+                prose-li:text-foreground
+              ">
                 <Markdown>{decisionDetail.markdown}</Markdown>
               </div>
             </div>

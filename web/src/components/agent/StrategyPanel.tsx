@@ -1,4 +1,6 @@
 import type { AgentStrategy } from '../../api/types';
+import { Card } from '../ui/Card';
+import { Badge } from '../ui/Badge';
 
 interface StrategyPanelProps {
   strategy: AgentStrategy;
@@ -6,228 +8,81 @@ interface StrategyPanelProps {
 
 export function StrategyPanel({ strategy }: StrategyPanelProps) {
   return (
-    <div className="strategy-panel">
-      <style>{`
-        .strategy-panel {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-        }
-
-        .thesis-card {
-          background: white;
-          border: 1px solid #E5E7EB;
-          border-radius: 0.5rem;
-          padding: 1.5rem;
-          margin-bottom: 2rem;
-        }
-
-        .thesis-header {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 1rem;
-        }
-
-        .thesis-badge {
-          background: #007F5F;
-          color: white;
-          padding: 0.375rem 0.875rem;
-          border-radius: 0.375rem;
-          font-size: 0.75rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .thesis-horizon {
-          background: #F3F4F6;
-          color: #374151;
-          padding: 0.375rem 0.875rem;
-          border-radius: 0.375rem;
-          font-size: 0.75rem;
-          font-weight: 500;
-        }
-
-        .thesis-rationale {
-          color: #374151;
-          line-height: 1.6;
-          margin-bottom: 1rem;
-        }
-
-        .principles-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: grid;
-          gap: 0.5rem;
-        }
-
-        .principle-item {
-          display: flex;
-          align-items: flex-start;
-          gap: 0.5rem;
-          color: #374151;
-          font-size: 0.875rem;
-        }
-
-        .principle-bullet {
-          color: #2B9348;
-          font-weight: bold;
-          flex-shrink: 0;
-        }
-
-        .learnings-section {
-          margin-top: 2rem;
-        }
-
-        .learnings-header {
-          font-size: 0.75rem;
-          font-weight: 700;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: #007F5F;
-          margin-bottom: 1rem;
-          padding-bottom: 0.75rem;
-          border-bottom: 2px solid #007F5F;
-        }
-
-        .learnings-timeline {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .learning-card {
-          background: white;
-          border: 1px solid #E5E7EB;
-          border-radius: 0.5rem;
-          padding: 1.25rem;
-          position: relative;
-          padding-left: 3rem;
-        }
-
-        .learning-date {
-          position: absolute;
-          left: 1rem;
-          top: 1.25rem;
-          font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-          font-size: 0.6875rem;
-          color: #9CA3AF;
-          transform: rotate(-90deg);
-          transform-origin: left top;
-          white-space: nowrap;
-        }
-
-        .learning-outcome-badge {
-          display: inline-block;
-          padding: 0.25rem 0.625rem;
-          border-radius: 0.25rem;
-          font-size: 0.6875rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          margin-bottom: 0.75rem;
-        }
-
-        .learning-outcome-badge.positive {
-          background: #D1FAE5;
-          color: #065F46;
-        }
-
-        .learning-outcome-badge.negative {
-          background: #FEE2E2;
-          color: #991B1B;
-        }
-
-        .learning-outcome-badge.neutral {
-          background: #FEF3C7;
-          color: #92400E;
-        }
-
-        .learning-observation {
-          color: #374151;
-          font-size: 0.875rem;
-          line-height: 1.5;
-          margin-bottom: 0.5rem;
-        }
-
-        .learning-lesson {
-          color: #6B7280;
-          font-size: 0.8125rem;
-          line-height: 1.5;
-          font-style: italic;
-          padding-left: 1rem;
-          border-left: 3px solid #2B9348;
-        }
-
-        .empty-learnings {
-          text-align: center;
-          padding: 2rem;
-          color: #9CA3AF;
-          font-size: 0.875rem;
-        }
-      `}</style>
-
+    <div>
       {/* Investment Thesis Card */}
-      <div className="thesis-card">
-        <div className="thesis-header">
-          <div className="thesis-badge">{strategy.thesis.risk_tolerance}</div>
-          <div className="thesis-horizon">{strategy.thesis.time_horizon}</div>
+      <Card className="mb-8">
+        <div className="flex gap-3 mb-4">
+          <Badge variant="info" className="uppercase tracking-wide text-xs px-3 py-1">
+            {strategy.thesis.risk_tolerance}
+          </Badge>
+          <Badge variant="neutral" className="text-xs px-3 py-1">
+            {strategy.thesis.time_horizon}
+          </Badge>
         </div>
 
-        <div className="thesis-rationale">
+        <p className="text-foreground leading-relaxed mb-4">
           <strong>Philosophy:</strong> {strategy.thesis.philosophy}
-        </div>
+        </p>
 
         {strategy.thesis.preferred_sectors.length > 0 && (
-          <div className="thesis-rationale" style={{ marginTop: '1rem' }}>
+          <p className="text-foreground leading-relaxed mt-4 mb-4">
             <strong>Preferred Sectors:</strong> {strategy.thesis.preferred_sectors.join(', ')}
-          </div>
+          </p>
         )}
 
         {strategy.thesis.key_metrics.length > 0 && (
-          <>
-            <div style={{ marginTop: '1rem', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase' }}>
+          <div className="mt-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
               Key Metrics
             </div>
-            <ul className="principles-list">
+            <ul className="grid gap-2 list-none p-0 m-0">
               {strategy.thesis.key_metrics.map((metric, idx) => (
-                <li key={idx} className="principle-item">
-                  <span className="principle-bullet">•</span>
+                <li key={idx} className="flex items-start gap-2 text-foreground text-sm">
+                  <span className="text-brand-800 font-bold flex-shrink-0">•</span>
                   <span>{metric}</span>
                 </li>
               ))}
             </ul>
-          </>
+          </div>
         )}
 
-        <div className="thesis-rationale" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #E5E7EB' }}>
+        <div className="mt-4 pt-4 border-t border-border text-foreground leading-relaxed">
           <strong>Rationale:</strong> {strategy.rationale}
         </div>
-      </div>
+      </Card>
 
       {/* Learnings Timeline */}
-      <div className="learnings-section">
-        <div className="learnings-header">
+      <div>
+        <div className="text-xs font-bold tracking-widest uppercase text-primary mb-4 pb-3 border-b-2 border-primary">
           Strategy Learnings ({strategy.learnings.length})
         </div>
 
         {strategy.learnings.length === 0 ? (
-          <div className="empty-learnings">No learnings recorded yet</div>
+          <div className="text-center py-8 text-muted-foreground text-sm">No learnings recorded yet</div>
         ) : (
-          <div className="learnings-timeline">
-            {strategy.learnings.map((learning, idx) => (
-              <div key={idx} className="learning-card">
-                <div className="learning-date">{learning.date}</div>
-                <div
-                  className={`learning-outcome-badge ${
-                    learning.outcome.toLowerCase()
-                  }`}
-                >
-                  {learning.outcome}
-                </div>
-                <div className="learning-observation">{learning.observation}</div>
-                <div className="learning-lesson">{learning.lesson}</div>
-              </div>
-            ))}
+          <div className="flex flex-col gap-4">
+            {strategy.learnings.map((learning, idx) => {
+              const outcome = learning.outcome.toLowerCase();
+              const badgeVariant =
+                outcome === 'positive' ? 'success' :
+                outcome === 'negative' ? 'error' :
+                'warning';
+
+              return (
+                <Card key={idx} className="relative pl-12">
+                  <div className="absolute left-4 top-5 font-mono text-[0.6875rem] text-muted-foreground -rotate-90 origin-top-left whitespace-nowrap">
+                    {learning.date}
+                  </div>
+                  <Badge variant={badgeVariant} className="mb-3 uppercase tracking-wide text-[0.6875rem]">
+                    {learning.outcome}
+                  </Badge>
+                  <p className="text-foreground text-sm leading-relaxed mb-2">{learning.observation}</p>
+                  <p className="text-muted-foreground text-[0.8125rem] leading-relaxed italic pl-4 border-l-[3px] border-brand-800">
+                    {learning.lesson}
+                  </p>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
