@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { client } from './client';
+import { fetchApi } from './client';
 
 // Tax metrics per agent
 export interface TaxMetrics {
@@ -59,10 +59,8 @@ export interface ExperimentReport {
 export function useTaxMetrics(experimentId: string) {
   return useQuery<TaxMetricsResponse>({
     queryKey: ['tax-metrics', experimentId],
-    queryFn: async () => {
-      const response = await client.get(`/experiments/${experimentId}/tax-metrics`);
-      return response.data;
-    },
+    queryFn: () =>
+      fetchApi<TaxMetricsResponse>(`/experiments/${experimentId}/tax-metrics`),
     enabled: !!experimentId,
   });
 }
@@ -73,10 +71,8 @@ export function useTaxMetrics(experimentId: string) {
 export function useHoldingPeriods(experimentId: string) {
   return useQuery<HoldingPeriodResponse>({
     queryKey: ['holding-periods', experimentId],
-    queryFn: async () => {
-      const response = await client.get(`/experiments/${experimentId}/holding-periods`);
-      return response.data;
-    },
+    queryFn: () =>
+      fetchApi<HoldingPeriodResponse>(`/experiments/${experimentId}/holding-periods`),
     enabled: !!experimentId,
   });
 }
@@ -87,12 +83,10 @@ export function useHoldingPeriods(experimentId: string) {
 export function useExperimentReport(experimentId: string, includeTaxMetrics = true) {
   return useQuery<ExperimentReport>({
     queryKey: ['experiment-report', experimentId, includeTaxMetrics],
-    queryFn: async () => {
-      const response = await client.get(`/experiments/${experimentId}/report`, {
-        params: { include_tax_metrics: includeTaxMetrics },
-      });
-      return response.data;
-    },
+    queryFn: () =>
+      fetchApi<ExperimentReport>(
+        `/experiments/${experimentId}/report?include_tax_metrics=${includeTaxMetrics}`
+      ),
     enabled: !!experimentId,
   });
 }

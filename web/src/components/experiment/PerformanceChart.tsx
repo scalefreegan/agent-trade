@@ -7,8 +7,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  TooltipProps,
 } from 'recharts';
+import type { TooltipProps } from 'recharts';
 import type { PerformanceDataPoint } from '../../api/types';
 import { getChartColor } from '../../lib/colors';
 

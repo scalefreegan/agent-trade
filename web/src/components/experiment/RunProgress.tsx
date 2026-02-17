@@ -2,7 +2,7 @@
  * Run progress indicators showing per-agent status.
  */
 
-import { RunEvent } from '../../hooks/useRunStream';
+import type { RunEvent } from '../../hooks/useRunStream';
 
 interface RunProgressProps {
   events: RunEvent[];
