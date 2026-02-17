@@ -8,7 +8,6 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import type { TooltipProps } from 'recharts';
 import type { PerformanceDataPoint } from '../../api/types';
 import { getChartColor } from '../../lib/colors';
 
@@ -57,7 +56,8 @@ export function PerformanceChart({
   );
 
   // Custom tooltip
-  const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
 
     return (
@@ -66,9 +66,11 @@ export function PerformanceChart({
           Day {label}
         </p>
         <div className="space-y-1.5">
-          {payload
-            .sort((a, b) => (b.value as number) - (a.value as number))
-            .map((entry) => (
+          {[...payload]
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .sort((a: any, b: any) => ((b.value as number) ?? 0) - ((a.value as number) ?? 0))
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .map((entry: any) => (
               <div key={entry.dataKey} className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <div
@@ -131,7 +133,7 @@ export function PerformanceChart({
               `${value >= 0 ? '+' : ''}${(value / 1000).toFixed(0)}k`
             }
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={CustomTooltip} />
           <Legend
             wrapperStyle={{ paddingTop: '20px' }}
             iconType="line"
