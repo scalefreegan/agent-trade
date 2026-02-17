@@ -28,7 +28,7 @@ export function AgentPerformanceChart({
     // Use nullish coalescing to preserve 0 values (bankrupt agents)
     const value = point.values[agentId] ?? startingCapital;
     const gain = value - startingCapital;
-    const gainPct = ((gain / startingCapital) * 100);
+    const gainPct = startingCapital > 0 ? ((gain / startingCapital) * 100) : 0;
 
     return {
       date: point.date,
