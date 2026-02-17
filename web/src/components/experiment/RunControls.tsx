@@ -167,7 +167,7 @@ export default function RunControls({ experimentId }: RunControlsProps) {
       )}
 
       {/* Show progress if running */}
-      {isRunning && events.length > 0 && (
+      {isRunning && (
         <RunProgress events={events} />
       )}
     </div>

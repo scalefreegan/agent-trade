@@ -1,5 +1,5 @@
 /**
- * Hook for SSE (Server-Sent Events) stream of run progress with auto-reconnect.
+ * Hook for SSE (Server-Sent Events) stream of run progress with auto-reconnect and polling fallback.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -23,9 +23,11 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
   const [isConnected, setIsConnected] = useState(false);
   const [events, setEvents] = useState<RunEvent[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const isTerminalRef = useRef(false);
+  const isPollingRef = useRef(false);
 
   // Store callbacks in refs to avoid effect re-runs
   const callbacksRef = useRef(options);
@@ -36,13 +38,74 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
       return;
     }
 
-    // Reset terminal flag when starting new connection
+    // Reset state when starting new connection
     isTerminalRef.current = false;
     reconnectAttemptsRef.current = 0;
+    isPollingRef.current = false;
+    setEvents([]); // Clear events from previous runs
+
+    const startPollingFallback = () => {
+      if (isPollingRef.current || isTerminalRef.current) {
+        return;
+      }
+
+      console.log('Starting polling fallback for run status');
+      isPollingRef.current = true;
+
+      const poll = async () => {
+        if (isTerminalRef.current) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/v1/experiments/${experimentId}/run/status`);
+          if (response.ok) {
+            const status = await response.json();
+
+            // Check if run completed or failed
+            if (status.status === 'completed') {
+              isTerminalRef.current = true;
+              const completeEvent: RunEvent = {
+                type: 'run_complete',
+                timestamp: new Date().toISOString(),
+                message: 'Run completed',
+              };
+              setEvents((prev) => [...prev, completeEvent]);
+              if (callbacksRef.current.onComplete) {
+                callbacksRef.current.onComplete();
+              }
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+              }
+            } else if (status.status === 'failed') {
+              isTerminalRef.current = true;
+              const errorEvent: RunEvent = {
+                type: 'run_error',
+                timestamp: new Date().toISOString(),
+                error: status.error || 'Run failed',
+              };
+              setEvents((prev) => [...prev, errorEvent]);
+              if (callbacksRef.current.onError) {
+                callbacksRef.current.onError(status.error || 'Run failed');
+              }
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Polling error:', error);
+        }
+      };
+
+      // Poll every 2 seconds
+      pollIntervalRef.current = setInterval(poll, 2000);
+      poll(); // Initial poll
+    };
 
     const connect = () => {
-      // Don't reconnect if we've seen a terminal event
-      if (isTerminalRef.current) {
+      // Don't reconnect if we've seen a terminal event or are polling
+      if (isTerminalRef.current || isPollingRef.current) {
         return;
       }
 
@@ -111,10 +174,9 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
             connect();
           }, delay);
         } else {
-          // Give up after max attempts
-          if (callbacksRef.current.onError) {
-            callbacksRef.current.onError('Connection lost after multiple retry attempts');
-          }
+          // Fall back to polling after max SSE attempts
+          console.log('SSE retry exhausted, falling back to polling');
+          startPollingFallback();
         }
       };
     };
@@ -130,6 +192,9 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
       setIsConnected(false);
     };
   }, [experimentId]); // Only depend on experimentId
@@ -142,6 +207,9 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
     }
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
+    }
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
     }
   };
 

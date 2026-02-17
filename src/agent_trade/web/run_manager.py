@@ -126,12 +126,21 @@ class RunManager:
 
             # Create progress callback
             def progress_callback(event_type: str, agent_id: Optional[str] = None, message: Optional[str] = None):
-                event = RunEvent(
-                    type=event_type,
-                    timestamp=datetime.now(),
-                    agent_id=agent_id,
-                    message=message,
-                )
+                # For error events, put message in error field for proper UI display
+                if event_type == "agent_error":
+                    event = RunEvent(
+                        type=event_type,
+                        timestamp=datetime.now(),
+                        agent_id=agent_id,
+                        error=message,
+                    )
+                else:
+                    event = RunEvent(
+                        type=event_type,
+                        timestamp=datetime.now(),
+                        agent_id=agent_id,
+                        message=message,
+                    )
                 job.events.put(event)
 
             # Run the daily cycle with progress callback

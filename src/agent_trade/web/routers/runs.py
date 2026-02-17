@@ -95,8 +95,8 @@ async def event_stream(experiment_id: str) -> AsyncGenerator[str, None]:
 
     # Stream events until job completes
     while True:
-        # Get pending events
-        events = run_manager.get_events(experiment_id, timeout=0.1)
+        # Get pending events (use to_thread to avoid blocking event loop)
+        events = await asyncio.to_thread(run_manager.get_events, experiment_id, 0.1)
 
         for event in events:
             event_data = {
