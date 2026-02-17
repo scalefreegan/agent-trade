@@ -22,8 +22,8 @@ export function ExperimentPage() {
 
   const { data: experiment, isLoading: expLoading, error: expError } = useExperiment(experimentId || '');
   const { data: gameState, isLoading: stateLoading, error: stateError } = useGameState(experimentId || '');
-  const { data: leaderboard, isLoading: leaderboardLoading } = useLeaderboard(experimentId || '');
-  const { data: performance, isLoading: performanceLoading } = usePerformance(experimentId || '');
+  const { data: leaderboard, isLoading: leaderboardLoading, error: leaderboardError } = useLeaderboard(experimentId || '');
+  const { data: performance, isLoading: performanceLoading, error: performanceError } = usePerformance(experimentId || '');
   const { data: taxMetrics, isLoading: taxMetricsLoading, error: taxMetricsError } = useTaxMetrics(experimentId || '');
   const { data: holdingPeriods, isLoading: holdingPeriodsLoading, error: holdingPeriodsError } = useHoldingPeriods(experimentId || '');
   const { data: experimentReport, isLoading: reportLoading, error: reportError } = useExperimentReport(experimentId || '');
@@ -135,6 +135,10 @@ export function ExperimentPage() {
           <div className="flex items-center justify-center h-64">
             <div className="text-muted-foreground">Loading leaderboard...</div>
           </div>
+        ) : leaderboardError ? (
+          <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
+            <div className="text-red-600 dark:text-red-400">Failed to load leaderboard: {leaderboardError.message}</div>
+          </div>
         ) : leaderboard?.entries ? (
           <Leaderboard entries={leaderboard.entries} />
         ) : (
@@ -148,6 +152,10 @@ export function ExperimentPage() {
         {performanceLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-muted-foreground">Loading performance data...</div>
+          </div>
+        ) : performanceError ? (
+          <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
+            <div className="text-red-600 dark:text-red-400">Failed to load performance data: {performanceError.message}</div>
           </div>
         ) : performance?.data_points ? (
           <PerformanceChart
