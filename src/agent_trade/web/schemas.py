@@ -191,9 +191,11 @@ class PortfolioMetrics(BaseModel):
 class InvestmentThesisResponse(BaseModel):
     """Investment thesis information."""
 
-    style: str
+    philosophy: str
+    risk_tolerance: str
+    preferred_sectors: list[str]
     time_horizon: str
-    key_principles: list[str]
+    key_metrics: list[str]
 
 
 class StrategyLearningResponse(BaseModel):

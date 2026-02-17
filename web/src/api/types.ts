@@ -94,9 +94,11 @@ export interface PortfolioMetrics {
 }
 
 export interface InvestmentThesis {
-  style: string;
+  philosophy: string;
+  risk_tolerance: string;
+  preferred_sectors: string[];
   time_horizon: string;
-  key_principles: string[];
+  key_metrics: string[];
 }
 
 export interface StrategyLearning {

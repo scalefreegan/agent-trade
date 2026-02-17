@@ -25,7 +25,8 @@ export function AgentPerformanceChart({
 
   // Filter and transform data for this agent
   const chartData = dataPoints.map((point) => {
-    const value = point.values[agentId] || startingCapital;
+    // Use nullish coalescing to preserve 0 values (bankrupt agents)
+    const value = point.values[agentId] ?? startingCapital;
     const gain = value - startingCapital;
     const gainPct = ((gain / startingCapital) * 100);
 

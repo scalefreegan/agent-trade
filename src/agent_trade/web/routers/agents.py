@@ -238,9 +238,11 @@ async def get_agent_strategy(
 
     return StrategyResponse(
         thesis=InvestmentThesisResponse(
-            style=strategy.thesis.style,
+            philosophy=strategy.thesis.philosophy,
+            risk_tolerance=strategy.thesis.risk_tolerance,
+            preferred_sectors=strategy.thesis.preferred_sectors,
             time_horizon=strategy.thesis.time_horizon,
-            key_principles=strategy.thesis.key_principles,
+            key_metrics=strategy.thesis.key_metrics,
         ),
         rationale=strategy.rationale,
         learnings=[
@@ -267,43 +269,37 @@ async def get_agent_transactions(
         logger.exception(f"Failed to load outcomes for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Extract transactions for this agent
+    # Extract transactions for this agent from flat transaction list
     transactions = []
     total_buy_volume = Decimal("0")
     total_sell_volume = Decimal("0")
     total_tax_paid = Decimal("0")
 
     for outcome in outcomes:
-        if agent_id not in outcome.agent_outcomes:
-            continue
+        # Filter transactions by agent_id (transactions is a flat list)
+        agent_transactions = [
+            txn for txn in outcome.transactions if txn.agent_id == agent_id
+        ]
 
-        agent_outcome = outcome.agent_outcomes[agent_id]
-
-        # Process executed orders
-        for order in agent_outcome.executed_orders:
-            total = order.shares * order.price
+        for txn in agent_transactions:
             transactions.append(
                 TransactionRecord(
                     date=outcome.date,
-                    action=order.action,
-                    symbol=order.symbol,
-                    shares=float(order.shares),
-                    price=float(order.price),
-                    total=float(total),
-                    tax_paid=None if order.action == "BUY" else 0,  # Tax shown on sells
+                    action=txn.action.upper(),  # "buy" -> "BUY"
+                    symbol=txn.symbol,
+                    shares=float(txn.shares),
+                    price=float(txn.price_per_share),
+                    total=float(txn.gross_amount),
+                    tax_paid=float(txn.tax_amount) if txn.tax_amount > 0 else None,
                 )
             )
-            if order.action == "BUY":
-                total_buy_volume += total
-            else:
-                total_sell_volume += total
 
-        # Add tax paid
-        if agent_outcome.tax_paid:
-            total_tax_paid += agent_outcome.tax_paid
-            # Update last sell transaction with tax
-            if transactions and transactions[-1].action == "SELL":
-                transactions[-1].tax_paid = float(agent_outcome.tax_paid)
+            # Accumulate volumes
+            if txn.action == "buy":
+                total_buy_volume += txn.gross_amount
+            else:  # "sell"
+                total_sell_volume += txn.gross_amount
+                total_tax_paid += txn.tax_amount
 
     return TransactionHistoryResponse(
         transactions=transactions,
@@ -345,15 +341,18 @@ async def list_agent_decisions(
             date_formatted = date_str
 
         # Check if file has orders by scanning content
+        has_orders = False
+        order_count = 0
         try:
             with open(decision_file, "r") as f:
                 content = f.read()
                 has_orders = "# Orders" in content or "## Orders" in content
                 # Count order lines (simple heuristic)
                 order_count = content.count("- BUY") + content.count("- SELL")
-        except Exception:
-            has_orders = False
-            order_count = 0
+        except (IOError, OSError) as e:
+            # Log file read errors but continue - we still want to show the decision entry
+            logger.warning(f"Failed to read decision file {decision_file} for order parsing: {e}")
+            # Keep has_orders=False, order_count=0 as defaults
 
         decisions.append(
             DecisionLogEntry(

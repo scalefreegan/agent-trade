@@ -169,20 +169,39 @@ export function StrategyPanel({ strategy }: StrategyPanelProps) {
       {/* Investment Thesis Card */}
       <div className="thesis-card">
         <div className="thesis-header">
-          <div className="thesis-badge">{strategy.thesis.style}</div>
+          <div className="thesis-badge">{strategy.thesis.risk_tolerance}</div>
           <div className="thesis-horizon">{strategy.thesis.time_horizon}</div>
         </div>
 
-        <div className="thesis-rationale">{strategy.rationale}</div>
+        <div className="thesis-rationale">
+          <strong>Philosophy:</strong> {strategy.thesis.philosophy}
+        </div>
 
-        <ul className="principles-list">
-          {strategy.thesis.key_principles.map((principle, idx) => (
-            <li key={idx} className="principle-item">
-              <span className="principle-bullet">•</span>
-              <span>{principle}</span>
-            </li>
-          ))}
-        </ul>
+        {strategy.thesis.preferred_sectors.length > 0 && (
+          <div className="thesis-rationale" style={{ marginTop: '1rem' }}>
+            <strong>Preferred Sectors:</strong> {strategy.thesis.preferred_sectors.join(', ')}
+          </div>
+        )}
+
+        {strategy.thesis.key_metrics.length > 0 && (
+          <>
+            <div style={{ marginTop: '1rem', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase' }}>
+              Key Metrics
+            </div>
+            <ul className="principles-list">
+              {strategy.thesis.key_metrics.map((metric, idx) => (
+                <li key={idx} className="principle-item">
+                  <span className="principle-bullet">•</span>
+                  <span>{metric}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        <div className="thesis-rationale" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #E5E7EB' }}>
+          <strong>Rationale:</strong> {strategy.rationale}
+        </div>
       </div>
 
       {/* Learnings Timeline */}
