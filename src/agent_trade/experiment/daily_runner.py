@@ -8,6 +8,7 @@ a single day's trading cycle for an experiment.
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable, Optional
 
 from .config import get_experiment_dir, load_config, save_config
 from .coordinator import (
@@ -39,6 +40,7 @@ def run_daily_cycle(
     experiment_id: str,
     force: bool = False,
     timeout: int = 300,
+    progress_callback: Optional[Callable[[str, Optional[str], Optional[str]], None]] = None,
 ) -> bool:
     """
     Run a single daily trading cycle for an experiment.
@@ -47,6 +49,8 @@ def run_daily_cycle(
         experiment_id: Experiment ID to run
         force: If True, run even if not a trading day
         timeout: Maximum time per agent in seconds
+        progress_callback: Optional callback for progress events.
+            Called with (event_type: str, agent_id: Optional[str], message: Optional[str])
 
     Returns:
         True if cycle completed successfully, False otherwise
@@ -90,6 +94,7 @@ def run_daily_cycle(
             date=date,
             decisions_base_dir=decisions_dir,
             timeout=timeout,
+            progress_callback=progress_callback,
         )
 
         # Save updated game state

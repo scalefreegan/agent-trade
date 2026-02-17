@@ -272,3 +272,19 @@ class AgentDetailResponse(BaseModel):
     metrics: PortfolioMetrics
     created_at: datetime
     eliminated_at: datetime | None = None
+
+
+# ==============================================================================
+# Run Control Schemas
+# ==============================================================================
+
+
+class RunStatusResponse(BaseModel):
+    """Run job status."""
+
+    job_id: str
+    experiment_id: str
+    status: str  # "idle", "running", "completed", "failed"
+    started_at: datetime
+    completed_at: datetime | None = None
+    error: str | None = None

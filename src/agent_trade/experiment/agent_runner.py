@@ -10,7 +10,7 @@ import logging
 import time
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from ..claude_wrapper import query_claude_code
 from .market_data import get_current_prices
@@ -114,6 +114,7 @@ async def spawn_all_agents(
     date: str,
     decisions_base_dir: Path,
     timeout: int = 300,
+    progress_callback: Optional[Callable[[str, Optional[str], Optional[str]], None]] = None,
 ) -> dict[str, DailyDecision]:
     """
     Spawn all active agents in parallel for daily decisions.
@@ -124,6 +125,8 @@ async def spawn_all_agents(
         date: Trading date (YYYY-MM-DD)
         decisions_base_dir: Base directory for agent decisions
         timeout: Maximum time per agent in seconds (default: 5 minutes)
+        progress_callback: Optional callback for progress events.
+            Called with (event_type: str, agent_id: Optional[str], message: Optional[str])
 
     Returns:
         Dictionary mapping agent_id to DailyDecision
@@ -145,6 +148,10 @@ async def spawn_all_agents(
         decisions_dir = decisions_base_dir / agent.agent_id / "decisions"
         decisions_dir.mkdir(parents=True, exist_ok=True)
         decisions_dirs[agent.agent_id] = decisions_dir
+
+        # Emit agent start event
+        if progress_callback:
+            progress_callback("agent_start", agent.agent_id, f"Starting agent {agent.name}")
 
         task = asyncio.wait_for(
             spawn_agent(agent, config, date, current_prices, decisions_dir),
@@ -175,6 +182,11 @@ async def spawn_all_agents(
                 strategy_updates=None,
                 execution_time_ms=timeout * 1000,
             )
+
+            # Emit error event
+            if progress_callback:
+                progress_callback("agent_error", agent_id, error_msg)
+
         elif isinstance(result, Exception):
             # Create error decision
             error_msg = f"ERROR: {str(result)}"
@@ -191,9 +203,18 @@ async def spawn_all_agents(
                 strategy_updates=None,
                 execution_time_ms=0.0,
             )
+
+            # Emit error event
+            if progress_callback:
+                progress_callback("agent_error", agent_id, error_msg)
+
         else:
             # Success
             results[agent_id] = result
+
+            # Emit completion event
+            if progress_callback:
+                progress_callback("agent_complete", agent_id, f"Agent {agent_id} completed")
 
     return results
 

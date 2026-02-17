@@ -4,6 +4,7 @@ import { useExperiment, useGameState } from '../api/experiments';
 import { useLeaderboard, usePerformance } from '../api/performance';
 import { Leaderboard } from '../components/experiment/Leaderboard';
 import { PerformanceChart } from '../components/experiment/PerformanceChart';
+import RunControls from '../components/experiment/RunControls';
 
 type Tab = 'overview' | 'leaderboard' | 'performance';
 
@@ -52,11 +53,18 @@ export function ExperimentPage() {
     <div>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">{experiment.name}</h1>
-        <p className="text-gray-600 mt-2">
-          Trading Day {gameState.trading_day}
-          {gameState.last_run && <> • Last run: {new Date(gameState.last_run).toLocaleDateString()}</>}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{experiment.name}</h1>
+            <p className="text-gray-600 mt-2">
+              Trading Day {gameState.trading_day}
+              {gameState.last_run && <> • Last run: {new Date(gameState.last_run).toLocaleDateString()}</>}
+            </p>
+          </div>
+          <div>
+            <RunControls experimentId={experimentId!} />
+          </div>
+        </div>
       </div>
 
       {/* Tab Navigation */}
