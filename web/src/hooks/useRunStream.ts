@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 export interface RunEvent {
-  type: 'connected' | 'agent_start' | 'agent_complete' | 'agent_error' | 'run_complete' | 'run_error';
+  type: 'connected' | 'agent_start' | 'agent_complete' | 'agent_error' | 'run_complete' | 'run_error' | 'error';
   timestamp?: string;
   agent_id?: string;
   message?: string;
@@ -59,6 +59,7 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
 
         try {
           const response = await fetch(`/api/v1/experiments/${experimentId}/run/status`);
+
           if (response.ok) {
             const status = await response.json();
 
@@ -91,10 +92,46 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
               if (pollIntervalRef.current) {
                 clearInterval(pollIntervalRef.current);
               }
+            } else if (status.status === 'idle') {
+              // Job disappeared or was never created (404 returns idle)
+              // Treat as terminal error
+              isTerminalRef.current = true;
+              const errorEvent: RunEvent = {
+                type: 'run_error',
+                timestamp: new Date().toISOString(),
+                error: 'Run job not found',
+              };
+              setEvents((prev) => [...prev, errorEvent]);
+              if (callbacksRef.current.onError) {
+                callbacksRef.current.onError('Run job not found');
+              }
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+              }
+            }
+          } else {
+            // Non-OK response (404, 500, etc.) - treat as terminal error
+            isTerminalRef.current = true;
+            const errorText = response.status === 404
+              ? 'Run job not found'
+              : `Server error: ${response.status}`;
+            const errorEvent: RunEvent = {
+              type: 'run_error',
+              timestamp: new Date().toISOString(),
+              error: errorText,
+            };
+            setEvents((prev) => [...prev, errorEvent]);
+            if (callbacksRef.current.onError) {
+              callbacksRef.current.onError(errorText);
+            }
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
             }
           }
         } catch (error) {
           console.error('Polling error:', error);
+          // Network errors could be transient, don't treat as terminal
+          // But log for debugging
         }
       };
 
@@ -139,11 +176,11 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
             setIsConnected(false);
           }
 
-          // Handle error
-          if (data.type === 'run_error') {
+          // Handle errors (both run_error and error types)
+          if (data.type === 'run_error' || data.type === 'error') {
             isTerminalRef.current = true;
             if (callbacksRef.current.onError) {
-              callbacksRef.current.onError(data.error || 'Unknown error');
+              callbacksRef.current.onError(data.error || data.message || 'Unknown error');
             }
             eventSource.close();
             setIsConnected(false);
