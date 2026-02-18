@@ -23,6 +23,16 @@ class TestExtractJson:
         result = _extract_json(text)
         assert result["research_notes"] == "neutral"
 
+    def test_json_after_prose(self):
+        text = 'Based on my research, here is my decision:\n\n```json\n{"research_notes":"energy play","orders":[]}\n```'
+        result = _extract_json(text)
+        assert result["research_notes"] == "energy play"
+
+    def test_bare_json_after_prose(self):
+        text = 'Here is my decision: {"research_notes": "momentum", "orders": []}'
+        result = _extract_json(text)
+        assert result["research_notes"] == "momentum"
+
     def test_non_json_raises(self):
         with pytest.raises(RuntimeError):
             _extract_json("hello world")

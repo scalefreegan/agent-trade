@@ -31,7 +31,10 @@ def _build_mcp_config(tmp_dir: str) -> str:
 def _extract_json(text: str) -> dict:
     """Extract a JSON object from agent text output.
 
-    Tries direct parse first, then strips markdown code fences.
+    Tries in order:
+    1. Direct parse (agent returned only JSON)
+    2. First ```json ... ``` or ``` ... ``` block anywhere in the text
+    3. First bare { ... } object spanning the rest of the text
 
     Raises:
         RuntimeError: If no valid JSON object can be extracted.
@@ -42,14 +45,20 @@ def _extract_json(text: str) -> dict:
     except json.JSONDecodeError:
         pass
 
-    # Strip markdown fences (```json ... ``` or ``` ... ```)
-    stripped = text.strip()
-    if stripped.startswith("```"):
-        lines = stripped.splitlines()
-        # Remove first line (``` or ```json) and last line (```)
-        inner = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
+    # Search for a fenced code block anywhere in the text
+    import re
+    fence_match = re.search(r"```(?:json)?\s*\n(.*?)\n```", text, re.DOTALL)
+    if fence_match:
         try:
-            return json.loads(inner)
+            return json.loads(fence_match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Search for the first { and try to parse from there
+    brace_pos = text.find("{")
+    if brace_pos != -1:
+        try:
+            return json.loads(text[brace_pos:])
         except json.JSONDecodeError:
             pass
 
