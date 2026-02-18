@@ -1,7 +1,6 @@
 """Agent detail endpoints."""
 import json
 import logging
-from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -319,40 +318,22 @@ async def list_agent_decisions(
     if not agent_dir.exists():
         return []
 
+    # Files are written as {YYYY-MM-DD}.json by the runner
+    json_files = sorted(agent_dir.glob("*.json"))
+
     decisions = []
-    for decision_file in sorted(agent_dir.glob("*.md")):
-        # Parse filename: day_YYYYMMDD.md or YYYYMMDD.md
-        filename = decision_file.stem
-        parts = filename.split("_")
+    for trading_day, decision_file in enumerate(json_files, start=1):
+        date_formatted = decision_file.stem  # stem is already YYYY-MM-DD
 
-        if len(parts) == 2 and parts[0].startswith("day"):
-            trading_day = int(parts[0][3:])  # Extract day number
-            date_str = parts[1]
-        else:
-            # Fallback for older format
-            trading_day = 0
-            date_str = parts[0]
-
-        # Parse date
-        try:
-            date_obj = datetime.strptime(date_str, "%Y%m%d")
-            date_formatted = date_obj.strftime("%Y-%m-%d")
-        except ValueError:
-            date_formatted = date_str
-
-        # Check if file has orders by scanning content
         has_orders = False
         order_count = 0
         try:
-            with open(decision_file, "r") as f:
-                content = f.read()
-                has_orders = "# Orders" in content or "## Orders" in content
-                # Count order lines (simple heuristic)
-                order_count = content.count("- BUY") + content.count("- SELL")
-        except (IOError, OSError) as e:
-            # Log file read errors but continue - we still want to show the decision entry
-            logger.warning(f"Failed to read decision file {decision_file} for order parsing: {e}")
-            # Keep has_orders=False, order_count=0 as defaults
+            data = json.loads(decision_file.read_text())
+            orders = data.get("orders", [])
+            order_count = len(orders)
+            has_orders = order_count > 0
+        except (IOError, OSError, json.JSONDecodeError) as e:
+            logger.warning(f"Failed to read decision file {decision_file}: {e}")
 
         decisions.append(
             DecisionLogEntry(
@@ -370,36 +351,56 @@ async def list_agent_decisions(
 async def get_agent_decision(
     experiment_id: str, agent_id: str, date: str
 ) -> dict[str, str]:
-    """Get agent decision markdown for a specific date."""
+    """Get agent decision for a specific date, returned as rendered markdown."""
     agent_dir = get_experiment_dir(experiment_id) / "agents" / agent_id / "decisions"
+    decision_file = agent_dir / f"{date}.json"
 
-    # Try to find decision file - could be in different formats
-    date_clean = date.replace("-", "")
-    possible_files = [
-        agent_dir / f"{date_clean}.md",
-        agent_dir / f"day*_{date_clean}.md",
-    ]
-
-    decision_file = None
-    for pattern in possible_files:
-        if "*" in str(pattern):
-            # Glob pattern
-            matches = list(agent_dir.glob(pattern.name))
-            if matches:
-                decision_file = matches[0]
-                break
-        elif pattern.exists():
-            decision_file = pattern
-            break
-
-    if not decision_file:
+    if not decision_file.exists():
         raise HTTPException(status_code=404, detail="Decision not found")
 
     try:
-        with open(decision_file, "r") as f:
-            content = f.read()
+        data = json.loads(decision_file.read_text())
     except Exception as e:
         logger.exception(f"Failed to read decision file {decision_file}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    return {"markdown": content}
+    # Render structured JSON as markdown for the frontend
+    lines: list[str] = [f"# Trading Decision: {date}", ""]
+
+    error = data.get("error")
+    if error:
+        lines += ["## Status", "", f"**{error}**", ""]
+    else:
+        research_notes = data.get("research_notes", "")
+        orders = data.get("orders", [])
+        strategy_updates = data.get("strategy_updates")
+
+        if research_notes:
+            lines += ["## Research Notes", "", research_notes, ""]
+
+        lines.append("## Orders")
+        lines.append("")
+        if orders:
+            for o in orders:
+                action = str(o.get("action", "?")).upper()
+                symbol = o.get("symbol", "?")
+                amount = o.get("amount", "?")
+                reasoning = o.get("reasoning", "")
+                lines.append(f"- **{action} {symbol}** — amount: {amount}")
+                if reasoning:
+                    lines.append(f"  > {reasoning}")
+        else:
+            lines.append("*No orders placed.*")
+        lines.append("")
+
+        if strategy_updates and isinstance(strategy_updates, dict):
+            lines += ["## Strategy Update", ""]
+            if strategy_updates.get("observation"):
+                lines.append(f"**Observation**: {strategy_updates['observation']}")
+            if strategy_updates.get("outcome"):
+                lines.append(f"**Outcome**: {strategy_updates['outcome']}")
+            if strategy_updates.get("lesson"):
+                lines.append(f"**Lesson**: {strategy_updates['lesson']}")
+            lines.append("")
+
+    return {"markdown": "\n".join(lines)}

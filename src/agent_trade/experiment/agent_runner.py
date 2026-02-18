@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 import time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -69,7 +69,7 @@ def _parse_structured_response(
                     reasoning=o.get("reasoning", ""),
                 )
             )
-        except (KeyError, ValueError) as e:
+        except (KeyError, ValueError, InvalidOperation) as e:
             logger.warning(f"Agent {agent_id}: skipping malformed order {o}: {e}")
 
     strategy_updates: Optional[StrategyLearning] = None
@@ -155,7 +155,7 @@ async def spawn_agent(
 
         return decision
 
-    except asyncio.TimeoutError:
+    except (TimeoutError, asyncio.TimeoutError):
         execution_time = (time.time() - start_time) * 1000
         error_msg = "TIMEOUT: Agent did not respond within time limit"
         logger.warning(f"Agent {agent.agent_id} timed out on {date}")
