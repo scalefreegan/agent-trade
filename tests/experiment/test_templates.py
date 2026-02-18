@@ -351,13 +351,13 @@ class TestCreateDefaultStrategy:
 
         assert isinstance(strategy, AgentStrategy)
         assert strategy.thesis.philosophy in [
-            "Value investing focused on undervalued companies with strong fundamentals",
-            "Growth investing targeting high-potential technology and innovation leaders",
-            "Momentum trading following trends and technical indicators",
-            "Dividend investing seeking stable income from established companies",
-            "Index tracking with tactical rebalancing based on market conditions",
-            "Contrarian investing buying when others sell and selling when others buy",
-            "Quality investing in companies with strong balance sheets and competitive moats",
+            "News-driven trading: act on earnings surprises, analyst upgrades/downgrades, and sector catalysts",
+            "Momentum trading: buy stocks breaking to new highs on strong volume; cut losers quickly",
+            "Earnings-catalyst trading: enter before anticipated beats, exit after the pop",
+            "Sector-rotation trading: rotate capital into leading sectors as macro conditions shift",
+            "Contrarian swing trading: buy sharp oversold dips in fundamentally sound companies, sell the bounce",
+            "Technical breakout trading: enter on confirmed breakouts above resistance with volume confirmation",
+            "Event-driven trading: capitalize on M&A rumors, FDA decisions, product launches, and index additions",
         ]
         assert strategy.thesis.risk_tolerance in ["conservative", "moderate", "aggressive"]
         assert len(strategy.thesis.preferred_sectors) >= 2

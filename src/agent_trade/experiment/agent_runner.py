@@ -6,17 +6,108 @@ given their portfolio state and strategy, and asked to make trading decisions.
 """
 
 import asyncio
+import json
 import logging
 import time
 from decimal import Decimal
 from pathlib import Path
 from typing import Callable, Optional
 
-from ..claude_wrapper import query_claude_code
+from ..claude_wrapper import run_agent
 from .market_data import get_current_prices
 from .models import AgentState, DailyDecision, ExperimentConfig, Order, StrategyLearning
 
 logger = logging.getLogger(__name__)
+
+
+def _build_decision_schema() -> dict:
+    """JSON schema for structured agent output."""
+    return {
+        "type": "object",
+        "required": ["research_notes", "orders"],
+        "properties": {
+            "research_notes": {"type": "string"},
+            "orders": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["action", "symbol", "amount", "reasoning"],
+                    "properties": {
+                        "action": {"type": "string", "enum": ["buy", "sell"]},
+                        "symbol": {"type": "string"},
+                        "amount": {"type": "number"},
+                        "reasoning": {"type": "string"},
+                    },
+                },
+            },
+            "strategy_updates": {
+                "type": ["object", "null"],
+                "properties": {
+                    "observation": {"type": "string"},
+                    "outcome": {"type": "string"},
+                    "lesson": {"type": "string"},
+                },
+            },
+        },
+    }
+
+
+def _parse_structured_response(
+    data: dict,
+    agent_id: str,
+    date: str,
+) -> DailyDecision:
+    """Build a DailyDecision from the structured JSON response."""
+    orders: list[Order] = []
+    for o in data.get("orders", []):
+        try:
+            orders.append(
+                Order(
+                    action=o["action"],
+                    symbol=o["symbol"],
+                    amount=Decimal(str(o["amount"])),
+                    reasoning=o.get("reasoning", ""),
+                )
+            )
+        except (KeyError, ValueError) as e:
+            logger.warning(f"Agent {agent_id}: skipping malformed order {o}: {e}")
+
+    strategy_updates: Optional[StrategyLearning] = None
+    su = data.get("strategy_updates")
+    if su and isinstance(su, dict):
+        obs = su.get("observation", "")
+        out = su.get("outcome", "")
+        les = su.get("lesson", "")
+        if obs and out and les:
+            strategy_updates = StrategyLearning(
+                date=date,
+                observation=obs,
+                outcome=out,
+                lesson=les,
+            )
+
+    return DailyDecision(
+        date=date,
+        research_notes=data.get("research_notes", ""),
+        orders=orders,
+        strategy_updates=strategy_updates,
+        execution_time_ms=0.0,  # Set by caller
+    )
+
+
+async def _execute_agent_session(
+    prompt: str,
+    system_prompt: str,
+    agent_id: str,
+) -> dict:
+    """Execute a headless Claude Code session and return structured JSON."""
+    return await run_agent(
+        prompt=prompt,
+        system_prompt=system_prompt,
+        json_schema=_build_decision_schema(),
+        max_turns=25,
+        timeout=300,
+    )
 
 
 async def spawn_agent(
@@ -41,46 +132,36 @@ async def spawn_agent(
     """
     start_time = time.time()
 
-    # Build system prompt
     system_prompt = _build_system_prompt(agent, config, date, current_prices)
-
-    # Build task prompt
     task_prompt = _build_task_prompt(agent, date)
 
-    # Spawn Claude Code session
     try:
-        response_text = await _execute_agent_session(
+        response_data = await _execute_agent_session(
             prompt=task_prompt,
             system_prompt=system_prompt,
             agent_id=agent.agent_id,
         )
 
-        # Parse decision from response
-        decision = _parse_agent_response(
-            response_text=response_text,
+        decision = _parse_structured_response(
+            data=response_data,
             agent_id=agent.agent_id,
             date=date,
         )
+        decision.execution_time_ms = (time.time() - start_time) * 1000
 
-        # Set execution time
-        execution_time = (time.time() - start_time) * 1000
-        decision.execution_time_ms = execution_time
-
-        # Save decision to file
-        decision_file = decisions_dir / f"{date}.md"
-        decision_file.write_text(response_text)
+        # Save structured audit trail
+        decision_file = decisions_dir / f"{date}.json"
+        decision_file.write_text(json.dumps(response_data, indent=2))
 
         return decision
 
     except asyncio.TimeoutError:
-        # Agent timed out
         execution_time = (time.time() - start_time) * 1000
-        error_msg = f"TIMEOUT: Agent did not respond within time limit"
+        error_msg = "TIMEOUT: Agent did not respond within time limit"
         logger.warning(f"Agent {agent.agent_id} timed out on {date}")
 
-        # Persist error decision for audit trail
-        decision_file = decisions_dir / f"{date}.md"
-        decision_file.write_text(f"# Daily Trading Decision: {date}\n\n{error_msg}\n")
+        decision_file = decisions_dir / f"{date}.json"
+        decision_file.write_text(json.dumps({"error": error_msg}))
 
         return DailyDecision(
             date=date,
@@ -90,14 +171,12 @@ async def spawn_agent(
             execution_time_ms=execution_time,
         )
     except Exception as e:
-        # Other errors
         execution_time = (time.time() - start_time) * 1000
         error_msg = f"ERROR: {str(e)}"
         logger.error(f"Agent {agent.agent_id} failed on {date}: {e}")
 
-        # Persist error decision for audit trail
-        decision_file = decisions_dir / f"{date}.md"
-        decision_file.write_text(f"# Daily Trading Decision: {date}\n\n{error_msg}\n")
+        decision_file = decisions_dir / f"{date}.json"
+        decision_file.write_text(json.dumps({"error": error_msg}))
 
         return DailyDecision(
             date=date,
@@ -139,7 +218,6 @@ async def spawn_all_agents(
 
     current_prices = get_current_prices(list(all_symbols))
 
-    # Spawn all agents in parallel
     agent_tasks = []
     agent_ids = []
     decisions_dirs = {}
@@ -149,7 +227,6 @@ async def spawn_all_agents(
         decisions_dir.mkdir(parents=True, exist_ok=True)
         decisions_dirs[agent.agent_id] = decisions_dir
 
-        # Emit agent start event
         if progress_callback:
             progress_callback("agent_start", agent.agent_id, f"Starting agent {agent.name}")
 
@@ -160,20 +237,16 @@ async def spawn_all_agents(
         agent_tasks.append(task)
         agent_ids.append(agent.agent_id)
 
-    # Execute all tasks in parallel
     gathered_results = await asyncio.gather(*agent_tasks, return_exceptions=True)
 
-    # Process results
     results = {}
     for agent_id, result in zip(agent_ids, gathered_results):
         if isinstance(result, asyncio.TimeoutError):
-            # Create timeout decision
             error_msg = f"TIMEOUT: Agent exceeded {timeout} second limit"
             logger.warning(f"Agent {agent_id} exceeded timeout on {date}")
 
-            # Persist error decision for audit trail
-            decision_file = decisions_dirs[agent_id] / f"{date}.md"
-            decision_file.write_text(f"# Daily Trading Decision: {date}\n\n{error_msg}\n")
+            decision_file = decisions_dirs[agent_id] / f"{date}.json"
+            decision_file.write_text(json.dumps({"error": error_msg}))
 
             results[agent_id] = DailyDecision(
                 date=date,
@@ -183,18 +256,15 @@ async def spawn_all_agents(
                 execution_time_ms=timeout * 1000,
             )
 
-            # Emit error event
             if progress_callback:
                 progress_callback("agent_error", agent_id, error_msg)
 
         elif isinstance(result, Exception):
-            # Create error decision
             error_msg = f"ERROR: {str(result)}"
             logger.error(f"Agent {agent_id} failed on {date}: {result}")
 
-            # Persist error decision for audit trail
-            decision_file = decisions_dirs[agent_id] / f"{date}.md"
-            decision_file.write_text(f"# Daily Trading Decision: {date}\n\n{error_msg}\n")
+            decision_file = decisions_dirs[agent_id] / f"{date}.json"
+            decision_file.write_text(json.dumps({"error": error_msg}))
 
             results[agent_id] = DailyDecision(
                 date=date,
@@ -204,15 +274,12 @@ async def spawn_all_agents(
                 execution_time_ms=0.0,
             )
 
-            # Emit error event
             if progress_callback:
                 progress_callback("agent_error", agent_id, error_msg)
 
         else:
-            # Success
             results[agent_id] = result
 
-            # Emit completion event
             if progress_callback:
                 progress_callback("agent_complete", agent_id, f"Agent {agent_id} completed")
 
@@ -226,7 +293,6 @@ def _build_system_prompt(
     current_prices: dict[str, Decimal],
 ) -> str:
     """Build system prompt with agent context."""
-    # Check for missing prices and build warning
     missing_prices = []
     positions_text = ""
     price_warning = ""
@@ -242,13 +308,22 @@ def _build_system_prompt(
                 price_warning_mark = ""
 
             position_value = pos.total_shares * current_price
-            positions_text += f"- {pos.symbol}: {pos.total_shares} shares @ ${pos.average_cost_basis:.2f}/share (current: ${current_price:.2f}, value: ${position_value:.2f}){price_warning_mark}\n"
+            positions_text += (
+                f"- {pos.symbol}: {pos.total_shares} shares @ "
+                f"${pos.average_cost_basis:.2f}/share "
+                f"(current: ${current_price:.2f}, value: ${position_value:.2f})"
+                f"{price_warning_mark}\n"
+            )
     else:
         positions_text = "- No positions held\n"
 
-    # Add warning about missing prices
     if missing_prices:
-        price_warning = f"\n⚠️ **WARNING**: Market prices unavailable for {len(missing_prices)} symbol(s): {', '.join(missing_prices)}. These positions are valued at $0 in the total below, which may materially understate your actual portfolio value.\n"
+        price_warning = (
+            f"\n⚠️ **WARNING**: Market prices unavailable for "
+            f"{len(missing_prices)} symbol(s): {', '.join(missing_prices)}. "
+            f"These positions are valued at $0 in the total below, which may "
+            f"materially understate your actual portfolio value.\n"
+        )
 
     # Format recent learnings
     learnings_text = ""
@@ -260,16 +335,34 @@ def _build_system_prompt(
     else:
         learnings_text = "*No learnings recorded yet*\n"
 
-    # Calculate total portfolio value (with strict=False but we've warned about missing prices)
     total_value = agent.portfolio.total_value(current_prices, strict=False)
+
+    held_tickers = [pos.symbol for pos in agent.portfolio.positions]
+    held_str = ", ".join(held_tickers) if held_tickers else "none"
 
     return f"""# Trading Agent: {agent.name} ({agent.agent_id})
 
-You are an autonomous trading agent competing in a stock market simulation. Your goal is to maximize portfolio value through strategic buy/sell decisions.
+You are an autonomous trading agent competing in a stock market simulation.
+Your mandate is to **actively trade on signals** to maximize portfolio value.
+Every day you must research the market and act on what you find.
+
+## Trading Principles
+
+- **Research every day** — do not skip. Use the MCP tools to check news and fundamentals.
+- **Look for actionable signals**: earnings surprises, analyst upgrades/downgrades,
+  momentum breaks, sector rotation, macroeconomic catalysts, and news events.
+- **Act, don't just monitor** — if you see a signal, make the trade. Sitting on cash
+  is only justified if you have a specific reason (e.g., waiting for a dip, avoiding
+  an earnings release with unknown direction).
+- **Justify holding cash** — if you end the day with significant cash and no trades,
+  explain exactly what you're waiting for.
+- **Profit-take and loss-cut actively** — don't let winners run into reversals or
+  losers drag the portfolio. Rotate into stronger opportunities.
 
 ## Current Portfolio
 
 **Cash**: ${agent.portfolio.cash:.2f}
+**Currently held**: {held_str}
 
 **Positions**:
 {positions_text}
@@ -302,304 +395,59 @@ You are an autonomous trading agent competing in a stock market simulation. Your
 - **No short selling** or margin trading
 - **Fractional shares** allowed
 
-## Available Tools (via MCP)
+## Available MCP Tools
 
-Your Claude Code environment has the agent-trade MCP server configured, giving you access to:
+Your environment has the agent-trade MCP server. Use these tools actively:
 
-- `get_stock_info(symbol)` - Current price, fundamentals, market cap, P/E ratio, sector, etc.
-- `get_historical_prices(symbol, period)` - Historical OHLCV data
-- `get_dividend_history(symbol, period)` - Dividend payments
-- `get_stock_splits(symbol)` - Stock split history
-- `get_stock_news(tickers, limit)` - News for specific stocks
-- `search_news(query, limit)` - General market news
+- `get_stock_info(symbol)` — current price, P/E, market cap, sector, 52-week range
+  *Example: check fundamentals on a stock you're considering buying*
+- `get_historical_prices(symbol, period)` — OHLCV data for trend analysis
+  *Example: check if AAPL is above/below its 50-day moving average*
+- `get_stock_news(tickers, limit)` — recent news for specific tickers
+  *Example: check news on every stock you hold before deciding*
+- `search_news(query, limit)` — broad market and sector news
+  *Example: search "semiconductor earnings" or "Fed rate decision"*
+- `get_dividend_history(symbol, period)` — dividend payments
+- `get_stock_splits(symbol)` — split history
 
-You also have web search capabilities for broader research.
+You also have web search for broader research.
 
-## Your Task
+## Recommended Research Workflow
 
-Today is {date}. You should:
+1. Call `get_stock_news` on each ticker you currently hold — look for red flags or catalysts
+2. Call `search_news` on 1-2 broad market themes (sector rotation, macro events)
+3. Identify 2-3 candidate stocks to buy; call `get_stock_info` on each
+4. Call `get_historical_prices` on top candidates to check trend/momentum
+5. Make decisions based on what you found — if signals are mixed, pick the strongest one
 
-1. **Research**: Analyze market conditions, stock fundamentals, and news
-2. **Decide**: Determine buy/sell orders (or hold current positions)
-3. **Document**: Write research notes explaining your analysis
-4. **Learn**: Reflect on past outcomes and update your strategy if needed
+## Output Format
 
-Output your decision in markdown format with these sections:
-
-1. **Market Research & Analysis** - Your research findings and reasoning
-2. **Trading Decisions** - List of buy/sell orders with reasoning
-3. **Strategy Updates** - Any new learnings (observation, outcome, lesson)
-
-Be specific about order details:
-- For BUY orders: specify dollar amount to invest
-- For SELL orders: specify number of shares to sell
-
-Remember: You pay {int(config.short_term_tax_rate * 100)}% tax on short-term gains, so consider holding periods when making decisions.
+Respond with a JSON object matching this schema exactly:
+- `research_notes` (string): Your analysis and reasoning
+- `orders` (array): List of trades. Each trade:
+  - `action`: "buy" or "sell"
+  - `symbol`: ticker symbol (e.g., "AAPL")
+  - `amount`: dollar amount for buys, number of shares for sells
+  - `reasoning`: why you're making this trade
+- `strategy_updates` (object or null): New learning with `observation`, `outcome`, `lesson`
 """
 
 
 def _build_task_prompt(agent: AgentState, date: str) -> str:
     """Build the main task prompt for the agent."""
-    return f"""Make your trading decision for {date}.
+    held_tickers = [pos.symbol for pos in agent.portfolio.positions]
+    held_str = ", ".join(held_tickers) if held_tickers else "none"
 
-Research the market, analyze opportunities, and decide what trades (if any) to make today.
+    return f"""Today is {date}. You are making trading decisions for your portfolio.
 
-Structure your response with:
+Currently holding: {held_str}
 
-## Market Research & Analysis
-[Your research and analysis here]
+Follow the research workflow in your system prompt:
+1. Check news on your current holdings
+2. Search for broad market signals and sector themes
+3. Identify buy candidates and check their fundamentals/price trends
+4. Make data-driven trade decisions
 
-## Trading Decisions
-
-### Orders
-[List your buy/sell orders, or state "No trades today"]
-
-Example format:
-**BUY AAPL**
-- Amount: $250.00
-- Reasoning: Strong fundamentals and positive earnings outlook
-
-**SELL TSLA**
-- Amount: 5 shares
-- Reasoning: Taking profits after 15% gain, concerned about valuation
-
-## Strategy Updates
-[Document any new learnings, or state "No strategy updates"]
-
-Example format:
-**Observation**: Tech stocks dropped after Fed announcement
-**Outcome**: Portfolio down 3% in one day
-**Lesson**: Monitor Fed calendar and reduce exposure before major announcements
+Be specific and decisive. If there's a signal, act on it. Return your decision as a JSON object
+with `research_notes`, `orders`, and `strategy_updates`.
 """
-
-
-async def _execute_agent_session(
-    prompt: str,
-    system_prompt: str,
-    agent_id: str,
-) -> str:
-    """
-    Execute Claude Code session and collect response.
-
-    Args:
-        prompt: Main task prompt
-        system_prompt: System context prompt
-        agent_id: Agent identifier (for logging)
-
-    Returns:
-        Full response text from agent
-    """
-    response_text = ""
-
-    async for message in query_claude_code(
-        prompt=prompt,
-        system_prompt=system_prompt,
-        permission_mode="default",  # Use default to avoid auto-accepting risky operations
-    ):
-        # Extract text from assistant messages
-        if isinstance(message, dict):
-            msg_type = message.get("type") or message.get("_type")
-            if msg_type == "assistant" or "AssistantMessage" in str(type(message.get("raw", ""))):
-                content = message.get("content") or message.get("_content", "")
-                if isinstance(content, str):
-                    response_text += content
-                elif isinstance(content, list):
-                    for block in content:
-                        if isinstance(block, dict) and block.get("type") == "text":
-                            response_text += block.get("text", "")
-
-    return response_text.strip()
-
-
-def _parse_agent_response(
-    response_text: str,
-    agent_id: str,
-    date: str,
-) -> DailyDecision:
-    """
-    Parse agent response into structured DailyDecision.
-
-    This is a simplified parser that extracts sections from markdown.
-    For production use, consider using structured JSON output from agents.
-
-    Args:
-        response_text: Full markdown response from agent
-        agent_id: Agent identifier
-        date: Trading date
-
-    Returns:
-        DailyDecision with parsed orders and updates
-    """
-    # Initialize empty decision
-    research_notes = ""
-    orders: list[Order] = []
-    strategy_updates: Optional[StrategyLearning] = None
-
-    # Split by sections (markdown headers)
-    lines = response_text.split("\n")
-
-    current_section = None
-    section_content = []
-
-    for line in lines:
-        # Check for section headers (only H2, not H3 or deeper)
-        if line.startswith("## ") and not line.startswith("### "):
-            # Save previous section
-            if current_section and section_content:
-                content = "\n".join(section_content).strip()
-                if "research" in current_section.lower() or "analysis" in current_section.lower():
-                    research_notes = content
-                elif "trading" in current_section.lower() or "decision" in current_section.lower():
-                    # Try to parse orders from this section
-                    orders = _parse_orders(content)
-                elif "strategy" in current_section.lower() or "learning" in current_section.lower():
-                    # Try to parse strategy updates
-                    strategy_updates = _parse_strategy_update(content, date)
-
-            # Start new section
-            current_section = line.strip("#").strip()
-            section_content = []
-        else:
-            section_content.append(line)
-
-    # Handle last section
-    if current_section and section_content:
-        content = "\n".join(section_content).strip()
-        if "research" in current_section.lower() or "analysis" in current_section.lower():
-            research_notes = content
-        elif "trading" in current_section.lower() or "decision" in current_section.lower():
-            orders = _parse_orders(content)
-        elif "strategy" in current_section.lower() or "learning" in current_section.lower():
-            strategy_updates = _parse_strategy_update(content, date)
-
-    # If no research notes found, use entire response
-    if not research_notes:
-        research_notes = response_text
-
-    return DailyDecision(
-        date=date,
-        research_notes=research_notes,
-        orders=orders,
-        strategy_updates=strategy_updates,
-        execution_time_ms=0.0,  # Will be set by caller
-    )
-
-
-def _parse_orders(content: str) -> list[Order]:
-    """
-    Parse orders from markdown content.
-
-    Looks for patterns like:
-    - **BUY AAPL** or **SELL TSLA**
-    - Amount: $250.00 or Amount: 5 shares
-    - Reasoning: ...
-
-    Returns:
-        List of Order objects
-    """
-    orders = []
-
-    # Simple pattern matching (can be improved)
-    lines = content.split("\n")
-    current_order = None
-
-    for line in lines:
-        line_upper = line.upper()
-
-        # Look for order headers
-        if "**BUY" in line_upper or "**SELL" in line_upper:
-            # If we have a pending order with amount, finalize it first
-            if current_order and current_order["amount"] is not None:
-                orders.append(
-                    Order(
-                        action=current_order["action"],
-                        symbol=current_order["symbol"],
-                        amount=current_order["amount"],
-                        reasoning=current_order["reasoning"],
-                    )
-                )
-
-            # Parse action and symbol
-            # Example: "**BUY AAPL**" or "**SELL TSLA**"
-            parts = line.replace("*", "").strip().split()
-            if len(parts) >= 2:
-                action = parts[0].lower()
-                symbol = parts[1].strip()
-                if action in ["buy", "sell"]:
-                    current_order = {
-                        "action": action,
-                        "symbol": symbol,
-                        "amount": None,
-                        "reasoning": "",
-                    }
-
-        # Look for amount
-        elif "amount:" in line.lower() and current_order:
-            # Example: "Amount: $250.00" or "Amount: 5 shares"
-            amount_text = line.split(":", 1)[1].strip()
-            # Remove $ and "shares" text
-            amount_text = amount_text.replace("$", "").replace("shares", "").replace(",", "").strip()
-            try:
-                current_order["amount"] = Decimal(amount_text)
-            except (ValueError, TypeError):
-                pass
-
-        # Look for reasoning (optional)
-        elif "reasoning:" in line.lower() and current_order:
-            reasoning_text = line.split(":", 1)[1].strip()
-            current_order["reasoning"] = reasoning_text
-
-    # Finalize any pending order
-    if current_order and current_order["amount"] is not None:
-        orders.append(
-            Order(
-                action=current_order["action"],
-                symbol=current_order["symbol"],
-                amount=current_order["amount"],
-                reasoning=current_order["reasoning"],
-            )
-        )
-
-    return orders
-
-
-def _parse_strategy_update(content: str, date: str) -> Optional[StrategyLearning]:
-    """
-    Parse strategy update from markdown content.
-
-    Looks for:
-    - Observation: ...
-    - Outcome: ...
-    - Lesson: ...
-
-    Returns:
-        StrategyLearning or None if no update found
-    """
-    # Check for "no" updates
-    if "no strategy update" in content.lower() or "no update" in content.lower():
-        return None
-
-    observation = ""
-    outcome = ""
-    lesson = ""
-
-    lines = content.split("\n")
-    for line in lines:
-        line_lower = line.lower()
-        if "observation:" in line_lower:
-            observation = line.split(":", 1)[1].strip()
-        elif "outcome:" in line_lower:
-            outcome = line.split(":", 1)[1].strip()
-        elif "lesson:" in line_lower:
-            lesson = line.split(":", 1)[1].strip()
-
-    # Only create if we have all three fields
-    if observation and outcome and lesson:
-        return StrategyLearning(
-            date=date,
-            observation=observation,
-            outcome=outcome,
-            lesson=lesson,
-        )
-
-    return None
