@@ -39,7 +39,7 @@ def is_trading_day() -> bool:
 def run_daily_cycle(
     experiment_id: str,
     force: bool = False,
-    timeout: int = 300,
+    timeout: int = 600,
     progress_callback: Optional[Callable[[str, Optional[str], Optional[str]], None]] = None,
 ) -> bool:
     """

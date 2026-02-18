@@ -28,12 +28,39 @@ def _build_mcp_config(tmp_dir: str) -> str:
     return config_path
 
 
+def _extract_json(text: str) -> dict:
+    """Extract a JSON object from agent text output.
+
+    Tries direct parse first, then strips markdown code fences.
+
+    Raises:
+        RuntimeError: If no valid JSON object can be extracted.
+    """
+    # Try direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Strip markdown fences (```json ... ``` or ``` ... ```)
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        # Remove first line (``` or ```json) and last line (```)
+        inner = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
+        try:
+            return json.loads(inner)
+        except json.JSONDecodeError:
+            pass
+
+    raise RuntimeError(f"Agent returned non-JSON output: {text[:200]}")
+
+
 async def run_agent(
     prompt: str,
     system_prompt: str | None = None,
-    json_schema: dict | None = None,
     max_turns: int = 25,
-    timeout: int = 300,
+    timeout: int | None = None,
     allowed_tools: list[str] | None = None,
     cwd: str | None = None,
     mcp_config_path: str | None = None,
@@ -46,9 +73,9 @@ async def run_agent(
         prompt: The task prompt to send to the agent.
         system_prompt: Optional additional system context appended to Claude's
             default system prompt via --append-system-prompt.
-        json_schema: If provided, passed via --json-schema for structured output.
         max_turns: Maximum agentic turns (safety bound).
         timeout: Wall-clock timeout in seconds before killing the process.
+            If None or <= 0, no timeout is applied (caller controls the deadline).
         allowed_tools: Reserved for future use (currently unused; all tools
             are allowed via --dangerously-skip-permissions).
         cwd: Working directory for the subprocess. Defaults to project root.
@@ -56,10 +83,10 @@ async def run_agent(
             config is generated pointing at the agent-trade server.
 
     Returns:
-        Parsed JSON dict from Claude's structured output.
+        Parsed JSON dict extracted from Claude's text output.
 
     Raises:
-        RuntimeError: If the process exits with non-zero status.
+        RuntimeError: If the process exits with non-zero status or output is not JSON.
         TimeoutError: If the process exceeds the timeout.
     """
     work_dir = cwd or _PROJECT_ROOT
@@ -90,12 +117,6 @@ async def run_agent(
             with open(sys_prompt_path) as f:
                 cmd.extend(["--append-system-prompt", f.read()])
 
-        if json_schema is not None:
-            schema_path = os.path.join(tmp_dir, "schema.json")
-            with open(schema_path, "w") as f:
-                json.dump(json_schema, f)
-            cmd.extend(["--json-schema", schema_path])
-
         # Spawn subprocess
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -105,10 +126,13 @@ async def run_agent(
         )
 
         try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=timeout,
-            )
+            if timeout and timeout > 0:
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(),
+                    timeout=timeout,
+                )
+            else:
+                stdout, stderr = await proc.communicate()
         except (asyncio.TimeoutError, TimeoutError):
             proc.kill()
             await proc.communicate()
@@ -123,11 +147,7 @@ async def run_agent(
             )
 
         raw = stdout.decode("utf-8", errors="replace").strip()
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            if json_schema is not None:
-                raise RuntimeError(
-                    f"Claude agent returned non-JSON output (expected structured response): {raw[:200]}"
-                )
-            return {"result": raw}
+        wrapper = json.loads(raw)
+        # `claude -p --output-format json` wraps output as {"type":"result","result":"<agent text>",...}
+        text = wrapper.get("result", raw) if isinstance(wrapper, dict) else raw
+        return _extract_json(text)

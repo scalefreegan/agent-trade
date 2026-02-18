@@ -1,0 +1,28 @@
+"""Tests for claude_wrapper._extract_json."""
+
+import pytest
+
+from agent_trade.claude_wrapper import _extract_json
+
+
+class TestExtractJson:
+    def test_plain_json(self):
+        text = '{"research_notes": "market looks good", "orders": []}'
+        result = _extract_json(text)
+        assert result["research_notes"] == "market looks good"
+        assert result["orders"] == []
+
+    def test_json_in_markdown_fences(self):
+        text = '```json\n{"research_notes": "bullish", "orders": []}\n```'
+        result = _extract_json(text)
+        assert result["research_notes"] == "bullish"
+        assert result["orders"] == []
+
+    def test_json_in_plain_fences(self):
+        text = '```\n{"research_notes": "neutral", "orders": []}\n```'
+        result = _extract_json(text)
+        assert result["research_notes"] == "neutral"
+
+    def test_non_json_raises(self):
+        with pytest.raises(RuntimeError):
+            _extract_json("hello world")
