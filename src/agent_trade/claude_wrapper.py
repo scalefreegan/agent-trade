@@ -1,236 +1,133 @@
-"""Claude Code CLI automation wrapper using Claude Agent SDK."""
+"""Claude Code CLI automation wrapper using subprocess headless mode."""
 
+import asyncio
+import json
 import os
-from typing import Any, AsyncIterator, Optional
-from claude_agent_sdk import query, ClaudeAgentOptions
+import tempfile
+from pathlib import Path
+from typing import Any
+
+# Project root is two levels up from this file (src/agent_trade/claude_wrapper.py)
+_PROJECT_ROOT = str(Path(__file__).parent.parent.parent)
 
 
-async def query_claude_code(
+def _build_mcp_config(tmp_dir: str) -> str:
+    """Write a temporary MCP config JSON and return its path."""
+    config = {
+        "mcpServers": {
+            "agent-trade": {
+                "command": "uv",
+                "args": ["run", "--project", _PROJECT_ROOT, "agent-trade"],
+                "cwd": _PROJECT_ROOT,
+            }
+        }
+    }
+    config_path = os.path.join(tmp_dir, "mcp_config.json")
+    with open(config_path, "w") as f:
+        json.dump(config, f)
+    return config_path
+
+
+async def run_agent(
     prompt: str,
-    cwd: Optional[str] = None,
-    system_prompt: Optional[str] = None,
-    permission_mode: str = "default",
-) -> AsyncIterator[dict[str, Any]]:
-    """Query Claude Code CLI with MCP server access.
+    system_prompt: str | None = None,
+    json_schema: dict | None = None,
+    max_turns: int = 25,
+    timeout: int = 300,
+    allowed_tools: list[str] | None = None,
+    cwd: str | None = None,
+    mcp_config_path: str | None = None,
+) -> dict[str, Any]:
+    """Run a headless Claude Code agent via `claude -p`.
 
-    This function automates the Claude Code CLI, giving you access to:
-    - All installed skills
-    - MCP servers configured in Claude Code
-    - File system operations
-    - And more Claude Code features
-
-    Args:
-        prompt: The prompt/query to send
-        cwd: Working directory (defaults to current directory)
-        system_prompt: Optional system prompt
-        permission_mode: Permission mode for tools
-            - 'default': Prompt for dangerous operations
-            - 'acceptEdits': Auto-accept file edits
-            - 'bypassPermissions': Allow all (use with caution)
-
-    Yields:
-        Messages from the Claude Code session
-
-    Example:
-        ```python
-        async for message in query_claude_code("What is AAPL trading at?"):
-            if message.get("type") == "assistant":
-                print(message.get("content"))
-        ```
-    """
-    options = ClaudeAgentOptions(
-        cwd=cwd or os.getcwd(),
-        system_prompt=system_prompt,
-        permission_mode=permission_mode,
-    )
-
-    async for message in query(prompt=prompt, options=options):
-        # Convert message objects to dicts for easier use
-        if hasattr(message, '__dict__'):
-            yield message.__dict__
-        else:
-            yield {"raw": message}
-
-
-async def run_skill(
-    skill_name: str,
-    args: Optional[str] = None,
-    cwd: Optional[str] = None,
-    system_prompt: Optional[str] = None,
-    permission_mode: str = "default",
-) -> AsyncIterator[dict[str, Any]]:
-    """Run a specific Claude Code skill.
+    Uses the user's Claude Code subscription (no API key required).
 
     Args:
-        skill_name: Name of the skill (e.g., 'commit', 'review-pr')
-        args: Arguments for the skill
-        cwd: Working directory
-        system_prompt: Optional system prompt
-        permission_mode: Permission mode for tools
-
-    Yields:
-        Messages from the skill execution
-
-    Example:
-        ```python
-        # Run commit skill
-        async for message in run_skill("commit", args="-m 'Update readme'"):
-            print(message)
-        ```
-    """
-    prompt = f"/{skill_name}"
-    if args:
-        prompt += f" {args}"
-
-    async for message in query_claude_code(
-        prompt,
-        cwd=cwd,
-        system_prompt=system_prompt,
-        permission_mode=permission_mode,
-    ):
-        yield message
-
-
-async def get_stock_data_via_claude(
-    query_text: str,
-    cwd: Optional[str] = None,
-    system_prompt: Optional[str] = None,
-    permission_mode: str = "default",
-) -> str:
-    """Get stock data by querying through Claude Code with agent-trade MCP server.
-
-    This assumes the agent-trade MCP server is configured in Claude Code.
-
-    Args:
-        query_text: Natural language query about stocks
-        cwd: Working directory
-        system_prompt: Optional system prompt
-        permission_mode: Permission mode for tools
+        prompt: The task prompt to send to the agent.
+        system_prompt: Optional additional system context appended to Claude's
+            default system prompt via --append-system-prompt.
+        json_schema: If provided, passed via --json-schema for structured output.
+        max_turns: Maximum agentic turns (safety bound).
+        timeout: Wall-clock timeout in seconds before killing the process.
+        allowed_tools: Reserved for future use (currently unused; all tools
+            are allowed via --dangerously-skip-permissions).
+        cwd: Working directory for the subprocess. Defaults to project root.
+        mcp_config_path: Path to an MCP config JSON. If None, a temporary
+            config is generated pointing at the agent-trade server.
 
     Returns:
-        The assistant's response as text
+        Parsed JSON dict from Claude's structured output.
 
-    Example:
-        ```python
-        result = await get_stock_data_via_claude("What is AAPL trading at?")
-        print(result)
-        ```
+    Raises:
+        RuntimeError: If the process exits with non-zero status.
+        TimeoutError: If the process exceeds the timeout.
     """
-    response_text = ""
+    work_dir = cwd or _PROJECT_ROOT
 
-    async for message in query_claude_code(
-        query_text,
-        cwd=cwd,
-        system_prompt=system_prompt,
-        permission_mode=permission_mode,
-    ):
-        # Extract text from assistant messages
-        if isinstance(message, dict):
-            msg_type = message.get("type") or message.get("_type")
-            if msg_type == "assistant" or "AssistantMessage" in str(type(message.get("raw", ""))):
-                content = message.get("content") or message.get("_content", "")
-                if isinstance(content, str):
-                    response_text += content
-                elif isinstance(content, list):
-                    for block in content:
-                        if isinstance(block, dict) and block.get("type") == "text":
-                            response_text += block.get("text", "")
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        # Write system prompt to temp file if provided
+        sys_prompt_path: str | None = None
+        if system_prompt:
+            sys_prompt_path = os.path.join(tmp_dir, "system_prompt.txt")
+            with open(sys_prompt_path, "w") as f:
+                f.write(system_prompt)
 
-    return response_text.strip()
+        # Build or use MCP config
+        effective_mcp_path = mcp_config_path or _build_mcp_config(tmp_dir)
 
-
-class ClaudeCodeSession:
-    """Interactive session with Claude Code CLI.
-
-    Example:
-        ```python
-        async with ClaudeCodeSession() as session:
-            response = await session.query("What is AAPL trading at?")
-            print(response)
-
-            response = await session.query("Now get news about Apple")
-            print(response)
-        ```
-    """
-
-    def __init__(
-        self,
-        cwd: Optional[str] = None,
-        system_prompt: Optional[str] = None,
-        permission_mode: str = "default",
-    ):
-        """Initialize session.
-
-        Args:
-            cwd: Working directory
-            system_prompt: Optional system prompt
-            permission_mode: Permission mode for tools
-        """
-        self.cwd = cwd or os.getcwd()
-        self.system_prompt = system_prompt
-        self.permission_mode = permission_mode
-        self.conversation_history = []
-
-    async def query(self, prompt: str) -> str:
-        """Send a query and get the response.
-
-        Args:
-            prompt: Query text
-
-        Returns:
-            Response text
-        """
-        response = await get_stock_data_via_claude(
+        # Build claude command
+        cmd = [
+            "claude",
+            "-p",
             prompt,
-            cwd=self.cwd,
-            system_prompt=self.system_prompt,
-            permission_mode=self.permission_mode,
+            "--output-format", "json",
+            "--dangerously-skip-permissions",
+            "--max-turns", str(max_turns),
+            "--mcp-config", effective_mcp_path,
+        ]
+
+        if sys_prompt_path:
+            with open(sys_prompt_path) as f:
+                cmd.extend(["--append-system-prompt", f.read()])
+
+        if json_schema is not None:
+            schema_path = os.path.join(tmp_dir, "schema.json")
+            with open(schema_path, "w") as f:
+                json.dump(json_schema, f)
+            cmd.extend(["--json-schema", schema_path])
+
+        # Spawn subprocess
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=work_dir,
         )
 
-        # Store in history
-        self.conversation_history.append({
-            "role": "user",
-            "content": prompt
-        })
-        self.conversation_history.append({
-            "role": "assistant",
-            "content": response
-        })
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=timeout,
+            )
+        except (asyncio.TimeoutError, TimeoutError):
+            proc.kill()
+            await proc.communicate()
+            raise TimeoutError(
+                f"Claude agent timed out after {timeout}s"
+            )
 
-        return response
+        if proc.returncode != 0:
+            err = stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(
+                f"Claude agent exited with code {proc.returncode}: {err}"
+            )
 
-    async def run_skill(self, skill_name: str, args: Optional[str] = None) -> str:
-        """Run a skill and get the response.
-
-        Args:
-            skill_name: Skill name
-            args: Skill arguments
-
-        Returns:
-            Response text
-        """
-        response_text = ""
-
-        async for message in run_skill(
-            skill_name,
-            args,
-            cwd=self.cwd,
-            system_prompt=self.system_prompt,
-            permission_mode=self.permission_mode,
-        ):
-            if isinstance(message, dict):
-                msg_type = message.get("type") or message.get("_type")
-                if msg_type == "assistant" or "AssistantMessage" in str(type(message.get("raw", ""))):
-                    content = message.get("content") or message.get("_content", "")
-                    if isinstance(content, str):
-                        response_text += content
-
-        return response_text.strip()
-
-    async def __aenter__(self):
-        """Context manager entry."""
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
-        pass
+        raw = stdout.decode("utf-8", errors="replace").strip()
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            if json_schema is not None:
+                raise RuntimeError(
+                    f"Claude agent returned non-JSON output (expected structured response): {raw[:200]}"
+                )
+            return {"result": raw}

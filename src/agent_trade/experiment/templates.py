@@ -269,13 +269,13 @@ def create_default_strategy(agent_id: str, name: str) -> AgentStrategy:
     Strategies are randomized to create diversity among agents.
     """
     philosophies = [
-        "Value investing focused on undervalued companies with strong fundamentals",
-        "Growth investing targeting high-potential technology and innovation leaders",
-        "Momentum trading following trends and technical indicators",
-        "Dividend investing seeking stable income from established companies",
-        "Index tracking with tactical rebalancing based on market conditions",
-        "Contrarian investing buying when others sell and selling when others buy",
-        "Quality investing in companies with strong balance sheets and competitive moats",
+        "News-driven trading: act on earnings surprises, analyst upgrades/downgrades, and sector catalysts",
+        "Momentum trading: buy stocks breaking to new highs on strong volume; cut losers quickly",
+        "Earnings-catalyst trading: enter before anticipated beats, exit after the pop",
+        "Sector-rotation trading: rotate capital into leading sectors as macro conditions shift",
+        "Contrarian swing trading: buy sharp oversold dips in fundamentally sound companies, sell the bounce",
+        "Technical breakout trading: enter on confirmed breakouts above resistance with volume confirmation",
+        "Event-driven trading: capitalize on M&A rumors, FDA decisions, product launches, and index additions",
     ]
 
     risk_levels = ["conservative", "moderate", "aggressive"]
@@ -322,16 +322,19 @@ def create_default_strategy(agent_id: str, name: str) -> AgentStrategy:
         key_metrics=key_metrics,
     )
 
-    rationale = f"""As {name}, I will follow a {risk_tolerance} approach focused on {time_horizon} gains.
-My strategy emphasizes {philosophy.lower()}.
+    rationale = f"""As {name}, I take a {risk_tolerance} approach focused on {time_horizon} opportunities.
+My strategy: {philosophy.lower()}.
 
-I will primarily target stocks in the {', '.join(preferred_sectors[:-1])}, and {preferred_sectors[-1]} sectors,
-evaluating opportunities based on {', '.join(key_metrics[:-1])}, and {key_metrics[-1]}.
+I actively trade stocks in the {', '.join(preferred_sectors[:-1])}, and {preferred_sectors[-1]} sectors,
+using {', '.join(key_metrics[:-1])}, and {key_metrics[-1]} to identify entry and exit points.
 
-Given the 35% short-term capital gains tax, I will carefully balance the trade-off between
-trading flexibility and tax efficiency. For high-conviction positions, I may hold for 1+ years
-to benefit from the 15% long-term tax rate, while using tactical short-term trades when
-opportunities are too compelling to pass up despite the tax drag.
+I research the market every day and act on signals I find. I will take profits when positions
+hit my targets and cut losses before they compound. Capital should be rotating toward the
+strongest opportunities at all times — holding cash requires explicit justification.
+
+The 35% short-term tax is a cost of doing business when signals are strong. I accept it when
+the expected gain justifies the tax drag. When the thesis has a longer natural duration I may
+hold 365+ days to benefit from the 15% long-term rate, but not merely to defer taxes.
 """
 
     return AgentStrategy(
