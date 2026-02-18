@@ -30,6 +30,8 @@ agent = [
     { name = "typer" },
 ]
 dev = [
+    { name = "fastapi" },
+    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -42,8 +44,10 @@ web = [
 
 [package.metadata]
 requires-dist = [
+    { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.100.0" },
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.100.0" },
     { name = "fastmcp", specifier = ">=3.0.0b2" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.24.0" },
     { name = "newsapi-python" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
