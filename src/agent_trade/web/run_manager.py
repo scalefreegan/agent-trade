@@ -144,7 +144,7 @@ class RunManager:
                 job.events.put(event)
 
             # Run the daily cycle with progress callback
-            success = run_daily_cycle(job.experiment_id, progress_callback=progress_callback)
+            success = run_daily_cycle(job.experiment_id, force=True, progress_callback=progress_callback)
 
             if not success:
                 # Run was skipped or failed (e.g., non-trading day, missing config)

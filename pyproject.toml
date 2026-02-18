@@ -38,8 +38,6 @@ dev = [
 [project.scripts]
 # Run as standalone MCP server
 agent-trade = "agent_trade.server:main"
-# Run headless CLI queries via Anthropic API (requires agent extra)
-agent-trade-query = "agent_trade.cli:main"
 # Automate Claude Code CLI (requires agent extra)
 agent-trade-claude = "agent_trade.claude_cli:main"
 # View tool usage logs and statistics
