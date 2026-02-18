@@ -87,7 +87,8 @@ async def run_agent(
         ]
 
         if sys_prompt_path:
-            cmd.extend(["--append-system-prompt", open(sys_prompt_path).read()])
+            with open(sys_prompt_path) as f:
+                cmd.extend(["--append-system-prompt", f.read()])
 
         if json_schema is not None:
             schema_path = os.path.join(tmp_dir, "schema.json")
@@ -108,7 +109,7 @@ async def run_agent(
                 proc.communicate(),
                 timeout=timeout,
             )
-        except asyncio.TimeoutError:
+        except (asyncio.TimeoutError, TimeoutError):
             proc.kill()
             await proc.communicate()
             raise TimeoutError(
@@ -122,4 +123,11 @@ async def run_agent(
             )
 
         raw = stdout.decode("utf-8", errors="replace").strip()
-        return json.loads(raw)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            if json_schema is not None:
+                raise RuntimeError(
+                    f"Claude agent returned non-JSON output (expected structured response): {raw[:200]}"
+                )
+            return {"result": raw}

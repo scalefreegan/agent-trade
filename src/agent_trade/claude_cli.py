@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import sys
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
