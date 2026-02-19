@@ -1,6 +1,6 @@
 // TanStack Query hooks for experiments
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deleteApi, fetchApi, postApi } from './client';
+import { deleteApi, fetchApi, patchApi, postApi } from './client';
 import type { ExperimentDetail, ExperimentListItem, GameState } from './types';
 
 export function useExperiments() {
@@ -49,6 +49,18 @@ export function useDeleteExperiment() {
     mutationFn: (experimentId: string) => deleteApi(`/experiments/${experimentId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['experiments'] });
+    },
+  });
+}
+
+export function useUpdateExperiment(experimentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name?: string }) =>
+      patchApi<ExperimentDetail>(`/experiments/${experimentId}`, data),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ['experiments'] });
+      queryClient.setQueryData(['experiment', experimentId], updated);
     },
   });
 }

@@ -248,6 +248,7 @@ class AgentState(BaseModel):
 
     agent_id: str
     name: str
+    description: Optional[str] = None
     status: Literal["active", "eliminated"]
     portfolio: Portfolio
     strategy: AgentStrategy
@@ -284,6 +285,16 @@ class GameState(BaseModel):
 # ==============================================================================
 
 
+class Alert(BaseModel):
+    """High-conviction opportunity flag raised by an agent."""
+
+    symbol: str
+    thesis: str
+    confidence: Literal["high", "very_high"]
+    catalyst: str
+    time_horizon: str
+
+
 class DailyDecision(BaseModel):
     """Agent's decision output for a single trading day."""
 
@@ -291,6 +302,7 @@ class DailyDecision(BaseModel):
     research_notes: str  # Agent's research and analysis
     orders: list[Order]  # Buy/sell orders
     strategy_updates: Optional[StrategyLearning] = None
+    alerts: list[Alert] = Field(default_factory=list)
     execution_time_ms: float
 
 

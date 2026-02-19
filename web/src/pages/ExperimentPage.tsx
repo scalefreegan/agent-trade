@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useExperiment, useGameState } from '../api/experiments';
+import { useExperiment, useGameState, useUpdateExperiment } from '../api/experiments';
 import { useLeaderboard, usePerformance } from '../api/performance';
 import { useTaxMetrics, useHoldingPeriods, useExperimentReport } from '../api/analysis';
 import { Leaderboard } from '../components/experiment/Leaderboard';
@@ -10,6 +10,7 @@ import { HoldingPeriodChart } from '../components/analysis/HoldingPeriodChart';
 import { ExperimentReportView } from '../components/analysis/ExperimentReport';
 import RunControls from '../components/experiment/RunControls';
 import { Card } from '../components/ui/Card';
+import { InlineEdit } from '../components/ui/InlineEdit';
 import { Tabs } from '../components/ui/Tabs';
 import { Badge, statusVariant } from '../components/ui/Badge';
 import { MetricCard } from '../components/ui/MetricCard';
@@ -21,6 +22,7 @@ export function ExperimentPage() {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const { data: experiment, isLoading: expLoading, error: expError } = useExperiment(experimentId || '');
+  const updateExperiment = useUpdateExperiment(experimentId || '');
   const { data: gameState, isLoading: stateLoading, error: stateError } = useGameState(experimentId || '');
   const { data: leaderboard, isLoading: leaderboardLoading, error: leaderboardError } = useLeaderboard(experimentId || '');
   const { data: performance, isLoading: performanceLoading, error: performanceError } = usePerformance(experimentId || '');
@@ -73,15 +75,21 @@ export function ExperimentPage() {
     <div>
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">{experiment.name}</h1>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <InlineEdit
+              value={experiment.name}
+              onSave={(name) => updateExperiment.mutate({ name })}
+              isPending={updateExperiment.isPending}
+              className="text-3xl font-bold text-foreground"
+              inputClassName="text-3xl font-bold"
+            />
             <p className="text-muted-foreground mt-2">
               Trading Day {gameState.trading_day}
               {gameState.last_run && <> • Last run: {new Date(gameState.last_run).toLocaleDateString()}</>}
             </p>
           </div>
-          <div>
+          <div className="flex-shrink-0">
             <RunControls experimentId={experimentId!} />
           </div>
         </div>

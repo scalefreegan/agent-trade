@@ -267,11 +267,123 @@ class AgentDetailResponse(BaseModel):
 
     agent_id: str
     name: str
+    description: str | None = None
     status: str
     portfolio: PortfolioResponse
     metrics: PortfolioMetrics
     created_at: datetime
     eliminated_at: datetime | None = None
+
+
+class UpdateExperimentRequest(BaseModel):
+    """Request body for PATCH /experiments/{id}."""
+
+    name: str | None = None
+
+
+class UpdateAgentRequest(BaseModel):
+    """Request body for PATCH /agents/{agent_id}."""
+
+    name: str | None = None
+    description: str | None = None
+
+
+class UpdateAgentResponse(BaseModel):
+    """Response for PATCH /agents/{agent_id}."""
+
+    agent_id: str
+    name: str
+    description: str | None = None
+
+
+# ==============================================================================
+# Holdings Info Schemas
+# ==============================================================================
+
+
+class BuyReasonEntry(BaseModel):
+    """A single buy rationale entry from a decision file."""
+
+    date: str
+    reasoning: str
+
+
+class PricePoint(BaseModel):
+    """Single date/close entry for a price sparkline."""
+
+    date: str
+    close: float
+
+
+class HoldingRationaleResponse(BaseModel):
+    """Per-holding breakdown with business info and buy rationale."""
+
+    symbol: str
+    total_shares: float
+    avg_cost_basis: float
+    current_price: float | None = None
+    current_value: float | None = None
+    unrealized_gain: float | None = None
+    first_buy_date: str
+    buy_reasons: list[BuyReasonEntry]
+    # Business / fundamental data
+    company_name: str | None = None
+    sector: str | None = None
+    industry: str | None = None
+    market_cap: int | None = None
+    pe_ratio: float | None = None
+    fifty_two_week_high: float | None = None
+    fifty_two_week_low: float | None = None
+    business_summary: str | None = None
+    price_history: list[PricePoint] = []
+
+
+class HoldingsInfoResponse(BaseModel):
+    """Holdings info response with rationale for each position."""
+
+    holdings: list[HoldingRationaleResponse]
+
+
+# ==============================================================================
+# Alerts Schemas
+# ==============================================================================
+
+
+class AlertEntryResponse(BaseModel):
+    """A single alert entry from a decision file."""
+
+    date: str
+    symbol: str
+    thesis: str
+    confidence: str
+    catalyst: str
+    time_horizon: str
+
+
+class AlertsResponse(BaseModel):
+    """Alerts response."""
+
+    alerts: list[AlertEntryResponse]
+    total_count: int
+
+
+# ==============================================================================
+# Benchmark Schemas
+# ==============================================================================
+
+
+class BenchmarkSeries(BaseModel):
+    """Performance series for a single benchmark."""
+
+    symbol: str
+    label: str
+    data: list[dict]  # [{date, value}] normalized to starting capital
+
+
+class BenchmarkResponse(BaseModel):
+    """Benchmark comparison response."""
+
+    benchmarks: list[BenchmarkSeries]
 
 
 # ==============================================================================

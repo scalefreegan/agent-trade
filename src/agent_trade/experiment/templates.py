@@ -360,7 +360,6 @@ def create_initial_game_state(
     agents = {}
     for i in range(config.num_agents):
         agent_id = f"agent_{i+1:03d}"
-        agent_name = f"Agent {i+1:03d}"
 
         # Create initial portfolio with starting capital
         portfolio = Portfolio(
@@ -368,13 +367,14 @@ def create_initial_game_state(
             positions=[],  # positions is a list, not dict
         )
 
-        # Create randomized strategy
-        strategy = create_default_strategy(agent_id, agent_name)
+        # Name is a placeholder; caller should invoke generate_agent_names_via_claude
+        # to replace it with a Claude-generated name after init.
+        strategy = create_default_strategy(agent_id, agent_id)
 
-        # Create agent state
+        # Create agent state (name is placeholder; overwritten by generate_agent_names_via_claude)
         agent_state = AgentState(
             agent_id=agent_id,
-            name=agent_name,
+            name=agent_id,
             status="active",
             portfolio=portfolio,
             strategy=strategy,

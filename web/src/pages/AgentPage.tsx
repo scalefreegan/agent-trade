@@ -5,6 +5,10 @@ import {
   useAgentStrategy,
   useAgentTransactions,
   useAgentDecisions,
+  useAgentHoldings,
+  useAgentAlerts,
+  useAgentBenchmarks,
+  useUpdateAgent,
 } from '../api/agents';
 import { usePerformance } from '../api/performance';
 import { useExperiment } from '../api/experiments';
@@ -14,17 +18,22 @@ import { AgentPerformanceChart } from '../components/agent/AgentPerformanceChart
 import { StrategyPanel } from '../components/agent/StrategyPanel';
 import { TransactionHistory } from '../components/agent/TransactionHistory';
 import { DecisionLog } from '../components/agent/DecisionLog';
+import { HoldingsInfo } from '../components/agent/HoldingsInfo';
+import { AlertsPanel } from '../components/agent/AlertsPanel';
 import { Badge, statusVariant } from '../components/ui/Badge';
+import { InlineEdit } from '../components/ui/InlineEdit';
 import { Tabs } from '../components/ui/Tabs';
 
-type Tab = 'portfolio' | 'performance' | 'strategy' | 'transactions' | 'decisions';
+type Tab = 'portfolio' | 'info' | 'performance' | 'strategy' | 'transactions' | 'decisions' | 'alerts';
 
 const TABS = [
   { id: 'portfolio' as Tab, label: 'Portfolio' },
+  { id: 'info' as Tab, label: 'Info' },
   { id: 'performance' as Tab, label: 'Performance' },
   { id: 'strategy' as Tab, label: 'Strategy' },
   { id: 'transactions' as Tab, label: 'Transactions' },
   { id: 'decisions' as Tab, label: 'Decisions' },
+  { id: 'alerts' as Tab, label: 'Alerts' },
 ];
 
 export function AgentPage() {
@@ -51,6 +60,19 @@ export function AgentPage() {
   const { data: performance, isLoading: performanceLoading } = usePerformance(
     experimentId || ''
   );
+  const { data: holdings, isLoading: holdingsLoading } = useAgentHoldings(
+    experimentId || '',
+    agentId || ''
+  );
+  const { data: alerts, isLoading: alertsLoading } = useAgentAlerts(
+    experimentId || '',
+    agentId || ''
+  );
+  const { data: benchmarks } = useAgentBenchmarks(
+    experimentId || '',
+    agentId || ''
+  );
+  const updateAgent = useUpdateAgent(experimentId || '', agentId || '');
 
   if (agentLoading) {
     return (
@@ -74,13 +96,29 @@ export function AgentPage() {
     <div>
       {/* Agent Header */}
       <div className="mb-8 pb-6 border-b-2 border-border">
-        <div className="flex justify-between items-center mb-2">
-          <h1 className="text-3xl font-bold text-foreground">{agent.name}</h1>
-          <Badge variant={statusVariant(agent.status)} className="uppercase tracking-wide text-xs px-3 py-1">
+        <div className="flex justify-between items-start mb-2">
+          <InlineEdit
+            value={agent.name}
+            onSave={(name) => updateAgent.mutate({ name })}
+            isPending={updateAgent.isPending}
+            className="text-3xl font-bold text-foreground"
+            inputClassName="text-3xl font-bold"
+          />
+          <Badge variant={statusVariant(agent.status)} className="uppercase tracking-wide text-xs px-3 py-1 flex-shrink-0 ml-4">
             {agent.status}
           </Badge>
         </div>
-        <div className="font-mono text-sm text-muted-foreground">{agent.agent_id}</div>
+        <div className="font-mono text-sm text-muted-foreground mb-1">{agent.agent_id}</div>
+        <InlineEdit
+          value={agent.description ?? ''}
+          onSave={(description) => updateAgent.mutate({ description })}
+          isPending={updateAgent.isPending}
+          emptyText="Add description..."
+          placeholder="Add a description for this agent"
+          multiline
+          className="text-sm text-muted-foreground"
+          inputClassName="text-sm"
+        />
       </div>
 
       {/* Tabs */}
@@ -97,6 +135,18 @@ export function AgentPage() {
           </div>
         )}
 
+        {activeTab === 'info' && (
+          <>
+            {holdingsLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading holdings info...</div>
+            ) : holdings ? (
+              <HoldingsInfo data={holdings} />
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">No holdings data available</div>
+            )}
+          </>
+        )}
+
         {activeTab === 'performance' && (
           <>
             {performanceLoading ? (
@@ -107,6 +157,7 @@ export function AgentPage() {
                 agentId={agent.agent_id}
                 agentName={agent.name}
                 startingCapital={experiment.starting_capital}
+                benchmarks={benchmarks?.benchmarks}
               />
             ) : (
               <div className="text-center py-12 text-muted-foreground">No performance data available</div>
@@ -150,6 +201,18 @@ export function AgentPage() {
               />
             ) : (
               <div className="text-center py-12 text-muted-foreground">No decision data available</div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'alerts' && (
+          <>
+            {alertsLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading alerts...</div>
+            ) : alerts ? (
+              <AlertsPanel data={alerts} />
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">No alerts data available</div>
             )}
           </>
         )}

@@ -221,7 +221,11 @@ def process_daily_cycle(
             portfolio_values[agent_id] = Decimal("0")
 
     # Step 6: Update game state
-    game_state.trading_day += 1
+    # Only increment trading_day when this is a new calendar date — reruns on the
+    # same day (e.g. re-clicking "Run Day") should not advance the counter.
+    last_run_date = game_state.last_run.strftime("%Y-%m-%d") if game_state.last_run else None
+    if date != last_run_date:
+        game_state.trading_day += 1
     game_state.last_run = datetime.now(timezone.utc)
 
     logger.info(

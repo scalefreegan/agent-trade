@@ -1,13 +1,17 @@
 // TanStack Query hooks for agent endpoints
-import { useQuery } from '@tanstack/react-query';
-import { fetchApi } from './client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchApi, patchApi } from './client';
 import type {
   AgentDetail,
   AgentStrategy,
-  TransactionHistory,
+  AlertsResponse,
+  BenchmarkResponse,
   DecisionLogEntry,
-  PortfolioMetrics,
+  HoldingsInfo,
   Portfolio,
+  PortfolioMetrics,
+  TransactionHistory,
+  UpdateAgentResponse,
 } from './types';
 
 export function useAgentDetail(experimentId: string, agentId: string) {
@@ -63,5 +67,51 @@ export function useAgentDecision(experimentId: string, agentId: string, date: st
       `/experiments/${experimentId}/agents/${agentId}/decisions/${date}`
     ),
     enabled: !!experimentId && !!agentId && !!date,
+  });
+}
+
+export function useAgentHoldings(experimentId: string, agentId: string) {
+  return useQuery({
+    queryKey: ['agentHoldings', experimentId, agentId],
+    queryFn: () => fetchApi<HoldingsInfo>(
+      `/experiments/${experimentId}/agents/${agentId}/holdings`
+    ),
+    enabled: !!experimentId && !!agentId,
+  });
+}
+
+export function useAgentAlerts(experimentId: string, agentId: string) {
+  return useQuery({
+    queryKey: ['agentAlerts', experimentId, agentId],
+    queryFn: () => fetchApi<AlertsResponse>(
+      `/experiments/${experimentId}/agents/${agentId}/alerts`
+    ),
+    enabled: !!experimentId && !!agentId,
+  });
+}
+
+export function useAgentBenchmarks(experimentId: string, agentId: string) {
+  return useQuery({
+    queryKey: ['agentBenchmarks', experimentId, agentId],
+    queryFn: () => fetchApi<BenchmarkResponse>(
+      `/experiments/${experimentId}/agents/${agentId}/benchmarks`
+    ),
+    enabled: !!experimentId && !!agentId,
+    staleTime: 5 * 60 * 1000, // 5 min — ETF data doesn't change often
+  });
+}
+
+export function useUpdateAgent(experimentId: string, agentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name?: string; description?: string | null }) =>
+      patchApi<UpdateAgentResponse>(
+        `/experiments/${experimentId}/agents/${agentId}`,
+        data
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent', experimentId, agentId] });
+      queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
+    },
   });
 }

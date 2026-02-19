@@ -193,3 +193,90 @@ class TestParseStructuredResponseMalformedAmount:
         decision = _parse_structured_response(data, agent_id="a1", date="2026-01-15")
         assert decision.orders == []
         assert decision.research_notes == "research"
+
+
+# ---------------------------------------------------------------------------
+# _parse_structured_response — malformed alerts
+# ---------------------------------------------------------------------------
+
+
+class TestParseStructuredResponseMalformedAlerts:
+    """Verify that malformed alert entries are skipped without crashing."""
+
+    def test_non_dict_alert_entry_is_skipped(self):
+        """A string in the alerts list (non-dict) must be skipped, not raise TypeError."""
+        data = {
+            "research_notes": "notes",
+            "orders": [],
+            "alerts": ["not a dict", 42, None],
+        }
+        decision = _parse_structured_response(data, agent_id="a1", date="2026-01-15")
+        assert decision.alerts == []
+
+    def test_invalid_confidence_value_is_skipped(self):
+        """An alert with a confidence value not in Literal['high','very_high'] is skipped."""
+        data = {
+            "research_notes": "",
+            "orders": [],
+            "alerts": [
+                {
+                    "symbol": "AAPL",
+                    "thesis": "Big move coming",
+                    "confidence": "EXTREME",  # invalid Literal
+                    "catalyst": "earnings",
+                    "time_horizon": "1 week",
+                }
+            ],
+        }
+        decision = _parse_structured_response(data, agent_id="a1", date="2026-01-15")
+        assert decision.alerts == []
+
+    def test_missing_symbol_is_skipped(self):
+        """An alert missing the required 'symbol' field is skipped (KeyError)."""
+        data = {
+            "research_notes": "",
+            "orders": [],
+            "alerts": [
+                {
+                    "thesis": "Something happening",
+                    "confidence": "high",
+                    "catalyst": "FDA decision",
+                    "time_horizon": "2 weeks",
+                }
+            ],
+        }
+        decision = _parse_structured_response(data, agent_id="a1", date="2026-01-15")
+        assert decision.alerts == []
+
+    def test_valid_alert_survives_alongside_invalid(self):
+        """A valid alert is kept while malformed entries in the same list are dropped."""
+        data = {
+            "research_notes": "",
+            "orders": [],
+            "alerts": [
+                "not a dict",
+                {
+                    "symbol": "NVDA",
+                    "thesis": "AI demand surge",
+                    "confidence": "very_high",
+                    "catalyst": "data center buildout",
+                    "time_horizon": "1 month",
+                },
+                {"confidence": "high"},  # missing symbol
+            ],
+        }
+        decision = _parse_structured_response(data, agent_id="a1", date="2026-01-15")
+        assert len(decision.alerts) == 1
+        assert decision.alerts[0].symbol == "NVDA"
+
+    def test_null_alerts_field_returns_empty_list(self):
+        """alerts=null in JSON → empty list, no crash."""
+        data = {"research_notes": "", "orders": [], "alerts": None}
+        decision = _parse_structured_response(data, agent_id="a1", date="2026-01-15")
+        assert decision.alerts == []
+
+    def test_missing_alerts_field_returns_empty_list(self):
+        """Old decision files without 'alerts' key → empty list."""
+        data = {"research_notes": "old format", "orders": []}
+        decision = _parse_structured_response(data, agent_id="a1", date="2026-01-15")
+        assert decision.alerts == []

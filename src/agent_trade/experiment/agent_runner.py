@@ -8,14 +8,18 @@ given their portfolio state and strategy, and asked to make trading decisions.
 import asyncio
 import json
 import logging
+import os
+import tempfile
 import time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable, Optional
 
+from pydantic import ValidationError
+
 from ..claude_wrapper import run_agent
 from .market_data import get_current_prices
-from .models import AgentState, DailyDecision, ExperimentConfig, Order, StrategyLearning
+from .models import AgentState, Alert, DailyDecision, ExperimentConfig, Order, StrategyLearning
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +64,30 @@ def _parse_structured_response(
                 lesson=les,
             )
 
+    alerts: list[Alert] = []
+    for a in data.get("alerts") or []:
+        if not isinstance(a, dict):
+            logger.warning(f"Agent {agent_id}: skipping non-dict alert entry: {a!r}")
+            continue
+        try:
+            alerts.append(
+                Alert(
+                    symbol=a["symbol"],
+                    thesis=a.get("thesis", ""),
+                    confidence=a.get("confidence", "high"),
+                    catalyst=a.get("catalyst", ""),
+                    time_horizon=a.get("time_horizon", ""),
+                )
+            )
+        except (KeyError, TypeError, ValueError, ValidationError) as e:
+            logger.warning(f"Agent {agent_id}: skipping malformed alert {a}: {e}")
+
     return DailyDecision(
         date=date,
         research_notes=data.get("research_notes", ""),
         orders=orders,
         strategy_updates=strategy_updates,
+        alerts=alerts,
         execution_time_ms=0.0,  # Set by caller
     )
 
@@ -147,6 +170,7 @@ async def spawn_agent(
             research_notes=error_msg,
             orders=[],
             strategy_updates=None,
+            alerts=[],
             execution_time_ms=execution_time,
         )
     except Exception as e:
@@ -162,6 +186,7 @@ async def spawn_agent(
             research_notes=error_msg,
             orders=[],
             strategy_updates=None,
+            alerts=[],
             execution_time_ms=execution_time,
         )
 
@@ -232,6 +257,7 @@ async def spawn_all_agents(
                 research_notes=error_msg,
                 orders=[],
                 strategy_updates=None,
+                alerts=[],
                 execution_time_ms=timeout * 1000,
             )
 
@@ -250,6 +276,7 @@ async def spawn_all_agents(
                 research_notes=error_msg,
                 orders=[],
                 strategy_updates=None,
+                alerts=[],
                 execution_time_ms=0.0,
             )
 
@@ -407,6 +434,10 @@ Respond with a JSON object matching this schema exactly:
   - `amount`: dollar amount for buys, number of shares for sells
   - `reasoning`: why you're making this trade
 - `strategy_updates` (object or null): New learning with `observation`, `outcome`, `lesson`
+- `alerts` (array or null): **Rarely used.** Flag ONLY when you have very high conviction
+  based on a concrete, time-sensitive catalyst. Most days this should be empty or null.
+  Each alert: `symbol`, `thesis` (2-3 sentences), `confidence` ("high" or "very_high"),
+  `catalyst` (specific event driving the opportunity), `time_horizon` (e.g. "1-2 weeks")
 """
 
 
@@ -426,5 +457,86 @@ Follow the research workflow in your system prompt:
 4. Make data-driven trade decisions
 
 Be specific and decisive. If there's a signal, act on it. Return your decision as a JSON object
-with `research_notes`, `orders`, and `strategy_updates`.
+with `research_notes`, `orders`, `strategy_updates`, and optionally `alerts` (see system prompt).
 """
+
+
+async def generate_agent_names_via_claude(agents: dict[str, AgentState]) -> None:
+    """
+    Generate memorable, strategy-based names for all agents via Claude, in parallel.
+
+    Fires one lightweight Claude call per agent (max_turns=1, no MCP tools),
+    asks for a funny character name that reflects the agent's trading philosophy,
+    then updates agent.name and the rationale string in-place.
+
+    Falls back silently if any individual call fails — the agent keeps its
+    placeholder ID as the name rather than crashing initialization.
+    """
+
+    async def _name_one(agent_id: str, agent: AgentState) -> tuple[str, str]:
+        """Return (agent_id, new_name), or (agent_id, '') on failure."""
+        t = agent.strategy.thesis
+        prompt = (
+            "You are naming a trading agent in a stock market simulation. "
+            "Invent a memorable, funny 2-3 word character name that reflects "
+            "this agent's investment personality. The name should feel like a "
+            "real person's name but be slightly absurd and specific to the style.\n\n"
+            f"Trading philosophy: {t.philosophy}\n"
+            f"Risk tolerance: {t.risk_tolerance}\n"
+            f"Preferred sectors: {', '.join(t.preferred_sectors)}\n"
+            f"Time horizon: {t.time_horizon}\n"
+            f"Key metrics: {', '.join(t.key_metrics)}\n\n"
+            "Rules:\n"
+            "- 2-3 words, like a real person's name (first + last, or title + name)\n"
+            "- Alliterative preferred but not required\n"
+            "- The name should hint at the trading style (e.g. aggressive momentum "
+            "traders get bold names, cautious contrarians get stubborn-sounding names, "
+            "news-driven traders get journalist-ish names)\n"
+            "- Be creative and specific — avoid generic names like 'The Bull'\n"
+            "- Examples: 'Whisper Wanda' (earnings plays), 'Turbo Tess' (momentum), "
+            "'Stubborn Steve' (contrarian), 'Scoop McGee' (news-driven), "
+            "'Swivel Stan' (sector rotation), 'Chart Charlie' (technical)\n\n"
+            'Respond ONLY with JSON: {"name": "First Last"}'
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # Empty MCP config — no tools needed for a naming prompt
+            mcp_path = os.path.join(tmp, "mcp.json")
+            with open(mcp_path, "w") as f:
+                json.dump({"mcpServers": {}}, f)
+
+            try:
+                data = await run_agent(
+                    prompt=prompt,
+                    max_turns=1,
+                    mcp_config_path=mcp_path,
+                    timeout=30,
+                )
+                name = str(data.get("name", "")).strip()
+                if name:
+                    return agent_id, name
+            except Exception as e:
+                logger.warning(f"Claude naming failed for {agent_id}: {e}")
+
+        return agent_id, ""
+
+    tasks = [_name_one(aid, a) for aid, a in agents.items()]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    used_names: set[str] = set()
+    for result in results:
+        if isinstance(result, Exception):
+            continue
+        agent_id, new_name = result
+        if not new_name or new_name in used_names:
+            continue
+
+        agent = agents[agent_id]
+        old_name = agent.name
+        agent.name = new_name
+        # Fix the "As {placeholder}" line in the rationale
+        agent.strategy.rationale = agent.strategy.rationale.replace(
+            f"As {old_name}", f"As {new_name}", 1
+        )
+        used_names.add(new_name)
+        logger.info(f"Named {agent_id}: {new_name}")

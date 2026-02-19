@@ -22,6 +22,7 @@ class StockInfo(BaseModel):
     fifty_two_week_low: Optional[Decimal] = Field(None, alias="52_week_low")
     volume: Optional[int] = None
     average_volume: Optional[int] = None
+    business_summary: Optional[str] = None
 
 
 class HistoricalPrice(BaseModel):

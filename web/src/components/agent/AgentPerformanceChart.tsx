@@ -1,14 +1,18 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import type { PerformanceDataPoint } from '../../api/types';
+import type { BenchmarkSeries, PerformanceDataPoint } from '../../api/types';
 import { Card } from '../ui/Card';
 import { MetricCard } from '../ui/MetricCard';
 import { useChartTheme } from '../../hooks/useChartTheme';
+
+// Muted colors for benchmark lines (distinct from agent's primary green)
+const BENCHMARK_COLORS = ['#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#f97316'];
 
 interface AgentPerformanceChartProps {
   dataPoints: PerformanceDataPoint[];
   agentId: string;
   agentName: string;
   startingCapital: number;
+  benchmarks?: BenchmarkSeries[];
 }
 
 export function AgentPerformanceChart({
@@ -16,6 +20,7 @@ export function AgentPerformanceChart({
   agentId,
   agentName,
   startingCapital,
+  benchmarks = [],
 }: AgentPerformanceChartProps) {
   const ct = useChartTheme();
 
@@ -28,6 +33,15 @@ export function AgentPerformanceChart({
     }).format(value);
   };
 
+  // Build a lookup: date -> benchmark value per symbol
+  const benchmarkByDate: Record<string, Record<string, number>> = {};
+  for (const series of benchmarks) {
+    for (const pt of series.data) {
+      if (!benchmarkByDate[pt.date]) benchmarkByDate[pt.date] = {};
+      benchmarkByDate[pt.date][series.symbol] = pt.value;
+    }
+  }
+
   // Filter and transform data for this agent
   const chartData = dataPoints.map((point) => {
     // Use nullish coalescing to preserve 0 values (bankrupt agents)
@@ -35,12 +49,19 @@ export function AgentPerformanceChart({
     const gain = value - startingCapital;
     const gainPct = startingCapital > 0 ? ((gain / startingCapital) * 100) : 0;
 
+    const benchmarkValues: Record<string, number> = {};
+    for (const series of benchmarks) {
+      const bv = benchmarkByDate[point.date]?.[series.symbol];
+      if (bv !== undefined) benchmarkValues[series.symbol] = bv;
+    }
+
     return {
       date: point.date,
       trading_day: point.trading_day,
       value: value,
       gain: gain,
       gainPct: gainPct,
+      ...benchmarkValues,
     };
   });
 
@@ -114,12 +135,14 @@ export function AgentPerformanceChart({
                 formatter={(value: number | undefined, name: string | undefined) => {
                   const v = value ?? 0;
                   if (name === 'value') {
-                    return [formatCurrency(v), 'Portfolio Value'];
+                    return [formatCurrency(v), agentName];
                   }
                   if (name === 'gain') {
                     return [formatCurrency(v), 'Gain/Loss'];
                   }
-                  return [v, name ?? ''];
+                  // Benchmark — find label by symbol
+                  const series = benchmarks.find((b) => b.symbol === name);
+                  return [formatCurrency(v), series?.label ?? name ?? ''];
                 }}
                 labelFormatter={(day) => `Day ${day}`}
               />
@@ -136,6 +159,19 @@ export function AgentPerformanceChart({
                 activeDot={{ r: 5, fill: ct.primaryColor, stroke: ct.tooltip.bg, strokeWidth: 2 }}
                 name={agentName}
               />
+              {benchmarks.map((series, i) => (
+                <Line
+                  key={series.symbol}
+                  type="monotone"
+                  dataKey={series.symbol}
+                  stroke={BENCHMARK_COLORS[i % BENCHMARK_COLORS.length]}
+                  strokeWidth={1.5}
+                  strokeDasharray="5 3"
+                  dot={false}
+                  activeDot={{ r: 4, stroke: ct.tooltip.bg, strokeWidth: 2 }}
+                  name={series.symbol}
+                />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         </Card>

@@ -13,12 +13,13 @@ from agent_trade.experiment.config import (
     list_experiments,
     save_config,
 )
+from agent_trade.experiment.agent_runner import generate_agent_names_via_claude
 from agent_trade.experiment.coordinator import load_game_state, save_game_state
 from agent_trade.experiment.models import ExperimentConfig
 from agent_trade.experiment.strategy_manager import save_strategy
 from agent_trade.experiment.templates import create_initial_game_state
 from agent_trade.web.dependencies import load_experiment_config
-from agent_trade.web.schemas import ExperimentDetail, ExperimentListItem
+from agent_trade.web.schemas import ExperimentDetail, ExperimentListItem, UpdateExperimentRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/experiments", tags=["experiments"])
@@ -99,6 +100,41 @@ async def get_experiment(
     )
 
 
+@router.patch("/{experiment_id}", response_model=ExperimentDetail)
+async def update_experiment(
+    body: UpdateExperimentRequest,
+    experiment_id: str = Path(..., description="Experiment ID"),
+    config: ExperimentConfig = Depends(load_experiment_config),
+) -> ExperimentDetail:
+    """Rename an experiment."""
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="Name cannot be empty")
+        config.name = name
+        try:
+            save_config(config)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    current_day = None
+    try:
+        game_state = load_game_state(experiment_id)
+        current_day = game_state.trading_day if game_state else None
+    except Exception:
+        pass
+
+    return ExperimentDetail(
+        id=experiment_id,
+        name=config.name,
+        created_at=config.created_at,
+        starting_capital=float(config.starting_capital),
+        num_agents=config.num_agents,
+        status=config.status,
+        current_day=current_day,
+    )
+
+
 @router.post("", response_model=ExperimentDetail, status_code=201)
 async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
     """Create a new experiment with full initialization (config, game state, agents)."""
@@ -120,6 +156,10 @@ async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
 
         # Initialize game state and per-agent directories (mirrors CLI `init` command)
         game_state = create_initial_game_state(config, experiment_id, body.name)
+
+        # Generate memorable names via Claude (parallel, one call per agent)
+        await generate_agent_names_via_claude(game_state.agents)
+
         save_game_state(game_state)
 
         for agent in game_state.agents.values():

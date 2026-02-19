@@ -142,9 +142,92 @@ export interface DecisionLogEntry {
 export interface AgentDetail {
   agent_id: string;
   name: string;
+  description: string | null;
   status: string;
   portfolio: Portfolio;
   metrics: PortfolioMetrics;
   created_at: string;
   eliminated_at: string | null;
+}
+
+export interface UpdateAgentResponse {
+  agent_id: string;
+  name: string;
+  description: string | null;
+}
+
+// ==============================================================================
+// Holdings Info Types
+// ==============================================================================
+
+export interface BuyReason {
+  date: string;
+  reasoning: string;
+}
+
+export interface PricePoint {
+  date: string;
+  close: number;
+}
+
+export interface HoldingRationale {
+  symbol: string;
+  total_shares: number;
+  avg_cost_basis: number;
+  current_price: number | null;
+  current_value: number | null;
+  unrealized_gain: number | null;
+  first_buy_date: string;
+  buy_reasons: BuyReason[];
+  // Business / fundamental data
+  company_name: string | null;
+  sector: string | null;
+  industry: string | null;
+  market_cap: number | null;
+  pe_ratio: number | null;
+  fifty_two_week_high: number | null;
+  fifty_two_week_low: number | null;
+  business_summary: string | null;
+  price_history: PricePoint[];
+}
+
+export interface HoldingsInfo {
+  holdings: HoldingRationale[];
+}
+
+// ==============================================================================
+// Alerts Types
+// ==============================================================================
+
+export interface AlertEntry {
+  date: string;
+  symbol: string;
+  thesis: string;
+  confidence: 'high' | 'very_high';
+  catalyst: string;
+  time_horizon: string;
+}
+
+export interface AlertsResponse {
+  alerts: AlertEntry[];
+  total_count: number;
+}
+
+// ==============================================================================
+// Benchmark Types
+// ==============================================================================
+
+export interface BenchmarkDataPoint {
+  date: string;
+  value: number;
+}
+
+export interface BenchmarkSeries {
+  symbol: string;
+  label: string;
+  data: BenchmarkDataPoint[];
+}
+
+export interface BenchmarkResponse {
+  benchmarks: BenchmarkSeries[];
 }

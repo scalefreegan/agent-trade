@@ -5,12 +5,14 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import yfinance as yf
 from fastapi import APIRouter, HTTPException
 
 from agent_trade.experiment.analysis_reporter import load_all_daily_outcomes
 from agent_trade.experiment.config import get_experiment_dir
-from agent_trade.experiment.coordinator import load_game_state
+from agent_trade.experiment.coordinator import load_game_state, save_game_state
 from agent_trade.experiment.market_data import get_current_prices
+from agent_trade.stock_data import get_historical_prices, get_stock_info
 from agent_trade.experiment.portfolio_tracker import calculate_portfolio_metrics
 from agent_trade.experiment.strategy_manager import (
     get_strategy_path,
@@ -19,7 +21,15 @@ from agent_trade.experiment.strategy_manager import (
 from agent_trade.web.schemas import (
     AgentDetailResponse,
     AgentStateResponse,
+    AlertEntryResponse,
+    AlertsResponse,
+    BenchmarkResponse,
+    BenchmarkSeries,
+    BuyReasonEntry,
     DecisionLogEntry,
+    HoldingRationaleResponse,
+    HoldingsInfoResponse,
+    PricePoint,
     InvestmentThesisResponse,
     PortfolioMetrics,
     PortfolioResponse,
@@ -29,7 +39,23 @@ from agent_trade.web.schemas import (
     TaxLotResponse,
     TransactionHistoryResponse,
     TransactionRecord,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
 )
+
+SECTOR_ETFS: dict[str, str] = {
+    "Technology": "XLK",
+    "Healthcare": "XLV",
+    "Financial Services": "XLF",
+    "Energy": "XLE",
+    "Consumer Cyclical": "XLY",
+    "Consumer Defensive": "XLP",
+    "Industrials": "XLI",
+    "Utilities": "XLU",
+    "Real Estate": "XLRE",
+    "Basic Materials": "XLB",
+    "Communication Services": "XLC",
+}
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -209,6 +235,46 @@ async def get_agent_detail(
         metrics=metrics,
         created_at=agent.created_at,
         eliminated_at=agent.eliminated_at,
+    )
+
+
+@router.patch("/experiments/{experiment_id}/agents/{agent_id}")
+async def update_agent(
+    experiment_id: str, agent_id: str, body: UpdateAgentRequest
+) -> UpdateAgentResponse:
+    """Update an agent's name and/or description."""
+    try:
+        game_state = load_game_state(experiment_id)
+    except Exception as e:
+        logger.exception(f"Failed to load game state for {experiment_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if game_state is None:
+        raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
+
+    agent = game_state.agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="Name cannot be empty")
+        agent.name = name
+
+    if body.description is not None:
+        agent.description = body.description.strip() or None
+
+    try:
+        save_game_state(game_state)
+    except Exception as e:
+        logger.exception(f"Failed to save game state for {experiment_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return UpdateAgentResponse(
+        agent_id=agent.agent_id,
+        name=agent.name,
+        description=agent.description,
     )
 
 
@@ -407,3 +473,240 @@ async def get_agent_decision(
             lines.append("")
 
     return {"markdown": "\n".join(lines)}
+
+
+@router.get("/experiments/{experiment_id}/agents/{agent_id}/holdings")
+async def get_agent_holdings(
+    experiment_id: str, agent_id: str
+) -> HoldingsInfoResponse:
+    """Get per-holding breakdown with buy rationale from decision history."""
+    try:
+        game_state = load_game_state(experiment_id)
+    except Exception as e:
+        logger.exception(f"Failed to load game state for {experiment_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if game_state is None:
+        raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
+
+    agent = game_state.agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Get current prices
+    symbols = [pos.symbol for pos in agent.portfolio.positions]
+    current_prices = get_current_prices(symbols) if symbols else {}
+
+    # Scan decision files for buy reasoning per symbol
+    agent_dir = get_experiment_dir(experiment_id) / "agents" / agent_id / "decisions"
+    buy_reasons: dict[str, list[BuyReasonEntry]] = {sym: [] for sym in symbols}
+
+    if agent_dir.exists():
+        for decision_file in sorted(agent_dir.glob("*.json")):
+            date_str = decision_file.stem
+            try:
+                data = json.loads(decision_file.read_text())
+                for order in data.get("orders", []):
+                    if order.get("action") == "buy" and order.get("symbol") in buy_reasons:
+                        reasoning = order.get("reasoning", "")
+                        if reasoning:
+                            buy_reasons[order["symbol"]].append(
+                                BuyReasonEntry(date=date_str, reasoning=reasoning)
+                            )
+            except (IOError, OSError, json.JSONDecodeError) as e:
+                logger.warning(f"Failed to read decision file {decision_file}: {e}")
+
+    holdings = []
+    for pos in agent.portfolio.positions:
+        current_price = current_prices.get(pos.symbol)
+        current_value = None
+        unrealized_gain = None
+        if current_price is not None:
+            current_value = float(pos.total_shares * current_price)
+            unrealized_gain = current_value - float(pos.total_cost)
+
+        # First buy date from earliest tax lot
+        first_buy_date = (
+            min(lot.purchase_date for lot in pos.lots).strftime("%Y-%m-%d")
+            if pos.lots
+            else "unknown"
+        )
+
+        # Fetch business info and 90-day price history
+        company_name = sector = industry = business_summary = None
+        market_cap = None
+        pe_ratio = fifty_two_week_high = fifty_two_week_low = None
+        price_history: list[PricePoint] = []
+
+        try:
+            info = get_stock_info(pos.symbol)
+            company_name = info.name
+            sector = info.sector
+            industry = info.industry
+            business_summary = info.business_summary
+            market_cap = info.market_cap
+            pe_ratio = float(info.pe_ratio) if info.pe_ratio is not None else None
+            fifty_two_week_high = float(info.fifty_two_week_high) if info.fifty_two_week_high is not None else None
+            fifty_two_week_low = float(info.fifty_two_week_low) if info.fifty_two_week_low is not None else None
+        except Exception as e:
+            logger.warning(f"Failed to fetch stock info for {pos.symbol}: {e}")
+
+        try:
+            hist = get_historical_prices(pos.symbol, period="3mo")
+            price_history = [
+                PricePoint(date=p.date, close=float(p.close))
+                for p in hist.data
+            ]
+        except Exception as e:
+            logger.warning(f"Failed to fetch price history for {pos.symbol}: {e}")
+
+        holdings.append(
+            HoldingRationaleResponse(
+                symbol=pos.symbol,
+                total_shares=float(pos.total_shares),
+                avg_cost_basis=float(pos.average_cost_basis),
+                current_price=float(current_price) if current_price is not None else None,
+                current_value=current_value,
+                unrealized_gain=unrealized_gain,
+                first_buy_date=first_buy_date,
+                buy_reasons=buy_reasons.get(pos.symbol, []),
+                company_name=company_name,
+                sector=sector,
+                industry=industry,
+                market_cap=market_cap,
+                pe_ratio=pe_ratio,
+                fifty_two_week_high=fifty_two_week_high,
+                fifty_two_week_low=fifty_two_week_low,
+                business_summary=business_summary,
+                price_history=price_history,
+            )
+        )
+
+    return HoldingsInfoResponse(holdings=holdings)
+
+
+@router.get("/experiments/{experiment_id}/agents/{agent_id}/alerts")
+async def get_agent_alerts(
+    experiment_id: str, agent_id: str
+) -> AlertsResponse:
+    """Get alerts flagged by the agent across all decision files."""
+    try:
+        game_state = load_game_state(experiment_id)
+    except Exception as e:
+        logger.exception(f"Failed to load game state for {experiment_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if game_state is None:
+        raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
+
+    if agent_id not in game_state.agents:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    agent_dir = get_experiment_dir(experiment_id) / "agents" / agent_id / "decisions"
+
+    if not agent_dir.exists():
+        return AlertsResponse(alerts=[], total_count=0)
+
+    alerts: list[AlertEntryResponse] = []
+    for decision_file in sorted(agent_dir.glob("*.json"), reverse=True):
+        date_str = decision_file.stem
+        try:
+            data = json.loads(decision_file.read_text())
+            for a in data.get("alerts") or []:
+                if not isinstance(a, dict):
+                    continue
+                alerts.append(
+                    AlertEntryResponse(
+                        date=date_str,
+                        symbol=a.get("symbol", ""),
+                        thesis=a.get("thesis", ""),
+                        confidence=a.get("confidence", "high"),
+                        catalyst=a.get("catalyst", ""),
+                        time_horizon=a.get("time_horizon", ""),
+                    )
+                )
+        except (IOError, OSError, json.JSONDecodeError) as e:
+            logger.warning(f"Failed to read decision file {decision_file}: {e}")
+
+    return AlertsResponse(alerts=alerts, total_count=len(alerts))
+
+
+@router.get("/experiments/{experiment_id}/agents/{agent_id}/benchmarks")
+async def get_agent_benchmarks(
+    experiment_id: str, agent_id: str
+) -> BenchmarkResponse:
+    """Get benchmark comparison data (SPY + sector ETFs) normalized to starting capital."""
+    try:
+        game_state = load_game_state(experiment_id)
+    except Exception as e:
+        logger.exception(f"Failed to load game state for {experiment_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if game_state is None:
+        raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
+
+    agent = game_state.agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Determine sector ETFs from held symbols
+    etf_symbols: set[str] = {"SPY"}
+    for pos in agent.portfolio.positions:
+        try:
+            info = get_stock_info(pos.symbol)
+            if info.sector and info.sector in SECTOR_ETFS:
+                etf_symbols.add(SECTOR_ETFS[info.sector])
+        except Exception as e:
+            logger.warning(f"Could not get sector for {pos.symbol}: {e}")
+
+    # Determine date range from experiment creation
+    start_date = game_state.config.created_at.strftime("%Y-%m-%d")
+    starting_capital = float(game_state.config.starting_capital)
+
+    ETF_LABELS: dict[str, str] = {
+        "SPY": "S&P 500 (SPY)",
+        "XLK": "Technology (XLK)",
+        "XLV": "Healthcare (XLV)",
+        "XLF": "Financials (XLF)",
+        "XLE": "Energy (XLE)",
+        "XLY": "Consumer Cyclical (XLY)",
+        "XLP": "Consumer Defensive (XLP)",
+        "XLI": "Industrials (XLI)",
+        "XLU": "Utilities (XLU)",
+        "XLRE": "Real Estate (XLRE)",
+        "XLB": "Materials (XLB)",
+        "XLC": "Communication (XLC)",
+    }
+
+    benchmarks: list[BenchmarkSeries] = []
+    for etf in sorted(etf_symbols):
+        try:
+            ticker = yf.Ticker(etf)
+            hist = ticker.history(start=start_date, interval="1d")
+            if hist.empty:
+                continue
+
+            # Normalize to starting capital
+            first_price = float(hist["Close"].iloc[0])
+            if first_price == 0:
+                continue
+
+            data = [
+                {
+                    "date": ts.strftime("%Y-%m-%d"),
+                    "value": round(float(price) / first_price * starting_capital, 2),
+                }
+                for ts, price in hist["Close"].items()
+            ]
+
+            benchmarks.append(
+                BenchmarkSeries(
+                    symbol=etf,
+                    label=ETF_LABELS.get(etf, etf),
+                    data=data,
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Failed to fetch benchmark data for {etf}: {e}")
+
+    return BenchmarkResponse(benchmarks=benchmarks)
