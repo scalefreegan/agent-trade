@@ -273,6 +273,7 @@ class AgentDetailResponse(BaseModel):
     metrics: PortfolioMetrics
     created_at: datetime
     eliminated_at: datetime | None = None
+    guidance: str | None = None
 
 
 class UpdateExperimentRequest(BaseModel):

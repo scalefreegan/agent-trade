@@ -239,6 +239,7 @@ async def get_agent_detail(
         metrics=metrics,
         created_at=agent.created_at,
         eliminated_at=agent.eliminated_at,
+        guidance=agent.guidance,
     )
 
 

@@ -9,6 +9,8 @@ import {
   useAgentAlerts,
   useAgentBenchmarks,
   useUpdateAgent,
+  useUpdateStrategy,
+  useUpdateGuidance,
 } from '../api/agents';
 import { usePerformance } from '../api/performance';
 import { useExperiment } from '../api/experiments';
@@ -16,6 +18,7 @@ import { PortfolioBreakdown } from '../components/agent/PortfolioBreakdown';
 import { PositionAllocationChart } from '../components/agent/PositionAllocationChart';
 import { AgentPerformanceChart } from '../components/agent/AgentPerformanceChart';
 import { StrategyPanel } from '../components/agent/StrategyPanel';
+import { StrategyEditModal } from '../components/agent/StrategyEditModal';
 import { TransactionHistory } from '../components/agent/TransactionHistory';
 import { DecisionLog } from '../components/agent/DecisionLog';
 import { HoldingsInfo } from '../components/agent/HoldingsInfo';
@@ -39,6 +42,7 @@ const TABS = [
 export function AgentPage() {
   const { experimentId, agentId } = useParams<{ experimentId: string; agentId: string }>();
   const [activeTab, setActiveTab] = useState<Tab>('portfolio');
+  const [strategyEditOpen, setStrategyEditOpen] = useState(false);
 
   const { data: experiment } = useExperiment(experimentId || '');
   const { data: agent, isLoading: agentLoading, error: agentError } = useAgentDetail(
@@ -73,6 +77,8 @@ export function AgentPage() {
     agentId || ''
   );
   const updateAgent = useUpdateAgent(experimentId || '', agentId || '');
+  const updateStrategy = useUpdateStrategy(experimentId || '', agentId || '');
+  const updateGuidance = useUpdateGuidance(experimentId || '', agentId || '');
 
   if (agentLoading) {
     return (
@@ -170,7 +176,23 @@ export function AgentPage() {
             {strategyLoading ? (
               <div className="text-center py-12 text-muted-foreground">Loading strategy...</div>
             ) : strategy ? (
-              <StrategyPanel strategy={strategy} />
+              <>
+                <StrategyPanel
+                  strategy={strategy}
+                  guidance={agent.guidance}
+                  onEditStrategy={() => setStrategyEditOpen(true)}
+                  onSaveGuidance={(g) => updateGuidance.mutate(g)}
+                  isGuidancePending={updateGuidance.isPending}
+                />
+                <StrategyEditModal
+                  open={strategyEditOpen}
+                  strategy={strategy}
+                  onClose={() => { setStrategyEditOpen(false); updateStrategy.reset(); }}
+                  onSave={(data) => updateStrategy.mutate(data, { onSuccess: () => setStrategyEditOpen(false) })}
+                  isPending={updateStrategy.isPending}
+                  error={updateStrategy.error?.message ?? null}
+                />
+              </>
             ) : (
               <div className="text-center py-12 text-muted-foreground">No strategy data available</div>
             )}

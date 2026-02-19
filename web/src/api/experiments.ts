@@ -1,7 +1,7 @@
 // TanStack Query hooks for experiments
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteApi, fetchApi, patchApi, postApi } from './client';
-import type { ExperimentDetail, ExperimentListItem, GameState } from './types';
+import type { AgentInitHints, ExperimentDetail, ExperimentListItem, GameState, StartingPortfolioSpec } from './types';
 
 export function useExperiments() {
   return useQuery({
@@ -30,6 +30,9 @@ export interface CreateExperimentInput {
   name: string;
   num_agents: number;
   starting_capital: number;
+  guidance?: string;
+  agent_defaults?: AgentInitHints;
+  starting_portfolio?: StartingPortfolioSpec;
 }
 
 export function useCreateExperiment() {

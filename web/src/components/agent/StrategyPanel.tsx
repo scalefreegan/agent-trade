@@ -1,23 +1,42 @@
-import type { AgentStrategy } from '../../api/types';
+import type { AgentStrategy, StrategyEditInput } from '../../api/types';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
+import { GuidanceSection } from './GuidanceSection';
 
 interface StrategyPanelProps {
   strategy: AgentStrategy;
+  guidance: string | null;
+  onEditStrategy: () => void;
+  onSaveGuidance: (guidance: string | null) => void;
+  isGuidancePending: boolean;
 }
 
-export function StrategyPanel({ strategy }: StrategyPanelProps) {
+export function StrategyPanel({
+  strategy,
+  guidance,
+  onEditStrategy,
+  onSaveGuidance,
+  isGuidancePending,
+}: StrategyPanelProps) {
   return (
     <div>
       {/* Investment Thesis Card */}
       <Card className="mb-8">
-        <div className="flex gap-3 mb-4">
-          <Badge variant="info" className="uppercase tracking-wide text-xs px-3 py-1">
-            {strategy.thesis.risk_tolerance}
-          </Badge>
-          <Badge variant="neutral" className="text-xs px-3 py-1">
-            {strategy.thesis.time_horizon}
-          </Badge>
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex gap-3">
+            <Badge variant="info" className="uppercase tracking-wide text-xs px-3 py-1">
+              {strategy.thesis.risk_tolerance}
+            </Badge>
+            <Badge variant="neutral" className="text-xs px-3 py-1">
+              {strategy.thesis.time_horizon}
+            </Badge>
+          </div>
+          <button
+            onClick={onEditStrategy}
+            className="px-3 py-1 text-xs font-mono font-semibold rounded border border-border text-muted-foreground hover:text-foreground hover:border-foreground transition-colors flex-shrink-0"
+          >
+            Edit
+          </button>
         </div>
 
         <p className="text-foreground leading-relaxed mb-4">
@@ -86,6 +105,13 @@ export function StrategyPanel({ strategy }: StrategyPanelProps) {
           </div>
         )}
       </div>
+
+      {/* Guidance Section */}
+      <GuidanceSection
+        guidance={guidance}
+        onSave={onSaveGuidance}
+        isPending={isGuidancePending}
+      />
     </div>
   );
 }

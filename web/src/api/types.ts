@@ -148,6 +148,26 @@ export interface AgentDetail {
   metrics: PortfolioMetrics;
   created_at: string;
   eliminated_at: string | null;
+  guidance: string | null;
+}
+
+export interface StrategyEditInput {
+  philosophy?: string;
+  risk_tolerance?: 'conservative' | 'moderate' | 'aggressive';
+  preferred_sectors?: string[];
+  time_horizon?: string;
+  key_metrics?: string[];
+  rationale?: string;
+}
+
+export interface StrategyUpdateResponse {
+  updated: string[];
+  message: string;
+}
+
+export interface GuidanceUpdateResponse {
+  guidance: string | null;
+  message: string;
 }
 
 export interface UpdateAgentResponse {
@@ -230,4 +250,29 @@ export interface BenchmarkSeries {
 
 export interface BenchmarkResponse {
   benchmarks: BenchmarkSeries[];
+}
+
+// ==============================================================================
+// Experiment Creation Advanced Options Types
+// ==============================================================================
+
+export interface AgentInitHints {
+  philosophy?: string;
+  risk_tolerance?: 'conservative' | 'moderate' | 'aggressive';
+  preferred_sectors?: string[];
+  time_horizon?: string;
+  key_metrics?: string[];
+  rationale?: string;
+}
+
+export interface PortfolioPositionSpec {
+  symbol: string;
+  shares: number;
+  cost_basis: number;
+  purchase_date?: string; // ISO date string YYYY-MM-DD
+}
+
+export interface StartingPortfolioSpec {
+  cash?: number;
+  positions: PortfolioPositionSpec[];
 }
