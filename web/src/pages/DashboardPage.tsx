@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCreateExperiment, useExperiments } from '../api/experiments';
+import { useCreateExperiment, useExperiments, type CreateExperimentInput } from '../api/experiments';
 import { ExperimentList } from '../components/dashboard/ExperimentList';
 import { NewExperimentDialog } from '../components/dashboard/NewExperimentDialog';
 import { ExperimentCardSkeleton } from '../components/ui/Skeleton';
@@ -13,7 +13,7 @@ export function DashboardPage() {
 
   const createMutation = useCreateExperiment();
 
-  const handleCreate = (data: { name: string; num_agents: number; starting_capital: number }) => {
+  const handleCreate = (data: CreateExperimentInput) => {
     createMutation.mutate(data, {
       onSuccess: (newExp) => {
         setDialogOpen(false);

@@ -1,15 +1,18 @@
 // TanStack Query hooks for agent endpoints
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchApi, patchApi } from './client';
+import { fetchApi, patchApi, putApi } from './client';
 import type {
   AgentDetail,
   AgentStrategy,
   AlertsResponse,
   BenchmarkResponse,
   DecisionLogEntry,
+  GuidanceUpdateResponse,
   HoldingsInfo,
   Portfolio,
   PortfolioMetrics,
+  StrategyEditInput,
+  StrategyUpdateResponse,
   TransactionHistory,
   UpdateAgentResponse,
 } from './types';
@@ -112,6 +115,34 @@ export function useUpdateAgent(experimentId: string, agentId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent', experimentId, agentId] });
       queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
+    },
+  });
+}
+
+export function useUpdateStrategy(experimentId: string, agentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: StrategyEditInput) =>
+      putApi<StrategyUpdateResponse>(
+        `/experiments/${experimentId}/agents/${agentId}/strategy`,
+        data
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agentStrategy', experimentId, agentId] });
+    },
+  });
+}
+
+export function useUpdateGuidance(experimentId: string, agentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (guidance: string | null) =>
+      putApi<GuidanceUpdateResponse>(
+        `/experiments/${experimentId}/agents/${agentId}/guidance`,
+        { guidance }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent', experimentId, agentId] });
     },
   });
 }
