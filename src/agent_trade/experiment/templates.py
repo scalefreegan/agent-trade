@@ -392,19 +392,32 @@ def create_initial_game_state(
         for override in init_spec.agent_overrides:
             override_map[override.agent_index] = override.hints
 
-    # Determine starting cash
+    # Determine starting cash; sync config so return calculations stay accurate
     starting_cash = config.starting_capital
     if init_spec and init_spec.starting_portfolio and init_spec.starting_portfolio.cash is not None:
         starting_cash = init_spec.starting_portfolio.cash
+        config.starting_capital = starting_cash
+
+    # Validate agent_override indices against actual agent count (fail fast on typos)
+    if init_spec and init_spec.agent_overrides:
+        for override in init_spec.agent_overrides:
+            if override.agent_index > config.num_agents:
+                raise ValueError(
+                    f"agent_overrides contains agent_index={override.agent_index} "
+                    f"but experiment only has {config.num_agents} agent(s)"
+                )
 
     # Build seeded positions if provided
     seeded_positions: list[StockPosition] = []
     now = datetime.now(timezone.utc)
     if init_spec and init_spec.starting_portfolio and init_spec.starting_portfolio.positions:
         for pos_spec in init_spec.starting_portfolio.positions:
-            if pos_spec.purchase_date:
-                purchase_dt = datetime.strptime(pos_spec.purchase_date, "%Y-%m-%d").replace(
-                    tzinfo=timezone.utc
+            if pos_spec.purchase_date is not None:
+                purchase_dt = datetime(
+                    pos_spec.purchase_date.year,
+                    pos_spec.purchase_date.month,
+                    pos_spec.purchase_date.day,
+                    tzinfo=timezone.utc,
                 )
             else:
                 purchase_dt = now

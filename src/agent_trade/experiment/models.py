@@ -4,7 +4,7 @@ Pydantic models for the trading experiment.
 All financial amounts use Decimal for precision to avoid floating-point errors.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Literal, Optional
 
@@ -278,7 +278,7 @@ class AgentInitHints(BaseModel):
 class AgentOverride(BaseModel):
     """Per-agent overrides, keyed by agent index (1-based: maps to agent_001, etc.)."""
 
-    agent_index: int
+    agent_index: int = Field(..., ge=1)
     hints: AgentInitHints
 
 
@@ -288,7 +288,7 @@ class PortfolioPositionSpec(BaseModel):
     symbol: str
     shares: Decimal
     cost_basis: Decimal  # Per share at purchase
-    purchase_date: Optional[str] = None  # YYYY-MM-DD; defaults to experiment creation date
+    purchase_date: Optional[date] = None  # Defaults to experiment creation date
 
 
 class StartingPortfolioSpec(BaseModel):
