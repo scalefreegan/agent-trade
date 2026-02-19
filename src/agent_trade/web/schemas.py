@@ -286,8 +286,15 @@ class BuyReasonEntry(BaseModel):
     reasoning: str
 
 
+class PricePoint(BaseModel):
+    """Single date/close entry for a price sparkline."""
+
+    date: str
+    close: float
+
+
 class HoldingRationaleResponse(BaseModel):
-    """Per-holding breakdown with buy rationale."""
+    """Per-holding breakdown with business info and buy rationale."""
 
     symbol: str
     total_shares: float
@@ -297,6 +304,16 @@ class HoldingRationaleResponse(BaseModel):
     unrealized_gain: float | None = None
     first_buy_date: str
     buy_reasons: list[BuyReasonEntry]
+    # Business / fundamental data
+    company_name: str | None = None
+    sector: str | None = None
+    industry: str | None = None
+    market_cap: int | None = None
+    pe_ratio: float | None = None
+    fifty_two_week_high: float | None = None
+    fifty_two_week_low: float | None = None
+    business_summary: str | None = None
+    price_history: list[PricePoint] = []
 
 
 class HoldingsInfoResponse(BaseModel):

@@ -12,7 +12,7 @@ from agent_trade.experiment.analysis_reporter import load_all_daily_outcomes
 from agent_trade.experiment.config import get_experiment_dir
 from agent_trade.experiment.coordinator import load_game_state
 from agent_trade.experiment.market_data import get_current_prices
-from agent_trade.stock_data import get_stock_info
+from agent_trade.stock_data import get_historical_prices, get_stock_info
 from agent_trade.experiment.portfolio_tracker import calculate_portfolio_metrics
 from agent_trade.experiment.strategy_manager import (
     get_strategy_path,
@@ -29,6 +29,7 @@ from agent_trade.web.schemas import (
     DecisionLogEntry,
     HoldingRationaleResponse,
     HoldingsInfoResponse,
+    PricePoint,
     InvestmentThesisResponse,
     PortfolioMetrics,
     PortfolioResponse,
@@ -489,6 +490,34 @@ async def get_agent_holdings(
             else "unknown"
         )
 
+        # Fetch business info and 90-day price history
+        company_name = sector = industry = business_summary = None
+        market_cap = None
+        pe_ratio = fifty_two_week_high = fifty_two_week_low = None
+        price_history: list[PricePoint] = []
+
+        try:
+            info = get_stock_info(pos.symbol)
+            company_name = info.name
+            sector = info.sector
+            industry = info.industry
+            business_summary = info.business_summary
+            market_cap = info.market_cap
+            pe_ratio = float(info.pe_ratio) if info.pe_ratio is not None else None
+            fifty_two_week_high = float(info.fifty_two_week_high) if info.fifty_two_week_high is not None else None
+            fifty_two_week_low = float(info.fifty_two_week_low) if info.fifty_two_week_low is not None else None
+        except Exception as e:
+            logger.warning(f"Failed to fetch stock info for {pos.symbol}: {e}")
+
+        try:
+            hist = get_historical_prices(pos.symbol, period="3mo")
+            price_history = [
+                PricePoint(date=p.date, close=float(p.close))
+                for p in hist.data
+            ]
+        except Exception as e:
+            logger.warning(f"Failed to fetch price history for {pos.symbol}: {e}")
+
         holdings.append(
             HoldingRationaleResponse(
                 symbol=pos.symbol,
@@ -499,6 +528,15 @@ async def get_agent_holdings(
                 unrealized_gain=unrealized_gain,
                 first_buy_date=first_buy_date,
                 buy_reasons=buy_reasons.get(pos.symbol, []),
+                company_name=company_name,
+                sector=sector,
+                industry=industry,
+                market_cap=market_cap,
+                pe_ratio=pe_ratio,
+                fifty_two_week_high=fifty_two_week_high,
+                fifty_two_week_low=fifty_two_week_low,
+                business_summary=business_summary,
+                price_history=price_history,
             )
         )
 

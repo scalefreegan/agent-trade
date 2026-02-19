@@ -35,6 +35,7 @@ def get_stock_info(symbol: str) -> StockInfo:
         fifty_two_week_low=Decimal(str(week_low)) if week_low is not None else None,
         volume=info.get("volume"),
         average_volume=info.get("averageVolume"),
+        business_summary=info.get("longBusinessSummary"),
     )
 
 

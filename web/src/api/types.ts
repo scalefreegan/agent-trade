@@ -158,6 +158,11 @@ export interface BuyReason {
   reasoning: string;
 }
 
+export interface PricePoint {
+  date: string;
+  close: number;
+}
+
 export interface HoldingRationale {
   symbol: string;
   total_shares: number;
@@ -167,6 +172,16 @@ export interface HoldingRationale {
   unrealized_gain: number | null;
   first_buy_date: string;
   buy_reasons: BuyReason[];
+  // Business / fundamental data
+  company_name: string | null;
+  sector: string | null;
+  industry: string | null;
+  market_cap: number | null;
+  pe_ratio: number | null;
+  fifty_two_week_high: number | null;
+  fifty_two_week_low: number | null;
+  business_summary: string | null;
+  price_history: PricePoint[];
 }
 
 export interface HoldingsInfo {
