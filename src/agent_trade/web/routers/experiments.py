@@ -3,6 +3,8 @@ import logging
 import shutil
 from decimal import Decimal
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
 
@@ -15,7 +17,13 @@ from agent_trade.experiment.config import (
 )
 from agent_trade.experiment.agent_runner import generate_agent_names_via_claude
 from agent_trade.experiment.coordinator import load_game_state, save_game_state
-from agent_trade.experiment.models import ExperimentConfig
+from agent_trade.experiment.models import (
+    AgentInitHints,
+    AgentOverride,
+    ExperimentConfig,
+    ExperimentInitSpec,
+    StartingPortfolioSpec,
+)
 from agent_trade.experiment.strategy_manager import save_strategy
 from agent_trade.experiment.templates import create_initial_game_state
 from agent_trade.web.dependencies import load_experiment_config
@@ -31,6 +39,10 @@ class CreateExperimentRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     num_agents: int = Field(default=10, ge=1, le=50)
     starting_capital: float = Field(default=1000.0, ge=100.0, le=1_000_000)
+    guidance: Optional[str] = None
+    agent_defaults: Optional[AgentInitHints] = None
+    agent_overrides: Optional[list[AgentOverride]] = None
+    starting_portfolio: Optional[StartingPortfolioSpec] = None
 
 
 @router.get("", response_model=list[ExperimentListItem])
@@ -148,18 +160,29 @@ async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
         name=body.name,
         num_agents=body.num_agents,
         starting_capital=Decimal(str(body.starting_capital)),
+        guidance=body.guidance,
     )
     exp_dir = get_experiment_dir(experiment_id)
+
+    # Build ExperimentInitSpec if any customization was requested
+    init_spec: Optional[ExperimentInitSpec] = None
+    if body.agent_defaults or body.agent_overrides or body.starting_portfolio:
+        init_spec = ExperimentInitSpec(
+            guidance=body.guidance,
+            agent_defaults=body.agent_defaults,
+            agent_overrides=body.agent_overrides,
+            starting_portfolio=body.starting_portfolio,
+        )
+
     try:
         exp_dir.mkdir(parents=True, exist_ok=True)
         save_config(config)
 
         # Initialize game state and per-agent directories (mirrors CLI `init` command)
-        game_state = create_initial_game_state(config, experiment_id, body.name)
+        game_state = create_initial_game_state(config, experiment_id, body.name, init_spec=init_spec)
 
         # Generate memorable names via Claude (parallel, one call per agent)
         await generate_agent_names_via_claude(game_state.agents)
-
         save_game_state(game_state)
 
         for agent in game_state.agents.values():

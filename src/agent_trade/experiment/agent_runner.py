@@ -346,6 +346,15 @@ def _build_system_prompt(
     held_tickers = [pos.symbol for pos in agent.portfolio.positions]
     held_str = ", ".join(held_tickers) if held_tickers else "none"
 
+    # Build optional guidance sections
+    experiment_guidance_section = ""
+    if config.guidance:
+        experiment_guidance_section = f"\n## Experiment Guidance\n\n{config.guidance}\n"
+
+    agent_guidance_section = ""
+    if agent.guidance:
+        agent_guidance_section = f"\n## Additional Guidance\n\n{agent.guidance}\n"
+
     return f"""# Trading Agent: {agent.name} ({agent.agent_id})
 
 You are an autonomous trading agent competing in a stock market simulation.
@@ -364,7 +373,7 @@ Every day you must research the market and act on what you find.
   explain exactly what you're waiting for.
 - **Profit-take and loss-cut actively** — don't let winners run into reversals or
   losers drag the portfolio. Rotate into stronger opportunities.
-
+{experiment_guidance_section}
 ## Current Portfolio
 
 **Cash**: ${agent.portfolio.cash:.2f}
@@ -384,7 +393,7 @@ Every day you must research the market and act on what you find.
 **Key Metrics**: {', '.join(agent.strategy.thesis.key_metrics)}
 
 **Rationale**: {agent.strategy.rationale}
-
+{agent_guidance_section}
 ## Recent Learnings
 
 {learnings_text}

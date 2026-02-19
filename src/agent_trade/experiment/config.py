@@ -45,6 +45,7 @@ def create_experiment_config(
     long_term_holding_days: int = DEFAULT_LONG_TERM_HOLDING_DAYS,
     max_position_pct: Decimal = DEFAULT_MAX_POSITION_PCT,
     min_trade_amount: Decimal = DEFAULT_MIN_TRADE_AMOUNT,
+    guidance: Optional[str] = None,
 ) -> ExperimentConfig:
     """Create a new experiment configuration with defaults."""
     return ExperimentConfig(
@@ -59,6 +60,7 @@ def create_experiment_config(
         min_trade_amount=min_trade_amount,
         created_at=datetime.now(timezone.utc),
         status="active",
+        guidance=guidance,
     )
 
 

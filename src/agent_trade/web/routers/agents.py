@@ -1,12 +1,14 @@
 """Agent detail endpoints."""
 import json
 import logging
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import yfinance as yf
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from agent_trade.experiment.analysis_reporter import load_all_daily_outcomes
 from agent_trade.experiment.config import get_experiment_dir
@@ -14,9 +16,11 @@ from agent_trade.experiment.coordinator import load_game_state, save_game_state
 from agent_trade.experiment.market_data import get_current_prices
 from agent_trade.stock_data import get_historical_prices, get_stock_info
 from agent_trade.experiment.portfolio_tracker import calculate_portfolio_metrics
+from agent_trade.experiment.coordinator import save_game_state
 from agent_trade.experiment.strategy_manager import (
     get_strategy_path,
     load_strategy,
+    save_strategy,
 )
 from agent_trade.web.schemas import (
     AgentDetailResponse,
@@ -710,3 +714,115 @@ async def get_agent_benchmarks(
             logger.warning(f"Failed to fetch benchmark data for {etf}: {e}")
 
     return BenchmarkResponse(benchmarks=benchmarks)
+
+
+# ---------------------------------------------------------------------------
+# Strategy edit + guidance endpoints (Feature 3)
+# ---------------------------------------------------------------------------
+
+
+class StrategyEditRequest(BaseModel):
+    """Request body for editing agent strategy fields. All fields optional."""
+
+    philosophy: Optional[str] = None
+    risk_tolerance: Optional[str] = None  # conservative | moderate | aggressive
+    preferred_sectors: Optional[list[str]] = None
+    time_horizon: Optional[str] = None
+    key_metrics: Optional[list[str]] = None
+    rationale: Optional[str] = None
+
+
+class AgentGuidanceRequest(BaseModel):
+    """Request body for setting per-agent guidance."""
+
+    guidance: Optional[str] = None  # None / omitted = clear guidance
+
+
+@router.put("/experiments/{experiment_id}/agents/{agent_id}/strategy")
+async def update_agent_strategy(
+    experiment_id: str, agent_id: str, body: StrategyEditRequest
+) -> dict[str, Any]:
+    """Edit one or more strategy fields for an agent."""
+    try:
+        game_state = load_game_state(experiment_id)
+    except Exception as e:
+        logger.exception(f"Failed to load game state for {experiment_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if game_state is None:
+        raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
+
+    agent = game_state.agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    if body.risk_tolerance is not None and body.risk_tolerance not in (
+        "conservative", "moderate", "aggressive"
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid risk_tolerance '{body.risk_tolerance}'. Must be conservative, moderate, or aggressive",
+        )
+
+    changed = []
+    if body.philosophy is not None:
+        agent.strategy.thesis.philosophy = body.philosophy
+        changed.append("philosophy")
+    if body.risk_tolerance is not None:
+        agent.strategy.thesis.risk_tolerance = body.risk_tolerance  # type: ignore
+        changed.append("risk_tolerance")
+    if body.preferred_sectors is not None:
+        agent.strategy.thesis.preferred_sectors = body.preferred_sectors
+        changed.append("preferred_sectors")
+    if body.time_horizon is not None:
+        agent.strategy.thesis.time_horizon = body.time_horizon
+        changed.append("time_horizon")
+    if body.key_metrics is not None:
+        agent.strategy.thesis.key_metrics = body.key_metrics
+        changed.append("key_metrics")
+    if body.rationale is not None:
+        agent.strategy.rationale = body.rationale
+        changed.append("rationale")
+
+    if not changed:
+        return {"updated": [], "message": "No fields were changed"}
+
+    agent.strategy.last_updated = datetime.now(timezone.utc)
+
+    try:
+        save_game_state(game_state)
+        save_strategy(experiment_id, agent_id, agent.strategy)
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save strategy: {e}")
+
+    return {"updated": changed, "message": f"Updated {agent_id}: {', '.join(changed)}"}
+
+
+@router.put("/experiments/{experiment_id}/agents/{agent_id}/guidance")
+async def update_agent_guidance(
+    experiment_id: str, agent_id: str, body: AgentGuidanceRequest
+) -> dict[str, Any]:
+    """Set or clear per-agent guidance text."""
+    try:
+        game_state = load_game_state(experiment_id)
+    except Exception as e:
+        logger.exception(f"Failed to load game state for {experiment_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if game_state is None:
+        raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
+
+    agent = game_state.agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    agent.guidance = body.guidance
+
+    try:
+        save_game_state(game_state)
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save game state: {e}")
+
+    if body.guidance:
+        return {"guidance": body.guidance, "message": f"Guidance set for {agent_id}"}
+    return {"guidance": None, "message": f"Guidance cleared for {agent_id}"}

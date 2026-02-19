@@ -241,6 +241,7 @@ class ExperimentConfig(BaseModel):
     min_trade_amount: Decimal = Decimal("1.00")
     created_at: datetime
     status: Literal["active", "paused", "completed"]
+    guidance: Optional[str] = None  # Free-text guidance injected into all agent prompts
 
 
 class AgentState(BaseModel):
@@ -255,6 +256,55 @@ class AgentState(BaseModel):
     stats: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     eliminated_at: Optional[datetime] = None
+    guidance: Optional[str] = None  # Per-agent guidance injected into the agent's prompt
+
+
+# ==============================================================================
+# Initialization Spec Models
+# ==============================================================================
+
+
+class AgentInitHints(BaseModel):
+    """Optional hints for strategy generation. Unset fields are randomized."""
+
+    philosophy: Optional[str] = None
+    risk_tolerance: Optional[Literal["conservative", "moderate", "aggressive"]] = None
+    preferred_sectors: Optional[list[str]] = None
+    time_horizon: Optional[str] = None
+    key_metrics: Optional[list[str]] = None
+    rationale: Optional[str] = None
+
+
+class AgentOverride(BaseModel):
+    """Per-agent overrides, keyed by agent index (1-based: maps to agent_001, etc.)."""
+
+    agent_index: int
+    hints: AgentInitHints
+
+
+class PortfolioPositionSpec(BaseModel):
+    """A stock position to seed in the starting portfolio."""
+
+    symbol: str
+    shares: Decimal
+    cost_basis: Decimal  # Per share at purchase
+    purchase_date: Optional[str] = None  # YYYY-MM-DD; defaults to experiment creation date
+
+
+class StartingPortfolioSpec(BaseModel):
+    """Starting portfolio specification from JSON file."""
+
+    cash: Optional[Decimal] = None  # Overrides --capital if set
+    positions: list[PortfolioPositionSpec] = Field(default_factory=list)
+
+
+class ExperimentInitSpec(BaseModel):
+    """Full initialization spec loaded from --init-file JSON."""
+
+    guidance: Optional[str] = None
+    agent_defaults: Optional[AgentInitHints] = None
+    agent_overrides: Optional[list[AgentOverride]] = None
+    starting_portfolio: Optional[StartingPortfolioSpec] = None
 
 
 class GameState(BaseModel):

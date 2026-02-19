@@ -1,6 +1,7 @@
 """CLI interface for the multi-agent trading experiment."""
 
 import asyncio
+import json
 import sys
 from pathlib import Path
 from typing import Optional
@@ -9,11 +10,11 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.markdown import Markdown
-from datetime import datetime
+from datetime import datetime, timezone
 
 from decimal import Decimal
 
-from .models import ExperimentConfig, GameState, AgentState
+from .models import ExperimentConfig, ExperimentInitSpec, GameState, AgentState
 from . import daily_runner
 from . import analysis_reporter
 from .market_data import get_current_prices
@@ -64,6 +65,8 @@ def init(
     short_term_tax: float = typer.Option(0.35, "--short-term-tax", help="Short-term capital gains tax rate"),
     long_term_tax: float = typer.Option(0.15, "--long-term-tax", help="Long-term capital gains tax rate"),
     long_term_days: int = typer.Option(365, "--long-term-days", help="Days for long-term holding period"),
+    init_file: Optional[Path] = typer.Option(None, "--init-file", help="JSON file with agent initialization spec"),
+    guidance: Optional[str] = typer.Option(None, "--guidance", help="Free-text guidance injected into all agent prompts"),
 ):
     """Initialize a new trading experiment.
 
@@ -72,7 +75,28 @@ def init(
         agent-trade-experiment init --name "Q1-2026" --agents 10 --capital 1000
 
         agent-trade-experiment init -n "Test" -a 3 -c 500
+
+        agent-trade-experiment init -n "Custom" --init-file spec.json
+
+        agent-trade-experiment init -n "Test" --guidance "Focus on dividend stocks"
     """
+    # Load init spec from file if provided
+    init_spec: Optional[ExperimentInitSpec] = None
+    if init_file:
+        if not init_file.exists():
+            console.print(f"[red]Error:[/red] Init file not found: {init_file}")
+            raise typer.Exit(1)
+        try:
+            init_spec = ExperimentInitSpec.model_validate_json(init_file.read_text())
+        except Exception as e:
+            console.print(f"[red]Error:[/red] Failed to parse init file: {e}")
+            raise typer.Exit(1)
+
+    # --guidance flag takes precedence over (and merges with) init_file guidance
+    effective_guidance = guidance
+    if effective_guidance is None and init_spec and init_spec.guidance:
+        effective_guidance = init_spec.guidance
+
     # Generate experiment ID from name and timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     experiment_id = f"{name.lower().replace(' ', '_')}_{timestamp}"
@@ -81,7 +105,7 @@ def init(
     exp_dir = get_experiment_dir(experiment_id)
     exp_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create config
+    # Create config (inject guidance if provided)
     config = create_experiment_config(
         experiment_id=experiment_id,
         name=name,
@@ -90,6 +114,7 @@ def init(
         short_term_tax_rate=Decimal(str(short_term_tax)),
         long_term_tax_rate=Decimal(str(long_term_tax)),
         long_term_holding_days=long_term_days,
+        guidance=effective_guidance,
     )
 
     # Save config
@@ -97,14 +122,13 @@ def init(
     with open(config_file, "w") as f:
         f.write(config.model_dump_json(indent=2))
 
-    # Initialize game state
+    # Initialize game state (pass init_spec for hints/portfolio seeding)
     from .templates import create_initial_game_state
-    game_state = create_initial_game_state(config, experiment_id, name)
+    game_state = create_initial_game_state(config, experiment_id, name, init_spec=init_spec)
 
     # Generate memorable names via Claude (parallel, one call per agent)
     from .agent_runner import generate_agent_names_via_claude
     asyncio.run(generate_agent_names_via_claude(game_state.agents))
-
     save_game_state(experiment_id, game_state)
 
     # Create agent directories with initial strategy files
@@ -131,8 +155,10 @@ def init(
         f"Starting Capital: ${capital:,.2f}\n"
         f"Short-term Tax: {short_term_tax*100:.0f}%\n"
         f"Long-term Tax: {long_term_tax*100:.0f}%\n"
-        f"Long-term Holding Period: {long_term_days} days\n\n"
-        f"Location: {exp_dir}",
+        f"Long-term Holding Period: {long_term_days} days\n"
+        + (f"Guidance: {effective_guidance[:60]}{'...' if effective_guidance and len(effective_guidance) > 60 else ''}\n" if effective_guidance else "")
+        + (f"Init file: {init_file}\n" if init_file else "")
+        + f"\nLocation: {exp_dir}",
         title="Experiment Created",
         border_style="green"
     ))
@@ -476,6 +502,169 @@ def list():
             )
 
         console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        if "--debug" in sys.argv:
+            raise
+        raise typer.Exit(1)
+
+
+strategy_app = typer.Typer(name="strategy", help="Manage agent strategies", add_completion=False)
+app.add_typer(strategy_app, name="strategy")
+
+
+@strategy_app.command("show")
+def strategy_show(
+    experiment_id: str = typer.Argument(..., help="Experiment ID"),
+    agent_id: str = typer.Argument(..., help="Agent ID (e.g. agent_001)"),
+):
+    """Show current strategy for an agent.
+
+    Examples:
+
+        agent-trade-experiment strategy show my_exp_20260219_120000 agent_001
+    """
+    try:
+        game_state = load_game_state(experiment_id)
+        agent = game_state.agents.get(agent_id)
+        if not agent:
+            console.print(f"[red]Error:[/red] Agent '{agent_id}' not found")
+            raise typer.Exit(1)
+
+        thesis = agent.strategy.thesis
+        console.print(Panel(
+            f"[bold]Philosophy[/bold]: {thesis.philosophy}\n"
+            f"[bold]Risk Tolerance[/bold]: {thesis.risk_tolerance}\n"
+            f"[bold]Preferred Sectors[/bold]: {', '.join(thesis.preferred_sectors)}\n"
+            f"[bold]Time Horizon[/bold]: {thesis.time_horizon}\n"
+            f"[bold]Key Metrics[/bold]: {', '.join(thesis.key_metrics)}\n\n"
+            f"[bold]Rationale[/bold]: {agent.strategy.rationale[:300]}{'...' if len(agent.strategy.rationale) > 300 else ''}\n\n"
+            f"[bold]Last Updated[/bold]: {agent.strategy.last_updated.strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+            + (f"[bold]Guidance[/bold]: {agent.guidance}\n" if agent.guidance else ""),
+            title=f"Strategy: {agent_id}",
+            border_style="cyan"
+        ))
+
+        if agent.strategy.learnings:
+            console.print(f"\n[cyan]Recent Learnings[/cyan] ({len(agent.strategy.learnings)} total, showing last 3):")
+            for learning in agent.strategy.learnings[-3:]:
+                console.print(f"  [{learning.date}] {learning.observation[:80]}...")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        if "--debug" in sys.argv:
+            raise
+        raise typer.Exit(1)
+
+
+@strategy_app.command("edit")
+def strategy_edit(
+    experiment_id: str = typer.Argument(..., help="Experiment ID"),
+    agent_id: str = typer.Argument(..., help="Agent ID (e.g. agent_001)"),
+    philosophy: Optional[str] = typer.Option(None, "--philosophy", help="Investment philosophy"),
+    risk: Optional[str] = typer.Option(None, "--risk", help="Risk tolerance: conservative|moderate|aggressive"),
+    sectors: Optional[str] = typer.Option(None, "--sectors", help="Comma-separated preferred sectors"),
+    time_horizon: Optional[str] = typer.Option(None, "--time-horizon", help="Time horizon"),
+    metrics: Optional[str] = typer.Option(None, "--metrics", help="Comma-separated key metrics"),
+    rationale: Optional[str] = typer.Option(None, "--rationale", help="Strategy rationale"),
+):
+    """Edit strategy fields for an agent.
+
+    Examples:
+
+        agent-trade-experiment strategy edit my_exp agent_001 --risk aggressive
+
+        agent-trade-experiment strategy edit my_exp agent_001 --philosophy "Value investing" --risk conservative
+
+        agent-trade-experiment strategy edit my_exp agent_001 --sectors "Technology,Healthcare"
+    """
+    try:
+        game_state = load_game_state(experiment_id)
+        agent = game_state.agents.get(agent_id)
+        if not agent:
+            console.print(f"[red]Error:[/red] Agent '{agent_id}' not found")
+            raise typer.Exit(1)
+
+        # Validate risk tolerance
+        if risk is not None and risk not in ("conservative", "moderate", "aggressive"):
+            console.print(f"[red]Error:[/red] Invalid risk tolerance '{risk}'. Must be: conservative, moderate, or aggressive")
+            raise typer.Exit(1)
+
+        # Apply updates
+        changed = []
+        if philosophy is not None:
+            agent.strategy.thesis.philosophy = philosophy
+            changed.append("philosophy")
+        if risk is not None:
+            agent.strategy.thesis.risk_tolerance = risk  # type: ignore
+            changed.append("risk_tolerance")
+        if sectors is not None:
+            agent.strategy.thesis.preferred_sectors = [s.strip() for s in sectors.split(",") if s.strip()]
+            changed.append("preferred_sectors")
+        if time_horizon is not None:
+            agent.strategy.thesis.time_horizon = time_horizon
+            changed.append("time_horizon")
+        if metrics is not None:
+            agent.strategy.thesis.key_metrics = [m.strip() for m in metrics.split(",") if m.strip()]
+            changed.append("key_metrics")
+        if rationale is not None:
+            agent.strategy.rationale = rationale
+            changed.append("rationale")
+
+        if not changed:
+            console.print("[yellow]No fields specified to update.[/yellow]")
+            return
+
+        agent.strategy.last_updated = datetime.now(timezone.utc)
+
+        # Save game state AND strategy.md
+        save_game_state(experiment_id, game_state)
+
+        from .strategy_manager import save_strategy
+        save_strategy(experiment_id, agent_id, agent.strategy)
+
+        console.print(f"[green]✓[/green] Updated {agent_id}: {', '.join(changed)}")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        if "--debug" in sys.argv:
+            raise
+        raise typer.Exit(1)
+
+
+@strategy_app.command("guide")
+def strategy_guide(
+    experiment_id: str = typer.Argument(..., help="Experiment ID"),
+    agent_id: str = typer.Argument(..., help="Agent ID (e.g. agent_001)"),
+    guidance_text: Optional[str] = typer.Argument(None, help="Guidance text (omit with --clear to remove)"),
+    clear: bool = typer.Option(False, "--clear", help="Clear existing guidance"),
+):
+    """Set or clear per-agent guidance.
+
+    Examples:
+
+        agent-trade-experiment strategy guide my_exp agent_001 "Focus on dividend stocks"
+
+        agent-trade-experiment strategy guide my_exp agent_001 --clear
+    """
+    try:
+        game_state = load_game_state(experiment_id)
+        agent = game_state.agents.get(agent_id)
+        if not agent:
+            console.print(f"[red]Error:[/red] Agent '{agent_id}' not found")
+            raise typer.Exit(1)
+
+        if clear:
+            agent.guidance = None
+            save_game_state(experiment_id, game_state)
+            console.print(f"[green]✓[/green] Cleared guidance for {agent_id}")
+        elif guidance_text:
+            agent.guidance = guidance_text
+            save_game_state(experiment_id, game_state)
+            console.print(f"[green]✓[/green] Set guidance for {agent_id}: {guidance_text[:80]}{'...' if len(guidance_text) > 80 else ''}")
+        else:
+            console.print("[yellow]Provide guidance text or --clear[/yellow]")
 
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
