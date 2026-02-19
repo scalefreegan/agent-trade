@@ -248,6 +248,7 @@ class AgentState(BaseModel):
 
     agent_id: str
     name: str
+    description: Optional[str] = None
     status: Literal["active", "eliminated"]
     portfolio: Portfolio
     strategy: AgentStrategy

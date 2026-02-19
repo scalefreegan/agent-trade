@@ -142,11 +142,18 @@ export interface DecisionLogEntry {
 export interface AgentDetail {
   agent_id: string;
   name: string;
+  description: string | null;
   status: string;
   portfolio: Portfolio;
   metrics: PortfolioMetrics;
   created_at: string;
   eliminated_at: string | null;
+}
+
+export interface UpdateAgentResponse {
+  agent_id: string;
+  name: string;
+  description: string | null;
 }
 
 // ==============================================================================

@@ -267,11 +267,33 @@ class AgentDetailResponse(BaseModel):
 
     agent_id: str
     name: str
+    description: str | None = None
     status: str
     portfolio: PortfolioResponse
     metrics: PortfolioMetrics
     created_at: datetime
     eliminated_at: datetime | None = None
+
+
+class UpdateExperimentRequest(BaseModel):
+    """Request body for PATCH /experiments/{id}."""
+
+    name: str | None = None
+
+
+class UpdateAgentRequest(BaseModel):
+    """Request body for PATCH /agents/{agent_id}."""
+
+    name: str | None = None
+    description: str | None = None
+
+
+class UpdateAgentResponse(BaseModel):
+    """Response for PATCH /agents/{agent_id}."""
+
+    agent_id: str
+    name: str
+    description: str | None = None
 
 
 # ==============================================================================

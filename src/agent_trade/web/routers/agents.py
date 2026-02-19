@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException
 
 from agent_trade.experiment.analysis_reporter import load_all_daily_outcomes
 from agent_trade.experiment.config import get_experiment_dir
-from agent_trade.experiment.coordinator import load_game_state
+from agent_trade.experiment.coordinator import load_game_state, save_game_state
 from agent_trade.experiment.market_data import get_current_prices
 from agent_trade.stock_data import get_historical_prices, get_stock_info
 from agent_trade.experiment.portfolio_tracker import calculate_portfolio_metrics
@@ -39,6 +39,8 @@ from agent_trade.web.schemas import (
     TaxLotResponse,
     TransactionHistoryResponse,
     TransactionRecord,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
 )
 
 SECTOR_ETFS: dict[str, str] = {
@@ -233,6 +235,46 @@ async def get_agent_detail(
         metrics=metrics,
         created_at=agent.created_at,
         eliminated_at=agent.eliminated_at,
+    )
+
+
+@router.patch("/experiments/{experiment_id}/agents/{agent_id}")
+async def update_agent(
+    experiment_id: str, agent_id: str, body: UpdateAgentRequest
+) -> UpdateAgentResponse:
+    """Update an agent's name and/or description."""
+    try:
+        game_state = load_game_state(experiment_id)
+    except Exception as e:
+        logger.exception(f"Failed to load game state for {experiment_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if game_state is None:
+        raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
+
+    agent = game_state.agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="Name cannot be empty")
+        agent.name = name
+
+    if body.description is not None:
+        agent.description = body.description.strip() or None
+
+    try:
+        save_game_state(game_state)
+    except Exception as e:
+        logger.exception(f"Failed to save game state for {experiment_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return UpdateAgentResponse(
+        agent_id=agent.agent_id,
+        name=agent.name,
+        description=agent.description,
     )
 
 

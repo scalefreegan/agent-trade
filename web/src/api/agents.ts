@@ -1,6 +1,6 @@
 // TanStack Query hooks for agent endpoints
-import { useQuery } from '@tanstack/react-query';
-import { fetchApi } from './client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchApi, patchApi } from './client';
 import type {
   AgentDetail,
   AgentStrategy,
@@ -11,6 +11,7 @@ import type {
   Portfolio,
   PortfolioMetrics,
   TransactionHistory,
+  UpdateAgentResponse,
 } from './types';
 
 export function useAgentDetail(experimentId: string, agentId: string) {
@@ -97,5 +98,20 @@ export function useAgentBenchmarks(experimentId: string, agentId: string) {
     ),
     enabled: !!experimentId && !!agentId,
     staleTime: 5 * 60 * 1000, // 5 min — ETF data doesn't change often
+  });
+}
+
+export function useUpdateAgent(experimentId: string, agentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name?: string; description?: string | null }) =>
+      patchApi<UpdateAgentResponse>(
+        `/experiments/${experimentId}/agents/${agentId}`,
+        data
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent', experimentId, agentId] });
+      queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
+    },
   });
 }

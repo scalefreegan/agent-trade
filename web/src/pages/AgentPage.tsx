@@ -8,6 +8,7 @@ import {
   useAgentHoldings,
   useAgentAlerts,
   useAgentBenchmarks,
+  useUpdateAgent,
 } from '../api/agents';
 import { usePerformance } from '../api/performance';
 import { useExperiment } from '../api/experiments';
@@ -20,6 +21,7 @@ import { DecisionLog } from '../components/agent/DecisionLog';
 import { HoldingsInfo } from '../components/agent/HoldingsInfo';
 import { AlertsPanel } from '../components/agent/AlertsPanel';
 import { Badge, statusVariant } from '../components/ui/Badge';
+import { InlineEdit } from '../components/ui/InlineEdit';
 import { Tabs } from '../components/ui/Tabs';
 
 type Tab = 'portfolio' | 'info' | 'performance' | 'strategy' | 'transactions' | 'decisions' | 'alerts';
@@ -70,6 +72,7 @@ export function AgentPage() {
     experimentId || '',
     agentId || ''
   );
+  const updateAgent = useUpdateAgent(experimentId || '', agentId || '');
 
   if (agentLoading) {
     return (
@@ -93,13 +96,29 @@ export function AgentPage() {
     <div>
       {/* Agent Header */}
       <div className="mb-8 pb-6 border-b-2 border-border">
-        <div className="flex justify-between items-center mb-2">
-          <h1 className="text-3xl font-bold text-foreground">{agent.name}</h1>
-          <Badge variant={statusVariant(agent.status)} className="uppercase tracking-wide text-xs px-3 py-1">
+        <div className="flex justify-between items-start mb-2">
+          <InlineEdit
+            value={agent.name}
+            onSave={(name) => updateAgent.mutate({ name })}
+            isPending={updateAgent.isPending}
+            className="text-3xl font-bold text-foreground"
+            inputClassName="text-3xl font-bold"
+          />
+          <Badge variant={statusVariant(agent.status)} className="uppercase tracking-wide text-xs px-3 py-1 flex-shrink-0 ml-4">
             {agent.status}
           </Badge>
         </div>
-        <div className="font-mono text-sm text-muted-foreground">{agent.agent_id}</div>
+        <div className="font-mono text-sm text-muted-foreground mb-1">{agent.agent_id}</div>
+        <InlineEdit
+          value={agent.description ?? ''}
+          onSave={(description) => updateAgent.mutate({ description })}
+          isPending={updateAgent.isPending}
+          emptyText="Add description..."
+          placeholder="Add a description for this agent"
+          multiline
+          className="text-sm text-muted-foreground"
+          inputClassName="text-sm"
+        />
       </div>
 
       {/* Tabs */}

@@ -24,6 +24,19 @@ export async function postApi<T>(endpoint: string, body?: unknown): Promise<T> {
   return response.json();
 }
 
+export async function patchApi<T>(endpoint: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const detail = await response.json().then((d) => d?.detail).catch(() => response.statusText);
+    throw new Error(detail || `API error: ${response.status}`);
+  }
+  return response.json();
+}
+
 export async function deleteApi(endpoint: string): Promise<void> {
   const response = await fetch(`${API_BASE}${endpoint}`, { method: 'DELETE' });
   if (!response.ok) {

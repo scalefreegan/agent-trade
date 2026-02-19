@@ -19,7 +19,7 @@ from agent_trade.experiment.models import ExperimentConfig
 from agent_trade.experiment.strategy_manager import save_strategy
 from agent_trade.experiment.templates import create_initial_game_state
 from agent_trade.web.dependencies import load_experiment_config
-from agent_trade.web.schemas import ExperimentDetail, ExperimentListItem
+from agent_trade.web.schemas import ExperimentDetail, ExperimentListItem, UpdateExperimentRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/experiments", tags=["experiments"])
@@ -88,6 +88,41 @@ async def get_experiment(
         logger.warning(
             f"Could not load game state for {experiment_id}, current_day unavailable: {e}"
         )
+
+    return ExperimentDetail(
+        id=experiment_id,
+        name=config.name,
+        created_at=config.created_at,
+        starting_capital=float(config.starting_capital),
+        num_agents=config.num_agents,
+        status=config.status,
+        current_day=current_day,
+    )
+
+
+@router.patch("/{experiment_id}", response_model=ExperimentDetail)
+async def update_experiment(
+    body: UpdateExperimentRequest,
+    experiment_id: str = Path(..., description="Experiment ID"),
+    config: ExperimentConfig = Depends(load_experiment_config),
+) -> ExperimentDetail:
+    """Rename an experiment."""
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="Name cannot be empty")
+        config.name = name
+        try:
+            save_config(config)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    current_day = None
+    try:
+        game_state = load_game_state(experiment_id)
+        current_day = game_state.trading_day if game_state else None
+    except Exception:
+        pass
 
     return ExperimentDetail(
         id=experiment_id,

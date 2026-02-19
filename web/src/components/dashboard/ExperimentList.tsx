@@ -1,11 +1,29 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ExperimentCard } from './ExperimentCard';
-import { useDeleteExperiment } from '../../api/experiments';
+import { useDeleteExperiment, useUpdateExperiment } from '../../api/experiments';
 import type { ExperimentListItem } from '../../api/types';
 
 interface ExperimentListProps {
   experiments: ExperimentListItem[];
+}
+
+// Per-card wrapper so each card has its own rename mutation scoped to its experiment id
+function ExperimentCardWithActions({
+  experiment,
+  onDeleteRequest,
+}: {
+  experiment: ExperimentListItem;
+  onDeleteRequest: (id: string) => void;
+}) {
+  const renameMutation = useUpdateExperiment(experiment.id);
+  return (
+    <ExperimentCard
+      experiment={experiment}
+      onDelete={() => onDeleteRequest(experiment.id)}
+      onRename={(newName) => renameMutation.mutate({ name: newName })}
+    />
+  );
 }
 
 export function ExperimentList({ experiments }: ExperimentListProps) {
@@ -30,10 +48,10 @@ export function ExperimentList({ experiments }: ExperimentListProps) {
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {experiments.map((experiment) => (
-          <ExperimentCard
+          <ExperimentCardWithActions
             key={experiment.id}
             experiment={experiment}
-            onDelete={() => handleDeleteRequest(experiment.id)}
+            onDeleteRequest={handleDeleteRequest}
           />
         ))}
       </div>
