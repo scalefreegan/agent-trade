@@ -38,7 +38,7 @@ class TestRunManagerForceTrue:
 
         mock_cycle.assert_called_once()
         _, kwargs = mock_cycle.call_args
-        assert kwargs.get("force") is True or mock_cycle.call_args.args[1] is True, (
+        assert kwargs.get("force") is True, (
             "run_daily_cycle must be called with force=True for web-initiated runs"
         )
 

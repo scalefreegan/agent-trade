@@ -36,3 +36,13 @@ class TestExtractJson:
     def test_non_json_raises(self):
         with pytest.raises(RuntimeError):
             _extract_json("hello world")
+
+    def test_json_array_raises(self):
+        """A top-level JSON array is not a valid agent response."""
+        with pytest.raises(RuntimeError, match="not an object"):
+            _extract_json('[{"action": "buy"}]')
+
+    def test_json_primitive_raises(self):
+        """A top-level JSON primitive is not a valid agent response."""
+        with pytest.raises(RuntimeError, match="not an object"):
+            _extract_json("42")

@@ -40,9 +40,17 @@ def _extract_json(text: str) -> dict:
     Raises:
         RuntimeError: If no valid JSON object can be extracted.
     """
+    def _as_dict(parsed: object) -> dict:
+        if not isinstance(parsed, dict):
+            raise RuntimeError(
+                f"Agent returned JSON but not an object (got {type(parsed).__name__}): "
+                f"{text[:200]}"
+            )
+        return parsed
+
     # Try direct parse
     try:
-        return json.loads(text)
+        return _as_dict(json.loads(text))
     except json.JSONDecodeError:
         pass
 
@@ -50,7 +58,7 @@ def _extract_json(text: str) -> dict:
     fence_match = re.search(r"```(?:json)?\s*\n(.*?)\n```", text, re.DOTALL)
     if fence_match:
         try:
-            return json.loads(fence_match.group(1))
+            return _as_dict(json.loads(fence_match.group(1)))
         except json.JSONDecodeError:
             pass
 
@@ -58,7 +66,7 @@ def _extract_json(text: str) -> dict:
     brace_pos = text.find("{")
     if brace_pos != -1:
         try:
-            return json.loads(text[brace_pos:])
+            return _as_dict(json.loads(text[brace_pos:]))
         except json.JSONDecodeError:
             pass
 
