@@ -46,37 +46,9 @@ Get API keys from:
 
 ## Usage
 
-There are **three modes** of operation:
+There are **two modes** of operation:
 
-### Mode 1: Headless CLI via Anthropic API (Fast & Direct)
-
-Run queries directly using Anthropic API with function calling:
-
-```bash
-# Install with agent support
-uv sync --extra agent
-
-# Set your API keys
-export ANTHROPIC_API_KEY="your_anthropic_key"
-export TIINGO_API_KEY="your_tiingo_key"  # optional
-export NEWSAPI_KEY="your_newsapi_key"    # optional
-
-# Run queries (calls tools directly via Anthropic API)
-agent-trade-query "What is AAPL trading at?"
-agent-trade-query "Get historical prices for TSLA over 3 months"
-agent-trade-query "What news is there about Federal Reserve?"
-
-# Verbose mode (shows token usage)
-agent-trade-query --verbose "What dividends has Microsoft paid?"
-
-# Use different model
-agent-trade-query --model claude-opus-4-5-20251101 "Analyze TSLA stock"
-```
-
-**Pros**: Fast, cheap, no Claude Code needed
-**Cons**: Only has access to the 6 stock market tools
-
-### Mode 1b: Automate Claude Code CLI (Full Access)
+### Mode 1: Automate Claude Code CLI (Full Access)
 
 Automate Claude Code to access **all skills and MCP servers**:
 
@@ -87,13 +59,6 @@ Automate Claude Code to access **all skills and MCP servers**:
 # Query through Claude Code (has access to ALL tools/skills)
 agent-trade-claude query "What is AAPL trading at?"
 agent-trade-claude query "Get historical prices for TSLA"
-
-# Run Claude Code skills
-agent-trade-claude skill commit "-m 'Update code'"
-agent-trade-claude skill review-pr "123"
-
-# Interactive mode
-agent-trade-claude interactive
 ```
 
 **Pros**: Access to all Claude Code features, skills, and MCP servers
@@ -221,9 +186,8 @@ The Web UI displays experiments; create them first with the CLI:
 uv sync --extra agent
 ```
 
-2. **Set API keys** (for market data and AI agents):
+2. **Set API keys** (for market data):
 ```bash
-export ANTHROPIC_API_KEY="your_anthropic_key"
 export TIINGO_API_KEY="your_tiingo_key"    # optional
 export NEWSAPI_KEY="your_newsapi_key"      # optional
 ```

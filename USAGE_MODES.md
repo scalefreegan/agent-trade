@@ -1,43 +1,8 @@
 # Usage Modes Comparison
 
-The `agent-trade` project supports **three different modes** of operation. Choose based on your needs:
+The `agent-trade` project supports **two modes** of operation. Choose based on your needs:
 
-## Mode 1: Direct API (agent-trade-query)
-
-**Command**: `agent-trade-query "What is AAPL trading at?"`
-
-**How it works**:
-- Calls Anthropic API directly
-- Uses function calling to invoke stock market tools
-- No Claude Code needed
-
-**What you get access to**:
-- ✅ 6 stock market tools (price, history, dividends, splits, news)
-- ❌ No Claude Code skills
-- ❌ No other MCP servers
-
-**When to use**:
-- Quick queries about stocks/news
-- Automated scripts and pipelines
-- CI/CD integrations
-- When you want fast, cheap responses
-- When you don't need Claude Code features
-
-**Requirements**:
-- `ANTHROPIC_API_KEY`
-- `TIINGO_API_KEY` (optional, for stock news)
-- `NEWSAPI_KEY` (optional, for general news)
-
-**Example**:
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-agent-trade-query "What is AAPL trading at?"
-agent-trade-query --verbose "Get news about Tesla"
-```
-
----
-
-## Mode 2: Claude Code Automation (agent-trade-claude)
+## Mode 1: Claude Code Automation (agent-trade-claude)
 
 **Command**: `agent-trade-claude query "What is AAPL trading at?"`
 
@@ -48,39 +13,29 @@ agent-trade-query --verbose "Get news about Tesla"
 
 **What you get access to**:
 - ✅ All 6 stock market tools (via agent-trade MCP server)
-- ✅ ALL Claude Code skills (commit, review-pr, etc.)
 - ✅ ALL configured MCP servers
-- ✅ File system operations
-- ✅ Code analysis, editing, etc.
+- ✅ Full Claude Code capability
 
 **When to use**:
-- You need access to Claude Code skills
-- You want to automate Claude Code workflows
+- You want to run headless Claude Code queries with stock tools
 - You need multiple MCP servers
-- You're building complex development workflows
-- You want the full Claude Code experience programmatically
+- You're building automated workflows
 
 **Requirements**:
 - Claude Code installed
 - agent-trade MCP server configured in Claude Code
-- `ANTHROPIC_API_KEY` (used by Claude Code)
 - `TIINGO_API_KEY` and `NEWSAPI_KEY` (in MCP config)
 
 **Example**:
 ```bash
 # Query through Claude Code
 agent-trade-claude query "What is AAPL trading at?"
-
-# Run Claude Code skills
-agent-trade-claude skill commit "-m 'Update code'"
-
-# Interactive session
-agent-trade-claude interactive
+agent-trade-claude query "Get historical prices for TSLA over the last month"
 ```
 
 ---
 
-## Mode 3: MCP Server (agent-trade)
+## Mode 2: MCP Server (agent-trade)
 
 **Command**: `agent-trade` (runs as server, doesn't respond to stdin)
 
@@ -120,12 +75,8 @@ uvx --from . agent-trade
 
 | I want to... | Use |
 |--------------|-----|
-| Quick stock price check | `agent-trade-query` |
-| Automated stock monitoring script | `agent-trade-query` |
-| CI/CD pipeline stock data | `agent-trade-query` |
-| Use Claude Code skills + stock tools | `agent-trade-claude` |
-| Automate Claude Code workflows | `agent-trade-claude` |
-| Interactive Claude Code session | `agent-trade-claude interactive` |
+| Headless query with stock tools | `agent-trade-claude query "..."` |
+| Automate Claude Code workflows | `agent-trade-claude query "..."` |
 | Use in Claude Code app | Configure `agent-trade` as MCP server |
 | Use in Cursor IDE | Configure `agent-trade` as MCP server |
 | Build custom MCP client | Connect to `agent-trade` server |
@@ -139,7 +90,7 @@ All modes require:
 # Basic installation (for MCP server mode)
 uv sync
 
-# With CLI tools (for query and claude modes)
+# With CLI tools (for claude mode)
 uv sync --extra agent
 ```
 
@@ -147,16 +98,7 @@ uv sync --extra agent
 
 ## Configuration Examples
 
-### Mode 1: Direct API
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-export TIINGO_API_KEY="..."
-export NEWSAPI_KEY="..."
-
-agent-trade-query "What is AAPL trading at?"
-```
-
-### Mode 2: Claude Code Automation
+### Mode 1: Claude Code Automation
 ```json
 // ~/.claude/claude_desktop_config.json
 {
@@ -178,20 +120,12 @@ agent-trade-query "What is AAPL trading at?"
 agent-trade-claude query "What is AAPL trading at?"
 ```
 
-### Mode 3: MCP Server for Claude Code
-Same as Mode 2 config, but use Claude Code app directly (not CLI automation)
+### Mode 2: MCP Server for Claude Code
+Same as Mode 1 config, but use Claude Code app directly (not CLI automation)
 
 ---
 
 ## Programmatic Usage
-
-### Python API (Direct)
-```python
-from agent_trade import agent
-
-result = agent.query("What is AAPL trading at?")
-print(result["answer"])
-```
 
 ### Python API (Claude Code Automation)
 ```python
@@ -199,23 +133,10 @@ import asyncio
 from agent_trade import claude_wrapper
 
 async def main():
-    result = await claude_wrapper.get_stock_data_via_claude(
+    result = await claude_wrapper.run_agent(
         "What is AAPL trading at?"
     )
     print(result)
 
 asyncio.run(main())
-```
-
-### Python API (Orchestration)
-```python
-from agent_trade.orchestration import Workflow, ExecutionMode
-from agent_trade import stock_data
-
-workflow = Workflow("analysis", mode=ExecutionMode.SEQUENTIAL)
-workflow.add_step("get_info", stock_data.get_stock_info, "AAPL")
-workflow.add_step("get_history", stock_data.get_historical_prices, "AAPL")
-
-result = workflow.execute()
-print(result.results)
 ```

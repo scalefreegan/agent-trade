@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ExperimentCard } from './ExperimentCard';
 import { useDeleteExperiment } from '../../api/experiments';
 import type { ExperimentListItem } from '../../api/types';
@@ -38,7 +39,7 @@ export function ExperimentList({ experiments }: ExperimentListProps) {
       </div>
 
       {/* Delete confirmation dialog */}
-      {pendingDelete && (
+      {pendingDelete && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPendingDelete(null)} />
           <div className="relative w-full max-w-sm bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
@@ -84,7 +85,8 @@ export function ExperimentList({ experiments }: ExperimentListProps) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

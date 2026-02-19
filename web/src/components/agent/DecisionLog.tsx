@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import type { DecisionLogEntry } from '../../api/types';
 import { useAgentDecision } from '../../api/agents';
@@ -72,8 +73,8 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
         </div>
       )}
 
-      {/* Decision Detail Modal */}
-      {selectedDate && decisionDetail && (
+      {/* Decision Detail Modal — portalled to document.body to escape overflow/stacking contexts */}
+      {selectedDate && decisionDetail && createPortal(
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in"
           onClick={() => setSelectedDate(null)}
@@ -117,7 +118,8 @@ export function DecisionLog({ experimentId, agentId, decisions }: DecisionLogPro
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

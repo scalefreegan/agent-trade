@@ -619,10 +619,6 @@ uv run agent-trade-experiment --help
 # Verify keys set
 echo $TIINGO_API_KEY
 echo $NEWSAPI_KEY
-echo $ANTHROPIC_API_KEY
-
-# Test API access
-uv run agent-trade-query "test AAPL"
 ```
 
 ### Experiment Not Found

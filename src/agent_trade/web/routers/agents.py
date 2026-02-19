@@ -67,11 +67,12 @@ async def list_agents(experiment_id: str) -> list[AgentStateResponse]:
     """List all agents in an experiment."""
     try:
         game_state = load_game_state(experiment_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Experiment not found")
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    if game_state is None:
+        raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
 
     # Get all symbols for pricing
     all_symbols = set()
@@ -133,11 +134,12 @@ async def get_agent_detail(
     """Get complete agent details."""
     try:
         game_state = load_game_state(experiment_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Experiment not found")
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    if game_state is None:
+        raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
 
     agent = game_state.agents.get(agent_id)
     if not agent:
@@ -229,11 +231,12 @@ async def get_agent_strategy(
     """Get agent strategy."""
     try:
         strategy = load_strategy(experiment_id, agent_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Strategy not found")
     except Exception as e:
         logger.exception(f"Failed to load strategy for {agent_id}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    if strategy is None:
+        raise HTTPException(status_code=404, detail=f"Strategy not found for agent {agent_id}")
 
     return StrategyResponse(
         thesis=InvestmentThesisResponse(

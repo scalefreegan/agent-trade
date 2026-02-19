@@ -1,4 +1,4 @@
-"""Pydantic models for stock data, news, logging, and orchestration."""
+"""Pydantic models for stock data, news, and logging."""
 
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -118,28 +118,3 @@ class ToolUsageLog(BaseModel):
     model: Optional[str] = None
     tokens_used: Optional[dict[str, int]] = None
 
-
-# === Orchestration Models ===
-
-class ExecutionMode(str, Enum):
-    """Execution mode for workflow steps."""
-    SEQUENTIAL = "sequential"
-    PARALLEL = "parallel"
-    CONDITIONAL = "conditional"
-
-
-class WorkflowStepResult(BaseModel):
-    """Result from executing a workflow step."""
-    name: str
-    success: bool
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    execution_time_ms: float
-
-
-class WorkflowResult(BaseModel):
-    """Result from executing a complete workflow."""
-    success: bool
-    steps_executed: list[str]
-    results: dict[str, Any]
-    errors: dict[str, str] = Field(default_factory=dict)

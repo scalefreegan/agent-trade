@@ -44,7 +44,7 @@ Initial strategy can be:
 Each trading day (Mon-Fri, 10:00 AM EST):
 
 1. **Load agent state** from `~/.agent-trade/experiments/<exp_id>/agents/<agent_id>/`
-2. **Spawn headless Claude Code session** via `claude_wrapper.query_claude_code()`
+2. **Spawn headless Claude Code session** via `claude_wrapper.run_agent()`
 3. **Inject system prompt** with portfolio, strategy, rules
 4. **Enable MCP tools** for stock data and news
 5. **Wait for response** (typically 30-60 seconds)

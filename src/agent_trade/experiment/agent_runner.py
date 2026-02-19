@@ -20,37 +20,6 @@ from .models import AgentState, DailyDecision, ExperimentConfig, Order, Strategy
 logger = logging.getLogger(__name__)
 
 
-def _build_decision_schema() -> dict:
-    """JSON schema for structured agent output."""
-    return {
-        "type": "object",
-        "required": ["research_notes", "orders"],
-        "properties": {
-            "research_notes": {"type": "string"},
-            "orders": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["action", "symbol", "amount", "reasoning"],
-                    "properties": {
-                        "action": {"type": "string", "enum": ["buy", "sell"]},
-                        "symbol": {"type": "string"},
-                        "amount": {"type": "number"},
-                        "reasoning": {"type": "string"},
-                    },
-                },
-            },
-            "strategy_updates": {
-                "type": ["object", "null"],
-                "properties": {
-                    "observation": {"type": "string"},
-                    "outcome": {"type": "string"},
-                    "lesson": {"type": "string"},
-                },
-            },
-        },
-    }
-
 
 def _parse_structured_response(
     data: dict,
@@ -58,6 +27,8 @@ def _parse_structured_response(
     date: str,
 ) -> DailyDecision:
     """Build a DailyDecision from the structured JSON response."""
+    logger.debug(f"Agent {agent_id}: response keys: {list(data.keys())}")
+
     orders: list[Order] = []
     for o in data.get("orders", []):
         try:
@@ -71,6 +42,9 @@ def _parse_structured_response(
             )
         except (KeyError, ValueError, InvalidOperation) as e:
             logger.warning(f"Agent {agent_id}: skipping malformed order {o}: {e}")
+
+    if not orders and data.get("research_notes"):
+        logger.warning(f"Agent {agent_id}: completed research but produced no orders")
 
     strategy_updates: Optional[StrategyLearning] = None
     su = data.get("strategy_updates")
@@ -100,13 +74,18 @@ async def _execute_agent_session(
     system_prompt: str,
     agent_id: str,
 ) -> dict:
-    """Execute a headless Claude Code session and return structured JSON."""
+    """Execute a headless Claude Code session and return structured JSON.
+
+    No inner timeout is set here — the outer asyncio.wait_for in
+    spawn_all_agents() is the single source of truth for the deadline.
+    This prevents a race between two competing timeouts that could leave
+    the subprocess un-killed.
+    """
     return await run_agent(
         prompt=prompt,
         system_prompt=system_prompt,
-        json_schema=_build_decision_schema(),
-        max_turns=25,
-        timeout=300,
+        max_turns=15,
+        timeout=None,
     )
 
 
@@ -192,7 +171,7 @@ async def spawn_all_agents(
     config: ExperimentConfig,
     date: str,
     decisions_base_dir: Path,
-    timeout: int = 300,
+    timeout: int = 600,
     progress_callback: Optional[Callable[[str, Optional[str], Optional[str]], None]] = None,
 ) -> dict[str, DailyDecision]:
     """
@@ -203,7 +182,7 @@ async def spawn_all_agents(
         config: Experiment configuration
         date: Trading date (YYYY-MM-DD)
         decisions_base_dir: Base directory for agent decisions
-        timeout: Maximum time per agent in seconds (default: 5 minutes)
+        timeout: Maximum time per agent in seconds (default: 10 minutes)
         progress_callback: Optional callback for progress events.
             Called with (event_type: str, agent_id: Optional[str], message: Optional[str])
 
@@ -414,11 +393,9 @@ You also have web search for broader research.
 
 ## Recommended Research Workflow
 
-1. Call `get_stock_news` on each ticker you currently hold — look for red flags or catalysts
-2. Call `search_news` on 1-2 broad market themes (sector rotation, macro events)
-3. Identify 2-3 candidate stocks to buy; call `get_stock_info` on each
-4. Call `get_historical_prices` on top candidates to check trend/momentum
-5. Make decisions based on what you found — if signals are mixed, pick the strongest one
+1. Call `get_stock_news` on your held tickers AND `search_news` on 1-2 broad market themes — look for catalysts and red flags in a single pass
+2. Identify 1-2 buy candidates; call `get_stock_info` on each to check fundamentals
+3. Make your decision — if signals are clear, act; if mixed, pick the strongest and move on
 
 ## Output Format
 
