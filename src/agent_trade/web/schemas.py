@@ -275,6 +275,79 @@ class AgentDetailResponse(BaseModel):
 
 
 # ==============================================================================
+# Holdings Info Schemas
+# ==============================================================================
+
+
+class BuyReasonEntry(BaseModel):
+    """A single buy rationale entry from a decision file."""
+
+    date: str
+    reasoning: str
+
+
+class HoldingRationaleResponse(BaseModel):
+    """Per-holding breakdown with buy rationale."""
+
+    symbol: str
+    total_shares: float
+    avg_cost_basis: float
+    current_price: float | None = None
+    current_value: float | None = None
+    unrealized_gain: float | None = None
+    first_buy_date: str
+    buy_reasons: list[BuyReasonEntry]
+
+
+class HoldingsInfoResponse(BaseModel):
+    """Holdings info response with rationale for each position."""
+
+    holdings: list[HoldingRationaleResponse]
+
+
+# ==============================================================================
+# Alerts Schemas
+# ==============================================================================
+
+
+class AlertEntryResponse(BaseModel):
+    """A single alert entry from a decision file."""
+
+    date: str
+    symbol: str
+    thesis: str
+    confidence: str
+    catalyst: str
+    time_horizon: str
+
+
+class AlertsResponse(BaseModel):
+    """Alerts response."""
+
+    alerts: list[AlertEntryResponse]
+    total_count: int
+
+
+# ==============================================================================
+# Benchmark Schemas
+# ==============================================================================
+
+
+class BenchmarkSeries(BaseModel):
+    """Performance series for a single benchmark."""
+
+    symbol: str
+    label: str
+    data: list[dict]  # [{date, value}] normalized to starting capital
+
+
+class BenchmarkResponse(BaseModel):
+    """Benchmark comparison response."""
+
+    benchmarks: list[BenchmarkSeries]
+
+
+# ==============================================================================
 # Run Control Schemas
 # ==============================================================================
 

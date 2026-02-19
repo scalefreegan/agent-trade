@@ -148,3 +148,64 @@ export interface AgentDetail {
   created_at: string;
   eliminated_at: string | null;
 }
+
+// ==============================================================================
+// Holdings Info Types
+// ==============================================================================
+
+export interface BuyReason {
+  date: string;
+  reasoning: string;
+}
+
+export interface HoldingRationale {
+  symbol: string;
+  total_shares: number;
+  avg_cost_basis: number;
+  current_price: number | null;
+  current_value: number | null;
+  unrealized_gain: number | null;
+  first_buy_date: string;
+  buy_reasons: BuyReason[];
+}
+
+export interface HoldingsInfo {
+  holdings: HoldingRationale[];
+}
+
+// ==============================================================================
+// Alerts Types
+// ==============================================================================
+
+export interface AlertEntry {
+  date: string;
+  symbol: string;
+  thesis: string;
+  confidence: 'high' | 'very_high';
+  catalyst: string;
+  time_horizon: string;
+}
+
+export interface AlertsResponse {
+  alerts: AlertEntry[];
+  total_count: number;
+}
+
+// ==============================================================================
+// Benchmark Types
+// ==============================================================================
+
+export interface BenchmarkDataPoint {
+  date: string;
+  value: number;
+}
+
+export interface BenchmarkSeries {
+  symbol: string;
+  label: string;
+  data: BenchmarkDataPoint[];
+}
+
+export interface BenchmarkResponse {
+  benchmarks: BenchmarkSeries[];
+}

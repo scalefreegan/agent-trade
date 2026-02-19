@@ -5,6 +5,9 @@ import {
   useAgentStrategy,
   useAgentTransactions,
   useAgentDecisions,
+  useAgentHoldings,
+  useAgentAlerts,
+  useAgentBenchmarks,
 } from '../api/agents';
 import { usePerformance } from '../api/performance';
 import { useExperiment } from '../api/experiments';
@@ -14,17 +17,21 @@ import { AgentPerformanceChart } from '../components/agent/AgentPerformanceChart
 import { StrategyPanel } from '../components/agent/StrategyPanel';
 import { TransactionHistory } from '../components/agent/TransactionHistory';
 import { DecisionLog } from '../components/agent/DecisionLog';
+import { HoldingsInfo } from '../components/agent/HoldingsInfo';
+import { AlertsPanel } from '../components/agent/AlertsPanel';
 import { Badge, statusVariant } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
 
-type Tab = 'portfolio' | 'performance' | 'strategy' | 'transactions' | 'decisions';
+type Tab = 'portfolio' | 'info' | 'performance' | 'strategy' | 'transactions' | 'decisions' | 'alerts';
 
 const TABS = [
   { id: 'portfolio' as Tab, label: 'Portfolio' },
+  { id: 'info' as Tab, label: 'Info' },
   { id: 'performance' as Tab, label: 'Performance' },
   { id: 'strategy' as Tab, label: 'Strategy' },
   { id: 'transactions' as Tab, label: 'Transactions' },
   { id: 'decisions' as Tab, label: 'Decisions' },
+  { id: 'alerts' as Tab, label: 'Alerts' },
 ];
 
 export function AgentPage() {
@@ -50,6 +57,18 @@ export function AgentPage() {
   );
   const { data: performance, isLoading: performanceLoading } = usePerformance(
     experimentId || ''
+  );
+  const { data: holdings, isLoading: holdingsLoading } = useAgentHoldings(
+    experimentId || '',
+    agentId || ''
+  );
+  const { data: alerts, isLoading: alertsLoading } = useAgentAlerts(
+    experimentId || '',
+    agentId || ''
+  );
+  const { data: benchmarks } = useAgentBenchmarks(
+    experimentId || '',
+    agentId || ''
   );
 
   if (agentLoading) {
@@ -97,6 +116,18 @@ export function AgentPage() {
           </div>
         )}
 
+        {activeTab === 'info' && (
+          <>
+            {holdingsLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading holdings info...</div>
+            ) : holdings ? (
+              <HoldingsInfo data={holdings} />
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">No holdings data available</div>
+            )}
+          </>
+        )}
+
         {activeTab === 'performance' && (
           <>
             {performanceLoading ? (
@@ -107,6 +138,7 @@ export function AgentPage() {
                 agentId={agent.agent_id}
                 agentName={agent.name}
                 startingCapital={experiment.starting_capital}
+                benchmarks={benchmarks?.benchmarks}
               />
             ) : (
               <div className="text-center py-12 text-muted-foreground">No performance data available</div>
@@ -150,6 +182,18 @@ export function AgentPage() {
               />
             ) : (
               <div className="text-center py-12 text-muted-foreground">No decision data available</div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'alerts' && (
+          <>
+            {alertsLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading alerts...</div>
+            ) : alerts ? (
+              <AlertsPanel data={alerts} />
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">No alerts data available</div>
             )}
           </>
         )}

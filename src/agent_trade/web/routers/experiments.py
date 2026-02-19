@@ -13,6 +13,7 @@ from agent_trade.experiment.config import (
     list_experiments,
     save_config,
 )
+from agent_trade.experiment.agent_runner import generate_agent_names_via_claude
 from agent_trade.experiment.coordinator import load_game_state, save_game_state
 from agent_trade.experiment.models import ExperimentConfig
 from agent_trade.experiment.strategy_manager import save_strategy
@@ -120,6 +121,10 @@ async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
 
         # Initialize game state and per-agent directories (mirrors CLI `init` command)
         game_state = create_initial_game_state(config, experiment_id, body.name)
+
+        # Generate memorable names via Claude (parallel, one call per agent)
+        await generate_agent_names_via_claude(game_state.agents)
+
         save_game_state(game_state)
 
         for agent in game_state.agents.values():
