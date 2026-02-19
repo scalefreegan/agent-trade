@@ -181,6 +181,10 @@ async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
         # Initialize game state and per-agent directories (mirrors CLI `init` command)
         game_state = create_initial_game_state(config, experiment_id, body.name, init_spec=init_spec)
 
+        # Re-save config: create_initial_game_state may mutate starting_capital
+        # (e.g. when starting_portfolio.cash overrides the default)
+        save_config(config)
+
         # Generate memorable names via Claude (parallel, one call per agent)
         await generate_agent_names_via_claude(game_state.agents)
         save_game_state(game_state)
@@ -193,6 +197,8 @@ async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
             portfolio_file = agent_dir / "portfolio.json"
             with open(portfolio_file, "w") as f:
                 f.write(agent.portfolio.model_dump_json(indent=2))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to initialize experiment: {e}")
 

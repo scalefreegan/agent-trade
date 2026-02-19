@@ -12,7 +12,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agent_trade.experiment.agent_runner import _parse_structured_response, spawn_agent
+from agent_trade.experiment.agent_runner import (
+    _build_system_prompt,
+    _parse_structured_response,
+    spawn_agent,
+)
 from agent_trade.experiment.models import (
     AgentState,
     AgentStrategy,
@@ -280,3 +284,58 @@ class TestParseStructuredResponseMalformedAlerts:
         data = {"research_notes": "old format", "orders": []}
         decision = _parse_structured_response(data, agent_id="a1", date="2026-01-15")
         assert decision.alerts == []
+
+
+# ---------------------------------------------------------------------------
+# _build_system_prompt — guidance injection
+# ---------------------------------------------------------------------------
+
+
+class TestBuildSystemPromptGuidance:
+    """Verify experiment-level and per-agent guidance appear in the system prompt."""
+
+    def _prompt(self, experiment_guidance: str | None = None, agent_guidance: str | None = None) -> str:
+        agent = make_agent()
+        agent.guidance = agent_guidance
+        config = make_config()
+        config.guidance = experiment_guidance
+        return _build_system_prompt(agent, config, "2026-01-15", {})
+
+    def test_no_guidance_sections_absent(self):
+        """With no guidance set, neither section header appears."""
+        prompt = self._prompt()
+        assert "## Experiment Guidance" not in prompt
+        assert "## Additional Guidance" not in prompt
+
+    def test_experiment_guidance_injected(self):
+        """config.guidance appears under '## Experiment Guidance'."""
+        prompt = self._prompt(experiment_guidance="Focus only on large-cap stocks")
+        assert "## Experiment Guidance" in prompt
+        assert "Focus only on large-cap stocks" in prompt
+
+    def test_experiment_guidance_absent_when_empty_string(self):
+        """Empty string guidance is treated as falsy — section not rendered."""
+        prompt = self._prompt(experiment_guidance="")
+        assert "## Experiment Guidance" not in prompt
+
+    def test_agent_guidance_injected(self):
+        """agent.guidance appears under '## Additional Guidance'."""
+        prompt = self._prompt(agent_guidance="Prioritise dividend stocks")
+        assert "## Additional Guidance" in prompt
+        assert "Prioritise dividend stocks" in prompt
+
+    def test_agent_guidance_absent_when_none(self):
+        """None agent guidance → section not rendered."""
+        prompt = self._prompt(agent_guidance=None)
+        assert "## Additional Guidance" not in prompt
+
+    def test_both_guidance_sections_present(self):
+        """Both sections appear when both are set."""
+        prompt = self._prompt(
+            experiment_guidance="Explore ESG investing",
+            agent_guidance="Extra focus on solar energy",
+        )
+        assert "## Experiment Guidance" in prompt
+        assert "Explore ESG investing" in prompt
+        assert "## Additional Guidance" in prompt
+        assert "Extra focus on solar energy" in prompt

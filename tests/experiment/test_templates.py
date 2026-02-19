@@ -5,23 +5,29 @@ Covers strategy/decision rendering and parsing.
 """
 
 import pytest
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from agent_trade.experiment.models import (
+    AgentInitHints,
+    AgentOverride,
     AgentStrategy,
     ExperimentConfig,
+    ExperimentInitSpec,
     InvestmentThesis,
     Portfolio,
+    PortfolioPositionSpec,
+    StartingPortfolioSpec,
     StockPosition,
     StrategyLearning,
     TaxLot,
 )
 from agent_trade.experiment.templates import (
-    render_strategy_template,
-    render_daily_decision_template,
-    parse_daily_decision,
     create_default_strategy,
+    create_initial_game_state,
+    parse_daily_decision,
+    render_daily_decision_template,
+    render_strategy_template,
 )
 
 
@@ -389,3 +395,198 @@ class TestCreateDefaultStrategy:
         assert "35%" in strategy.rationale
         assert "15%" in strategy.rationale
         assert "tax" in strategy.rationale.lower()
+
+    def test_hints_override_philosophy(self):
+        """AgentInitHints.philosophy overrides randomisation."""
+        hints = AgentInitHints(philosophy="Pure index tracking")
+        strategy = create_default_strategy("agent_001", "Agent X", hints=hints)
+        assert strategy.thesis.philosophy == "Pure index tracking"
+
+    def test_hints_override_risk_tolerance(self):
+        """AgentInitHints.risk_tolerance overrides randomisation."""
+        hints = AgentInitHints(risk_tolerance="conservative")
+        strategy = create_default_strategy("agent_001", "Agent X", hints=hints)
+        assert strategy.thesis.risk_tolerance == "conservative"
+
+    def test_hints_override_sectors_and_metrics(self):
+        """Sector and metric hints replace the random samples."""
+        hints = AgentInitHints(
+            preferred_sectors=["Energy"],
+            key_metrics=["dividend yield"],
+        )
+        strategy = create_default_strategy("agent_001", "Agent X", hints=hints)
+        assert strategy.thesis.preferred_sectors == ["Energy"]
+        assert strategy.thesis.key_metrics == ["dividend yield"]
+
+    def test_hints_override_rationale(self):
+        """A provided rationale is used verbatim."""
+        hints = AgentInitHints(rationale="Custom rationale text")
+        strategy = create_default_strategy("agent_001", "Agent X", hints=hints)
+        assert strategy.rationale == "Custom rationale text"
+
+    def test_partial_hints_leave_other_fields_randomised(self):
+        """Unset hint fields are still randomised (not defaulted to None)."""
+        hints = AgentInitHints(risk_tolerance="aggressive")
+        strategy = create_default_strategy("agent_001", "Agent X", hints=hints)
+        assert strategy.thesis.risk_tolerance == "aggressive"
+        # Philosophy must be one of the known options, not None
+        assert strategy.thesis.philosophy is not None
+        assert len(strategy.thesis.philosophy) > 0
+
+
+def _make_config(num_agents: int = 2, capital: str = "1000") -> ExperimentConfig:
+    return ExperimentConfig(
+        experiment_id="exp_test",
+        name="Test Experiment",
+        num_agents=num_agents,
+        starting_capital=Decimal(capital),
+        created_at=datetime.now(timezone.utc),
+        status="active",
+    )
+
+
+class TestCreateInitialGameState:
+    """Tests for create_initial_game_state with ExperimentInitSpec."""
+
+    def test_default_creates_correct_agent_count(self):
+        config = _make_config(num_agents=3)
+        gs = create_initial_game_state(config, "exp1", "Test")
+        assert len(gs.agents) == 3
+
+    def test_default_agents_have_starting_capital(self):
+        config = _make_config(num_agents=2, capital="5000")
+        gs = create_initial_game_state(config, "exp1", "Test")
+        for agent in gs.agents.values():
+            assert agent.portfolio.cash == Decimal("5000")
+
+    def test_experiment_defaults_applied_to_all_agents(self):
+        """agent_defaults hints reach every agent."""
+        config = _make_config(num_agents=2)
+        spec = ExperimentInitSpec(
+            agent_defaults=AgentInitHints(risk_tolerance="conservative"),
+        )
+        gs = create_initial_game_state(config, "exp1", "Test", init_spec=spec)
+        for agent in gs.agents.values():
+            assert agent.strategy.thesis.risk_tolerance == "conservative"
+
+    def test_per_agent_override_takes_precedence_over_defaults(self):
+        """agent_overrides fields win over agent_defaults for that agent."""
+        config = _make_config(num_agents=2)
+        spec = ExperimentInitSpec(
+            agent_defaults=AgentInitHints(risk_tolerance="conservative"),
+            agent_overrides=[
+                AgentOverride(agent_index=1, hints=AgentInitHints(risk_tolerance="aggressive")),
+            ],
+        )
+        gs = create_initial_game_state(config, "exp1", "Test", init_spec=spec)
+        assert gs.agents["agent_001"].strategy.thesis.risk_tolerance == "aggressive"
+        assert gs.agents["agent_002"].strategy.thesis.risk_tolerance == "conservative"
+
+    def test_unoverride_fields_from_defaults_still_apply(self):
+        """Fields not mentioned in per-agent override still come from defaults."""
+        config = _make_config(num_agents=2)
+        spec = ExperimentInitSpec(
+            agent_defaults=AgentInitHints(
+                preferred_sectors=["Energy"],
+                risk_tolerance="moderate",
+            ),
+            agent_overrides=[
+                # Override only risk for agent 1; sectors should still come from defaults
+                AgentOverride(agent_index=1, hints=AgentInitHints(risk_tolerance="aggressive")),
+            ],
+        )
+        gs = create_initial_game_state(config, "exp1", "Test", init_spec=spec)
+        assert gs.agents["agent_001"].strategy.thesis.preferred_sectors == ["Energy"]
+        assert gs.agents["agent_001"].strategy.thesis.risk_tolerance == "aggressive"
+
+    def test_out_of_range_agent_index_raises_value_error(self):
+        """agent_index exceeding num_agents raises ValueError, not silent drop."""
+        config = _make_config(num_agents=2)
+        spec = ExperimentInitSpec(
+            agent_overrides=[
+                AgentOverride(agent_index=5, hints=AgentInitHints(risk_tolerance="aggressive")),
+            ],
+        )
+        with pytest.raises(ValueError, match="agent_index=5"):
+            create_initial_game_state(config, "exp1", "Test", init_spec=spec)
+
+    def test_starting_portfolio_cash_overrides_capital(self):
+        """starting_portfolio.cash replaces config.starting_capital for agents."""
+        config = _make_config(num_agents=2, capital="1000")
+        spec = ExperimentInitSpec(
+            starting_portfolio=StartingPortfolioSpec(cash=Decimal("7500")),
+        )
+        gs = create_initial_game_state(config, "exp1", "Test", init_spec=spec)
+        for agent in gs.agents.values():
+            assert agent.portfolio.cash == Decimal("7500")
+
+    def test_starting_portfolio_cash_syncs_config(self):
+        """config.starting_capital is updated to match starting_portfolio.cash."""
+        config = _make_config(num_agents=1, capital="1000")
+        spec = ExperimentInitSpec(
+            starting_portfolio=StartingPortfolioSpec(cash=Decimal("5000")),
+        )
+        create_initial_game_state(config, "exp1", "Test", init_spec=spec)
+        assert config.starting_capital == Decimal("5000")
+
+    def test_starting_portfolio_positions_seeded_per_agent(self):
+        """Each agent gets an independent copy of the seeded position."""
+        config = _make_config(num_agents=2, capital="500")
+        spec = ExperimentInitSpec(
+            starting_portfolio=StartingPortfolioSpec(
+                positions=[
+                    PortfolioPositionSpec(
+                        symbol="AAPL",
+                        shares=Decimal("10"),
+                        cost_basis=Decimal("150"),
+                    )
+                ]
+            ),
+        )
+        gs = create_initial_game_state(config, "exp1", "Test", init_spec=spec)
+        for agent in gs.agents.values():
+            pos = agent.portfolio.get_position("AAPL")
+            assert pos is not None
+            assert pos.total_shares == Decimal("10")
+
+    def test_starting_portfolio_positions_are_independent_copies(self):
+        """Mutating one agent's position does not affect another agent's."""
+        config = _make_config(num_agents=2, capital="500")
+        spec = ExperimentInitSpec(
+            starting_portfolio=StartingPortfolioSpec(
+                positions=[
+                    PortfolioPositionSpec(
+                        symbol="MSFT",
+                        shares=Decimal("5"),
+                        cost_basis=Decimal("400"),
+                    )
+                ]
+            ),
+        )
+        gs = create_initial_game_state(config, "exp1", "Test", init_spec=spec)
+        agent1_pos = gs.agents["agent_001"].portfolio.get_position("MSFT")
+        agent2_pos = gs.agents["agent_002"].portfolio.get_position("MSFT")
+        # Modify agent1's lot; agent2 should not be affected
+        agent1_pos.lots[0].shares = Decimal("99")
+        assert agent2_pos.lots[0].shares == Decimal("5")
+
+    def test_starting_portfolio_purchase_date_preserved(self):
+        """purchase_date on PortfolioPositionSpec is converted to datetime on the lot."""
+        config = _make_config(num_agents=1)
+        spec = ExperimentInitSpec(
+            starting_portfolio=StartingPortfolioSpec(
+                positions=[
+                    PortfolioPositionSpec(
+                        symbol="TSLA",
+                        shares=Decimal("3"),
+                        cost_basis=Decimal("200"),
+                        purchase_date=date(2024, 6, 15),
+                    )
+                ]
+            ),
+        )
+        gs = create_initial_game_state(config, "exp1", "Test", init_spec=spec)
+        lot = gs.agents["agent_001"].portfolio.get_position("TSLA").lots[0]
+        assert lot.purchase_date.year == 2024
+        assert lot.purchase_date.month == 6
+        assert lot.purchase_date.day == 15

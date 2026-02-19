@@ -126,6 +126,10 @@ def init(
     from .templates import create_initial_game_state
     game_state = create_initial_game_state(config, experiment_id, name, init_spec=init_spec)
 
+    # Re-save config: create_initial_game_state may mutate starting_capital
+    # (e.g. when starting_portfolio.cash overrides --capital)
+    save_config(config)
+
     # Generate memorable names via Claude (parallel, one call per agent)
     from .agent_runner import generate_agent_names_via_claude
     asyncio.run(generate_agent_names_via_claude(game_state.agents))
