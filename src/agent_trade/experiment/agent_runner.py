@@ -15,6 +15,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable, Optional
 
+from pydantic import ValidationError
+
 from ..claude_wrapper import run_agent
 from .market_data import get_current_prices
 from .models import AgentState, Alert, DailyDecision, ExperimentConfig, Order, StrategyLearning
@@ -64,6 +66,9 @@ def _parse_structured_response(
 
     alerts: list[Alert] = []
     for a in data.get("alerts") or []:
+        if not isinstance(a, dict):
+            logger.warning(f"Agent {agent_id}: skipping non-dict alert entry: {a!r}")
+            continue
         try:
             alerts.append(
                 Alert(
@@ -74,7 +79,7 @@ def _parse_structured_response(
                     time_horizon=a.get("time_horizon", ""),
                 )
             )
-        except (KeyError, ValueError) as e:
+        except (KeyError, TypeError, ValueError, ValidationError) as e:
             logger.warning(f"Agent {agent_id}: skipping malformed alert {a}: {e}")
 
     return DailyDecision(
@@ -165,6 +170,7 @@ async def spawn_agent(
             research_notes=error_msg,
             orders=[],
             strategy_updates=None,
+            alerts=[],
             execution_time_ms=execution_time,
         )
     except Exception as e:
@@ -180,6 +186,7 @@ async def spawn_agent(
             research_notes=error_msg,
             orders=[],
             strategy_updates=None,
+            alerts=[],
             execution_time_ms=execution_time,
         )
 
@@ -250,6 +257,7 @@ async def spawn_all_agents(
                 research_notes=error_msg,
                 orders=[],
                 strategy_updates=None,
+                alerts=[],
                 execution_time_ms=timeout * 1000,
             )
 
@@ -268,6 +276,7 @@ async def spawn_all_agents(
                 research_notes=error_msg,
                 orders=[],
                 strategy_updates=None,
+                alerts=[],
                 execution_time_ms=0.0,
             )
 
@@ -448,7 +457,7 @@ Follow the research workflow in your system prompt:
 4. Make data-driven trade decisions
 
 Be specific and decisive. If there's a signal, act on it. Return your decision as a JSON object
-with `research_notes`, `orders`, and `strategy_updates`.
+with `research_notes`, `orders`, `strategy_updates`, and optionally `alerts` (see system prompt).
 """
 
 

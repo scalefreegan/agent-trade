@@ -510,6 +510,18 @@ async def get_agent_alerts(
     experiment_id: str, agent_id: str
 ) -> AlertsResponse:
     """Get alerts flagged by the agent across all decision files."""
+    try:
+        game_state = load_game_state(experiment_id)
+    except Exception as e:
+        logger.exception(f"Failed to load game state for {experiment_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if game_state is None:
+        raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
+
+    if agent_id not in game_state.agents:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
     agent_dir = get_experiment_dir(experiment_id) / "agents" / agent_id / "decisions"
 
     if not agent_dir.exists():

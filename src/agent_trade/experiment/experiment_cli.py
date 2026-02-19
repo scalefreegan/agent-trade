@@ -1,5 +1,6 @@
 """CLI interface for the multi-agent trading experiment."""
 
+import asyncio
 import sys
 from pathlib import Path
 from typing import Optional
@@ -101,7 +102,6 @@ def init(
     game_state = create_initial_game_state(config, experiment_id, name)
 
     # Generate memorable names via Claude (parallel, one call per agent)
-    import asyncio
     from .agent_runner import generate_agent_names_via_claude
     asyncio.run(generate_agent_names_via_claude(game_state.agents))
 
