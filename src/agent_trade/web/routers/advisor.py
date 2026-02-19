@@ -185,7 +185,7 @@ async def get_experiment_agents(experiment_id: str) -> list[ExperimentAgentInfo]
         raise HTTPException(status_code=404, detail="Experiment not found")
 
     agents = []
-    for agent in game_state.agents:
+    for agent in game_state.agents.values():
         philosophy = ""
         if agent.strategy and agent.strategy.thesis:
             philosophy = agent.strategy.thesis.philosophy or ""
