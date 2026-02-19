@@ -17,7 +17,7 @@ interface RunControlsProps {
 export default function RunControls({ experimentId }: RunControlsProps) {
   const queryClient = useQueryClient();
   const { data: experiment } = useExperiment(experimentId);
-  const { data: runStatus } = useRunStatus(experimentId);
+  const { data: runStatus, isLoading: runStatusLoading } = useRunStatus(experimentId);
   const startRunMutation = useStartRun();
   const pauseMutation = usePauseExperiment();
   const resumeMutation = useResumeExperiment();
@@ -78,7 +78,7 @@ export default function RunControls({ experimentId }: RunControlsProps) {
     }
   };
 
-  const isRunning = runStatus?.status === 'running' || isStreaming;
+  const isRunning = runStatus?.status === 'running' || isStreaming || runStatusLoading;
   const isPaused = experiment?.status === 'paused';
   const isCompleted = experiment?.status === 'completed';
 
