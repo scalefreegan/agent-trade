@@ -69,6 +69,10 @@ export function StrategyEditModal({
 
     if (rationale !== strategy.rationale) payload.rationale = rationale;
 
+    if (Object.keys(payload).length === 0) {
+      onClose();
+      return;
+    }
     onSave(payload);
   };
 

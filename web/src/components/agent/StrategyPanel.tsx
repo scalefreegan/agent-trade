@@ -1,4 +1,4 @@
-import type { AgentStrategy, StrategyEditInput } from '../../api/types';
+import type { AgentStrategy } from '../../api/types';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { GuidanceSection } from './GuidanceSection';
@@ -7,8 +7,9 @@ interface StrategyPanelProps {
   strategy: AgentStrategy;
   guidance: string | null;
   onEditStrategy: () => void;
-  onSaveGuidance: (guidance: string | null) => void;
+  onSaveGuidance: (guidance: string | null) => Promise<void>;
   isGuidancePending: boolean;
+  guidanceError: string | null;
 }
 
 export function StrategyPanel({
@@ -17,6 +18,7 @@ export function StrategyPanel({
   onEditStrategy,
   onSaveGuidance,
   isGuidancePending,
+  guidanceError,
 }: StrategyPanelProps) {
   return (
     <div>
@@ -111,6 +113,7 @@ export function StrategyPanel({
         guidance={guidance}
         onSave={onSaveGuidance}
         isPending={isGuidancePending}
+        error={guidanceError}
       />
     </div>
   );

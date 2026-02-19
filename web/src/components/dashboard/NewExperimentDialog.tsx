@@ -15,6 +15,7 @@ interface FormErrors {
   name?: string;
   num_agents?: string;
   starting_capital?: string;
+  cash_override?: string;
 }
 
 const RISK_OPTIONS = ['conservative', 'moderate', 'aggressive'] as const;
@@ -96,6 +97,11 @@ export function NewExperimentDialog({
     if (numAgents < 1 || numAgents > 50) next.num_agents = 'Must be between 1 and 50';
     if (startingCapital < 100 || startingCapital > 1_000_000)
       next.starting_capital = 'Must be between $100 and $1,000,000';
+    if (showAdvanced && cashOverride.trim() !== '') {
+      const val = Number(cashOverride);
+      if (!Number.isFinite(val) || val < 0)
+        next.cash_override = 'Cash override must be a non-negative number';
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -418,9 +424,15 @@ export function NewExperimentDialog({
                           min={0}
                           step={100}
                           placeholder="Leave blank to use Starting Capital"
-                          className={`${inputClass} pl-7`}
+                          className={`${inputClass} pl-7 ${errors.cash_override ? 'border-red-400 dark:border-red-600 bg-red-50 dark:bg-red-900/10' : ''}`}
+                          aria-describedby={errors.cash_override ? 'cash-error' : undefined}
                         />
                       </div>
+                      {errors.cash_override && (
+                        <p id="cash-error" className="mt-1 text-xs text-red-600 dark:text-red-400 font-mono">
+                          {errors.cash_override}
+                        </p>
+                      )}
                     </div>
 
                     {/* Position rows */}

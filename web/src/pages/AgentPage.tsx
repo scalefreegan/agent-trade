@@ -181,8 +181,13 @@ export function AgentPage() {
                   strategy={strategy}
                   guidance={agent.guidance}
                   onEditStrategy={() => setStrategyEditOpen(true)}
-                  onSaveGuidance={(g) => updateGuidance.mutate(g)}
+                  onSaveGuidance={(g) =>
+                    new Promise<void>((resolve, reject) =>
+                      updateGuidance.mutate(g, { onSuccess: () => resolve(), onError: (e) => reject(e) })
+                    )
+                  }
                   isGuidancePending={updateGuidance.isPending}
+                  guidanceError={updateGuidance.error?.message ?? null}
                 />
                 <StrategyEditModal
                   open={strategyEditOpen}

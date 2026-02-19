@@ -3,11 +3,12 @@ import { Card } from '../ui/Card';
 
 interface GuidanceSectionProps {
   guidance: string | null;
-  onSave: (guidance: string | null) => void;
+  onSave: (guidance: string | null) => Promise<void>;
   isPending: boolean;
+  error?: string | null;
 }
 
-export function GuidanceSection({ guidance, onSave, isPending }: GuidanceSectionProps) {
+export function GuidanceSection({ guidance, onSave, isPending, error }: GuidanceSectionProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(guidance ?? '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -19,10 +20,23 @@ export function GuidanceSection({ guidance, onSave, isPending }: GuidanceSection
     }
   }, [editing, guidance]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const value = draft.trim() || null;
-    onSave(value);
-    setEditing(false);
+    try {
+      await onSave(value);
+      setEditing(false);
+    } catch {
+      // error is surfaced via the `error` prop from the parent
+    }
+  };
+
+  const handleClear = async () => {
+    try {
+      await onSave(null);
+      setEditing(false);
+    } catch {
+      // error is surfaced via the `error` prop from the parent
+    }
   };
 
   const handleCancel = () => {
@@ -54,6 +68,11 @@ export function GuidanceSection({ guidance, onSave, isPending }: GuidanceSection
           <p className="text-xs text-muted-foreground font-mono mb-3">
             Guidance is injected into the agent's prompt on every trading day.
           </p>
+          {error && (
+            <div className="mb-3 rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2">
+              <p className="text-xs text-red-700 dark:text-red-400 font-mono">{error}</p>
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             rows={4}
@@ -74,7 +93,7 @@ export function GuidanceSection({ guidance, onSave, isPending }: GuidanceSection
             {guidance && (
               <button
                 type="button"
-                onClick={() => { onSave(null); setEditing(false); }}
+                onClick={handleClear}
                 disabled={isPending}
                 className="px-3 py-1.5 text-xs font-mono rounded border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
               >
