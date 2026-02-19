@@ -5,6 +5,8 @@ import { AppShell } from './components/layout/AppShell';
 import { DashboardPage } from './pages/DashboardPage';
 import { ExperimentPage } from './pages/ExperimentPage';
 import { AgentPage } from './pages/AgentPage';
+import { SearchPage } from './pages/SearchPage';
+import { AdvisorPage } from './pages/AdvisorPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 const queryClient = new QueryClient({
@@ -27,6 +29,8 @@ function App() {
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/experiments/:experimentId" element={<ExperimentPage />} />
                 <Route path="/experiments/:experimentId/agents/:agentId" element={<AgentPage />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/advisor" element={<AdvisorPage />} />
               </Routes>
             </AppShell>
           </ErrorBoundary>
