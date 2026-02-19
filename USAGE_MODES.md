@@ -13,17 +13,13 @@ The `agent-trade` project supports **two modes** of operation. Choose based on y
 
 **What you get access to**:
 - ✅ All 6 stock market tools (via agent-trade MCP server)
-- ✅ ALL Claude Code skills (commit, review-pr, etc.)
 - ✅ ALL configured MCP servers
-- ✅ File system operations
-- ✅ Code analysis, editing, etc.
+- ✅ Full Claude Code capability
 
 **When to use**:
-- You need access to Claude Code skills
-- You want to automate Claude Code workflows
+- You want to run headless Claude Code queries with stock tools
 - You need multiple MCP servers
-- You're building complex development workflows
-- You want the full Claude Code experience programmatically
+- You're building automated workflows
 
 **Requirements**:
 - Claude Code installed
@@ -34,12 +30,7 @@ The `agent-trade` project supports **two modes** of operation. Choose based on y
 ```bash
 # Query through Claude Code
 agent-trade-claude query "What is AAPL trading at?"
-
-# Run Claude Code skills
-agent-trade-claude skill commit "-m 'Update code'"
-
-# Interactive session
-agent-trade-claude interactive
+agent-trade-claude query "Get historical prices for TSLA over the last month"
 ```
 
 ---
@@ -84,9 +75,8 @@ uvx --from . agent-trade
 
 | I want to... | Use |
 |--------------|-----|
-| Use Claude Code skills + stock tools | `agent-trade-claude` |
-| Automate Claude Code workflows | `agent-trade-claude` |
-| Interactive Claude Code session | `agent-trade-claude interactive` |
+| Headless query with stock tools | `agent-trade-claude query "..."` |
+| Automate Claude Code workflows | `agent-trade-claude query "..."` |
 | Use in Claude Code app | Configure `agent-trade` as MCP server |
 | Use in Cursor IDE | Configure `agent-trade` as MCP server |
 | Build custom MCP client | Connect to `agent-trade` server |

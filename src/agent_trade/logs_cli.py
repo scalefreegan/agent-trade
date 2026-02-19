@@ -213,7 +213,7 @@ def show(
 
         agent-trade-logs show --tool get_stock_info
 
-        agent-trade-logs show --mode api
+        agent-trade-logs show --mode mcp
 
         agent-trade-logs show --errors-only
     """

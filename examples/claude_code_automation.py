@@ -9,7 +9,7 @@ async def example_simple_query():
     print("=== Simple Query ===")
 
     result = await claude_wrapper.run_agent(
-        "What is AAPL trading at right now?"
+        'What is AAPL trading at right now? Return a JSON object with keys: symbol, price, currency.'
     )
 
     print(result)

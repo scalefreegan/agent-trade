@@ -132,11 +132,10 @@ async def spawn_agent(
     prompt = build_agent_prompt(agent_state, current_prices, experiment_config)
 
     # Spawn headless session
-    output = await query_claude_code(
+    output = await run_agent(
         prompt,
         cwd=experiment_dir,
         system_prompt=system_prompt,
-        permission_mode="auto",  # Auto-approve MCP tools
     )
 
     # Parse decision

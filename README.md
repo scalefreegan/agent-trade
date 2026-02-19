@@ -59,13 +59,6 @@ Automate Claude Code to access **all skills and MCP servers**:
 # Query through Claude Code (has access to ALL tools/skills)
 agent-trade-claude query "What is AAPL trading at?"
 agent-trade-claude query "Get historical prices for TSLA"
-
-# Run Claude Code skills
-agent-trade-claude skill commit "-m 'Update code'"
-agent-trade-claude skill review-pr "123"
-
-# Interactive mode
-agent-trade-claude interactive
 ```
 
 **Pros**: Access to all Claude Code features, skills, and MCP servers
