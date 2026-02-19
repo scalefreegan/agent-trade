@@ -5,7 +5,7 @@ Covers:
 - Web-initiated runs always call run_daily_cycle with force=True
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from agent_trade.web.run_manager import RunManager, RunStatus
 

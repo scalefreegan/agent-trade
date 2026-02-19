@@ -1,4 +1,4 @@
-"""Pydantic models for stock data, news, logging, and orchestration."""
+"""Pydantic models for stock data, news, and logging."""
 
 from pydantic import BaseModel, Field
 from datetime import datetime

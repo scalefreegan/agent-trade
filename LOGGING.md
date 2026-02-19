@@ -16,13 +16,11 @@ Each line is a JSON object with the tool call details.
 For each tool call, the following information is logged:
 - **timestamp**: When the tool was called (UTC)
 - **tool_name**: Name of the tool (e.g., "get_stock_info")
-- **mode**: How it was called ("api", "mcp", or "claude_code")
+- **mode**: How it was called ("mcp" or "claude_code")
 - **input_args**: Arguments passed to the tool
 - **output**: Result returned by the tool
 - **error**: Error message if the tool failed
 - **execution_time_ms**: How long the tool took to execute
-- **model**: Claude model used (for API mode)
-- **tokens_used**: Token usage (for API mode)
 
 ### Viewing Logs
 
@@ -63,9 +61,6 @@ agent-trade-logs show
 
 # Show only get_stock_info calls
 agent-trade-logs show --tool get_stock_info
-
-# Show only API mode calls
-agent-trade-logs show --mode api
 
 # Show only errors
 agent-trade-logs show --errors-only
@@ -133,13 +128,11 @@ logger.log_tool_call(
 {
   "timestamp": "2026-02-08T20:30:15.123456",
   "tool_name": "get_stock_info",
-  "mode": "api",
+  "mode": "mcp",
   "input_args": {"symbol": "AAPL"},
   "output": {"symbol": "AAPL", "current_price": 150.0, "...": "..."},
   "error": null,
-  "execution_time_ms": 234.56,
-  "model": "claude-sonnet-4-5-20250929",
-  "tokens_used": {"input_tokens": 123, "output_tokens": 456}
+  "execution_time_ms": 234.56
 }
 ```
 
@@ -170,20 +163,6 @@ agent-trade-logs stats
 
 # Filter by specific tool
 agent-trade-logs show --tool get_stock_news
-```
-
-#### Track Costs
-```python
-from agent_trade.logging_config import get_usage_stats
-
-stats = get_usage_stats()
-
-# Calculate approximate API costs
-# (example rates, check Anthropic pricing)
-input_cost_per_1m = 3.00  # $3 per 1M input tokens
-output_cost_per_1m = 15.00  # $15 per 1M output tokens
-
-# Parse logs to sum token usage...
 ```
 
 ### When Logging Happens
