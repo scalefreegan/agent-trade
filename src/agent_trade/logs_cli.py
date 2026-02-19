@@ -197,7 +197,7 @@ def show(
     mode: Optional[str] = typer.Option(
         None,
         "--mode", "-m",
-        help="Filter by mode (api, claude_code, mcp)",
+        help="Filter by mode (mcp, claude_code)",
     ),
     errors_only: bool = typer.Option(
         False,
