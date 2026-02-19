@@ -191,37 +191,7 @@ output_cost_per_1m = 15.00  # $15 per 1M output tokens
 Automatic logging currently occurs in these modes:
 
 - **MCP Mode** (`server.py`): All MCP tool calls are logged automatically
-- **API Mode** (`agent.py`): All Anthropic API tool calls are logged automatically
 - **Manual Mode**: Use `log_tool_call()` directly for custom logging
-
-**Note**: The orchestration framework (`orchestration.py`) executes functions directly without automatic logging. If you need to log workflow steps, add manual logging:
-
-```python
-from agent_trade.orchestration import Workflow, ExecutionMode
-from agent_trade import stock_data
-from agent_trade.logging_config import log_tool_call
-import time
-
-def logged_get_stock_info(symbol: str):
-    """Wrapper that logs the call."""
-    start_time = time.time()
-    result = stock_data.get_stock_info(symbol)
-    execution_time_ms = (time.time() - start_time) * 1000
-
-    log_tool_call(
-        tool_name="get_stock_info",
-        mode="orchestration",
-        input_args={"symbol": symbol},
-        output=result.model_dump(),
-        execution_time_ms=execution_time_ms,
-    )
-    return result
-
-# Use the wrapped function in workflows
-workflow = Workflow("analysis", mode=ExecutionMode.SEQUENTIAL)
-workflow.add_step("get_info", logged_get_stock_info, "AAPL")
-result = workflow.execute()
-```
 
 ### Disable Logging
 

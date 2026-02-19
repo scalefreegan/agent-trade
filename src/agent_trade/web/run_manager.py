@@ -143,7 +143,9 @@ class RunManager:
                     )
                 job.events.put(event)
 
-            # Run the daily cycle with progress callback
+            # Run the daily cycle with progress callback.
+            # force=True so web-initiated runs always execute regardless of
+            # trading day/weekend checks (vs cron/CLI which use force=False).
             success = run_daily_cycle(job.experiment_id, force=True, progress_callback=progress_callback)
 
             if not success:

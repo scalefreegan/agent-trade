@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -46,7 +47,6 @@ def _extract_json(text: str) -> dict:
         pass
 
     # Search for a fenced code block anywhere in the text
-    import re
     fence_match = re.search(r"```(?:json)?\s*\n(.*?)\n```", text, re.DOTALL)
     if fence_match:
         try:
@@ -156,7 +156,12 @@ async def run_agent(
             )
 
         raw = stdout.decode("utf-8", errors="replace").strip()
-        wrapper = json.loads(raw)
+        try:
+            wrapper = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"Claude agent returned malformed JSON wrapper: {raw[:200]}"
+            ) from exc
         # `claude -p --output-format json` wraps output as {"type":"result","result":"<agent text>",...}
         text = wrapper.get("result", raw) if isinstance(wrapper, dict) else raw
         return _extract_json(text)
