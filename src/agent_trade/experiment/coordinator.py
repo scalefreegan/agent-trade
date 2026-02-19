@@ -181,13 +181,19 @@ def process_daily_cycle(
                 else:
                     errors[agent_id] = error_msg
 
-    # Step 4: Apply strategy updates
+    # Step 4: Apply strategy updates and sync strategy.md
+    from .strategy_manager import save_strategy
+
     for agent_id, decision in decisions.items():
         if decision.strategy_updates:
             agent = game_state.agents[agent_id]
             agent.strategy.learnings.append(decision.strategy_updates)
             agent.strategy.last_updated = datetime.now(timezone.utc)
             logger.info(f"Applied strategy update for {agent_id}")
+            try:
+                save_strategy(game_state.config.experiment_id, agent_id, agent.strategy)
+            except OSError as e:
+                logger.warning(f"Failed to sync strategy.md for {agent_id}: {e}")
 
     # Step 5: Calculate portfolio values and check for eliminations
     # Get all symbols across all agents

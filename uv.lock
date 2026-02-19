@@ -42,6 +42,11 @@ web = [
     { name = "uvicorn", extra = ["standard"] },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.100.0" },
@@ -62,6 +67,9 @@ requires-dist = [
     { name = "yfinance", specifier = ">=0.2.40" },
 ]
 provides-extras = ["agent", "web", "dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.0.2" }]
 
 [[package]]
 name = "annotated-doc"

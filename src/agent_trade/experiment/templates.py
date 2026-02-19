@@ -7,15 +7,19 @@ These templates structure how agents document their strategies and daily trading
 import random
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Optional
 
 from .models import (
+    AgentInitHints,
     AgentStrategy,
     DailyDecision,
     ExperimentConfig,
+    ExperimentInitSpec,
     InvestmentThesis,
     Order,
     Portfolio,
     StrategyLearning,
+    TaxLot,
 )
 
 
@@ -262,11 +266,14 @@ def parse_daily_decision(markdown: str, agent_id: str, date: str) -> DailyDecisi
     )
 
 
-def create_default_strategy(agent_id: str, name: str) -> AgentStrategy:
+def create_default_strategy(
+    agent_id: str, name: str, hints: Optional["AgentInitHints"] = None
+) -> AgentStrategy:
     """
     Create a default strategy for a new agent.
 
     Strategies are randomized to create diversity among agents.
+    If hints are provided, any non-None hint field overrides the random selection.
     """
     philosophies = [
         "News-driven trading: act on earnings surprises, analyst upgrades/downgrades, and sector catalysts",
@@ -308,11 +315,17 @@ def create_default_strategy(agent_id: str, name: str) -> AgentStrategy:
         "debt-to-equity",
     ]
 
-    philosophy = random.choice(philosophies)
-    risk_tolerance = random.choice(risk_levels)
-    preferred_sectors = random.sample(sector_options, k=random.randint(2, 4))
-    time_horizon = random.choice(time_horizons)
-    key_metrics = random.sample(metric_options, k=random.randint(3, 5))
+    # Apply hints where provided, randomize remaining fields
+    philosophy = (hints.philosophy if hints and hints.philosophy is not None
+                  else random.choice(philosophies))
+    risk_tolerance = (hints.risk_tolerance if hints and hints.risk_tolerance is not None
+                      else random.choice(risk_levels))
+    preferred_sectors = (hints.preferred_sectors if hints and hints.preferred_sectors is not None
+                         else random.sample(sector_options, k=random.randint(2, 4)))
+    time_horizon = (hints.time_horizon if hints and hints.time_horizon is not None
+                    else random.choice(time_horizons))
+    key_metrics = (hints.key_metrics if hints and hints.key_metrics is not None
+                   else random.sample(metric_options, k=random.randint(3, 5)))
 
     thesis = InvestmentThesis(
         philosophy=philosophy,
@@ -322,11 +335,24 @@ def create_default_strategy(agent_id: str, name: str) -> AgentStrategy:
         key_metrics=key_metrics,
     )
 
-    rationale = f"""As {name}, I take a {risk_tolerance} approach focused on {time_horizon} opportunities.
+    if hints and hints.rationale is not None:
+        rationale = hints.rationale
+    else:
+        sectors_str = (
+            f"{', '.join(preferred_sectors[:-1])}, and {preferred_sectors[-1]}"
+            if len(preferred_sectors) > 1
+            else preferred_sectors[0] if preferred_sectors else "various"
+        )
+        metrics_str = (
+            f"{', '.join(key_metrics[:-1])}, and {key_metrics[-1]}"
+            if len(key_metrics) > 1
+            else key_metrics[0] if key_metrics else "key indicators"
+        )
+        rationale = f"""As {name}, I take a {risk_tolerance} approach focused on {time_horizon} opportunities.
 My strategy: {philosophy.lower()}.
 
-I actively trade stocks in the {', '.join(preferred_sectors[:-1])}, and {preferred_sectors[-1]} sectors,
-using {', '.join(key_metrics[:-1])}, and {key_metrics[-1]} to identify entry and exit points.
+I actively trade stocks in the {sectors_str} sectors,
+using {metrics_str} to identify entry and exit points.
 
 I research the market every day and act on signals I find. I will take profits when positions
 hit my targets and cut losses before they compound. Capital should be rotating toward the
@@ -349,27 +375,94 @@ def create_initial_game_state(
     config: ExperimentConfig,
     experiment_id: str,
     experiment_name: str,
+    init_spec: Optional["ExperimentInitSpec"] = None,
 ) -> "GameState":
     """
     Create initial game state for a new experiment.
 
     Creates agents with randomized strategies and starting capital.
+    If init_spec is provided, agents get customized strategies and/or
+    a seeded starting portfolio.
     """
-    from .models import AgentState, GameState
+    from .models import AgentInitHints, AgentState, GameState, StockPosition
+
+    # Build override map: agent_index (1-based) -> AgentInitHints
+    override_map: dict[int, AgentInitHints] = {}
+    if init_spec and init_spec.agent_overrides:
+        for override in init_spec.agent_overrides:
+            override_map[override.agent_index] = override.hints
+
+    # Determine starting cash; sync config so return calculations stay accurate
+    starting_cash = config.starting_capital
+    if init_spec and init_spec.starting_portfolio and init_spec.starting_portfolio.cash is not None:
+        starting_cash = init_spec.starting_portfolio.cash
+        config.starting_capital = starting_cash
+
+    # Validate agent_override indices against actual agent count (fail fast on typos)
+    if init_spec and init_spec.agent_overrides:
+        for override in init_spec.agent_overrides:
+            if override.agent_index > config.num_agents:
+                raise ValueError(
+                    f"agent_overrides contains agent_index={override.agent_index} "
+                    f"but experiment only has {config.num_agents} agent(s)"
+                )
+
+    # Build seeded positions if provided
+    seeded_positions: list[StockPosition] = []
+    now = datetime.now(timezone.utc)
+    if init_spec and init_spec.starting_portfolio and init_spec.starting_portfolio.positions:
+        for pos_spec in init_spec.starting_portfolio.positions:
+            if pos_spec.purchase_date is not None:
+                purchase_dt = datetime(
+                    pos_spec.purchase_date.year,
+                    pos_spec.purchase_date.month,
+                    pos_spec.purchase_date.day,
+                    tzinfo=timezone.utc,
+                )
+            else:
+                purchase_dt = now
+            lot = TaxLot(
+                shares=pos_spec.shares,
+                cost_basis=pos_spec.cost_basis,
+                purchase_date=purchase_dt,
+            )
+            seeded_positions.append(StockPosition(symbol=pos_spec.symbol, lots=[lot]))
 
     agents = {}
     for i in range(config.num_agents):
-        agent_id = f"agent_{i+1:03d}"
+        agent_index = i + 1
+        agent_id = f"agent_{agent_index:03d}"
 
-        # Create initial portfolio with starting capital
+        # Merge experiment-level defaults with per-agent override
+        merged_hints: Optional[AgentInitHints] = None
+        defaults = init_spec.agent_defaults if init_spec else None
+        per_agent = override_map.get(agent_index)
+
+        if defaults or per_agent:
+            # Start from defaults (or empty hints), then overlay per-agent overrides
+            base = defaults or AgentInitHints()
+            if per_agent:
+                merged_hints = AgentInitHints(
+                    philosophy=per_agent.philosophy if per_agent.philosophy is not None else base.philosophy,
+                    risk_tolerance=per_agent.risk_tolerance if per_agent.risk_tolerance is not None else base.risk_tolerance,
+                    preferred_sectors=per_agent.preferred_sectors if per_agent.preferred_sectors is not None else base.preferred_sectors,
+                    time_horizon=per_agent.time_horizon if per_agent.time_horizon is not None else base.time_horizon,
+                    key_metrics=per_agent.key_metrics if per_agent.key_metrics is not None else base.key_metrics,
+                    rationale=per_agent.rationale if per_agent.rationale is not None else base.rationale,
+                )
+            else:
+                merged_hints = base
+
+        # Create portfolio (independent copy per agent)
+        import copy
         portfolio = Portfolio(
-            cash=config.starting_capital,
-            positions=[],  # positions is a list, not dict
+            cash=starting_cash,
+            positions=copy.deepcopy(seeded_positions),
         )
 
         # Name is a placeholder; caller should invoke generate_agent_names_via_claude
         # to replace it with a Claude-generated name after init.
-        strategy = create_default_strategy(agent_id, agent_id)
+        strategy = create_default_strategy(agent_id, agent_id, hints=merged_hints)
 
         # Create agent state (name is placeholder; overwritten by generate_agent_names_via_claude)
         agent_state = AgentState(
@@ -386,7 +479,7 @@ def create_initial_game_state(
                 "total_losses": Decimal("0"),
                 "total_taxes_paid": Decimal("0"),
             },
-            created_at=datetime.now(timezone.utc),
+            created_at=now,
         )
 
         agents[agent_id] = agent_state

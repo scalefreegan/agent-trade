@@ -18,4 +18,4 @@ web-frontend:
 # One-time setup for web UI
 web-install:
 	uv sync --extra web
-	cd web && npm install
+	cd web && npm install --no-audit
