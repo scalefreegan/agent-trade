@@ -3,6 +3,11 @@ import { createPortal } from 'react-dom';
 import type { CreateExperimentInput } from '../../api/experiments';
 import type { AgentInitHints, PortfolioPositionSpec } from '../../api/types';
 
+/** Internal row type — `id` is a stable key never sent to the server. */
+interface PositionRow extends PortfolioPositionSpec {
+  id: number;
+}
+
 interface NewExperimentDialogProps {
   open: boolean;
   onClose: () => void;
@@ -25,9 +30,8 @@ const inputClass =
 const labelClass =
   'block text-xs font-mono font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1.5';
 
-function emptyPosition(): PortfolioPositionSpec {
-  return { symbol: '', shares: 0, cost_basis: 0 };
-}
+let _positionCounter = 0;
+function nextPositionId() { return ++_positionCounter; }
 
 export function NewExperimentDialog({
   open,
@@ -59,7 +63,7 @@ export function NewExperimentDialog({
 
   // Starting portfolio
   const [cashOverride, setCashOverride] = useState('');
-  const [positions, setPositions] = useState<PortfolioPositionSpec[]>([]);
+  const [positions, setPositions] = useState<PositionRow[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -136,11 +140,10 @@ export function NewExperimentDialog({
       const hasCash = cashOverride.trim() !== '';
       if (hasCash || validPositions.length > 0) {
         payload.starting_portfolio = {
-          positions: validPositions.map((p) => ({
+          // Strip internal `id` before sending to the server
+          positions: validPositions.map(({ id: _id, ...p }) => ({
+            ...p,
             symbol: p.symbol.trim().toUpperCase(),
-            shares: p.shares,
-            cost_basis: p.cost_basis,
-            ...(p.purchase_date ? { purchase_date: p.purchase_date } : {}),
           })),
           ...(hasCash ? { cash: Number(cashOverride) } : {}),
         };
@@ -150,10 +153,12 @@ export function NewExperimentDialog({
     onCreate(payload);
   };
 
-  const addPosition = () => setPositions((prev) => [...prev, emptyPosition()]);
-  const removePosition = (i: number) => setPositions((prev) => prev.filter((_, idx) => idx !== i));
-  const updatePosition = (i: number, field: keyof PortfolioPositionSpec, value: string | number) =>
-    setPositions((prev) => prev.map((p, idx) => (idx === i ? { ...p, [field]: value } : p)));
+  const addPosition = () =>
+    setPositions((prev) => [...prev, { id: nextPositionId(), symbol: '', shares: 0, cost_basis: 0 }]);
+  const removePosition = (id: number) =>
+    setPositions((prev) => prev.filter((p) => p.id !== id));
+  const updatePosition = (id: number, field: keyof PortfolioPositionSpec, value: string | number) =>
+    setPositions((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
 
   if (!open) return null;
 
@@ -444,19 +449,19 @@ export function NewExperimentDialog({
                           <span>Cost/sh</span>
                           <span />
                         </div>
-                        {positions.map((pos, i) => (
-                          <div key={i} className="grid grid-cols-[1fr_80px_100px_24px] gap-2 items-center">
+                        {positions.map((pos) => (
+                          <div key={pos.id} className="grid grid-cols-[1fr_80px_100px_24px] gap-2 items-center">
                             <input
                               type="text"
                               value={pos.symbol}
-                              onChange={(e) => updatePosition(i, 'symbol', e.target.value.toUpperCase())}
+                              onChange={(e) => updatePosition(pos.id, 'symbol', e.target.value.toUpperCase())}
                               placeholder="AAPL"
                               className={`${inputClass} uppercase`}
                             />
                             <input
                               type="number"
                               value={pos.shares || ''}
-                              onChange={(e) => updatePosition(i, 'shares', Number(e.target.value))}
+                              onChange={(e) => updatePosition(pos.id, 'shares', Number(e.target.value))}
                               min={0}
                               step={1}
                               placeholder="10"
@@ -465,7 +470,7 @@ export function NewExperimentDialog({
                             <input
                               type="number"
                               value={pos.cost_basis || ''}
-                              onChange={(e) => updatePosition(i, 'cost_basis', Number(e.target.value))}
+                              onChange={(e) => updatePosition(pos.id, 'cost_basis', Number(e.target.value))}
                               min={0}
                               step={0.01}
                               placeholder="150.00"
@@ -473,7 +478,7 @@ export function NewExperimentDialog({
                             />
                             <button
                               type="button"
-                              onClick={() => removePosition(i)}
+                              onClick={() => removePosition(pos.id)}
                               className="text-gray-400 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center"
                               aria-label="Remove position"
                             >
