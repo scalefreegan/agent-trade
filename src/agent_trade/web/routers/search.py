@@ -5,7 +5,7 @@ import logging
 from functools import partial
 
 import yfinance as yf
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from agent_trade.news_data import search_news
 from agent_trade.stock_data import get_historical_prices, get_stock_info
@@ -56,14 +56,24 @@ async def autocomplete(q: str = Query(..., min_length=1)) -> TickerSearchRespons
 
 
 @router.get("/stocks/{symbol}")
-async def stock_info(symbol: str) -> StockInfoResponse:
+async def stock_info(
+    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Z0-9.-]+$")
+) -> StockInfoResponse:
     """Get detailed stock information for a symbol."""
     loop = asyncio.get_running_loop()
     try:
         info = await loop.run_in_executor(None, partial(get_stock_info, symbol))
-    except Exception as e:
-        logger.exception("Failed to get stock info for %s", symbol)
+    except ValueError as e:
+        # Explicit not-found or invalid symbol
+        logger.warning("Stock not found: %s - %s", symbol, e)
         raise HTTPException(status_code=404, detail=f"Could not find stock: {symbol}")
+    except Exception as e:
+        # Upstream/service failures - return 503
+        logger.exception("Failed to fetch stock info for %s", symbol)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Stock data service unavailable: {str(e)}"
+        )
 
     return StockInfoResponse(
         symbol=info.symbol,
@@ -83,7 +93,7 @@ async def stock_info(symbol: str) -> StockInfoResponse:
 
 @router.get("/stocks/{symbol}/history")
 async def stock_history(
-    symbol: str,
+    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Z0-9.-]+$"),
     period: str = Query("1mo", pattern="^(1d|5d|1mo|3mo|6mo|1y|2y|5y|max)$"),
 ) -> HistoricalPriceResponse:
     """Get historical price data for a symbol."""
@@ -92,10 +102,18 @@ async def stock_history(
         hist = await loop.run_in_executor(
             None, partial(get_historical_prices, symbol, period)
         )
-    except Exception as e:
-        logger.exception("Failed to get history for %s", symbol)
+    except ValueError as e:
+        # Explicit not-found or invalid symbol
+        logger.warning("History not found: %s - %s", symbol, e)
         raise HTTPException(
             status_code=404, detail=f"Could not find history for: {symbol}"
+        )
+    except Exception as e:
+        # Upstream/service failures - return 503
+        logger.exception("Failed to fetch history for %s", symbol)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Stock data service unavailable: {str(e)}"
         )
 
     return HistoricalPriceResponse(
@@ -119,7 +137,7 @@ async def stock_history(
 
 @router.get("/stocks/{symbol}/news")
 async def stock_news(
-    symbol: str,
+    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Z0-9.-]+$"),
     limit: int = Query(15, ge=1, le=50),
 ) -> StockNewsResponse:
     """Get news articles for a stock symbol using NewsAPI."""

@@ -15,6 +15,11 @@ export function SearchInput({ onSelect, initialValue = '' }: SearchInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
+  // Sync input when initialValue changes (e.g., navigation)
+  useEffect(() => {
+    setInput(initialValue);
+  }, [initialValue]);
+
   // Debounce input by 300ms
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(input.trim()), 300);

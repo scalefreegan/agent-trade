@@ -160,6 +160,21 @@ class AdvisorManager:
         asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(self._run_advisors_async(job, portfolio_value))
+        except Exception as e:
+            # Ensure job reaches terminal state on unexpected errors
+            logger.exception("Unexpected error in advisor job %s", job.job_id)
+            with self._job_lock:
+                job.status = AdvisorStatus.FAILED
+                job.error = f"Internal error: {str(e)}"
+                job.completed_at = datetime.now()
+            job.events.put(
+                AdvisorEvent(
+                    type="job_error",
+                    timestamp=datetime.now(),
+                    message="Job failed due to internal error",
+                    error=str(e),
+                )
+            )
         finally:
             loop.close()
 
@@ -243,13 +258,11 @@ class AdvisorManager:
                 agent_name, philosophy, symbol, portfolio_value
             )
 
-            result = await asyncio.wait_for(
-                run_agent(
-                    prompt=user_prompt,
-                    system_prompt=system_prompt,
-                    max_turns=15,
-                ),
-                timeout=300,  # 5 minute timeout per agent
+            # run_agent handles its own timeout/cleanup - no outer wait_for to avoid subprocess leak
+            result = await run_agent(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                max_turns=15,
             )
 
             # Validate the recommendation has required fields
@@ -329,15 +342,29 @@ def _validate_recommendation(result: dict[str, Any], agent_name: str) -> dict:
         confidence = 0.5
     confidence = max(0.0, min(1.0, float(confidence)))
 
+    # Ensure risk_factors is a list
+    risk_factors = result.get("risk_factors", [])
+    if not isinstance(risk_factors, list):
+        risk_factors = []
+
+    # Coerce prices to float or None
+    def safe_float(value: Any) -> float | None:
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
     return {
         "agent_name": agent_name,
         "action": action,
         "confidence": confidence,
-        "target_price": result.get("target_price"),
-        "current_price": result.get("current_price"),
+        "target_price": safe_float(result.get("target_price")),
+        "current_price": safe_float(result.get("current_price")),
         "amount_guidance": result.get("amount_guidance", ""),
         "reasoning": result.get("reasoning", "No reasoning provided."),
-        "risk_factors": result.get("risk_factors", []),
+        "risk_factors": risk_factors,
         "time_horizon": result.get("time_horizon", "Unknown"),
     }
 

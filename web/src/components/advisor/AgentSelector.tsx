@@ -64,7 +64,7 @@ export function AgentSelector({ selected, onSelectionChange, maxAgents = 10 }: A
           onPhilosophyChange={setCustomPhilosophy}
           onAdd={addCustom}
           disabled={atLimit}
-          duplicate={isSelected(customName.trim())}
+          duplicate={isSelected({ name: customName.trim(), philosophy: '' })}
         />
       )}
       {activeTab === 'experiment' && (
@@ -113,15 +113,19 @@ function PresetsGrid({
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      {presets.map((preset) => (
-        <PresetCard
-          key={preset.id}
-          preset={preset}
-          active={selected.some((a) => a.name === preset.name)}
-          disabled={atLimit && !selected.some((a) => a.name === preset.name)}
-          onToggle={() => onToggle({ name: preset.name, philosophy: preset.philosophy })}
-        />
-      ))}
+      {presets.map((preset) => {
+        const presetConfig = { name: preset.name, philosophy: preset.philosophy };
+        const isActive = selected.some((a) => agentKey(a) === agentKey(presetConfig));
+        return (
+          <PresetCard
+            key={preset.id}
+            preset={preset}
+            active={isActive}
+            disabled={atLimit && !isActive}
+            onToggle={() => onToggle(presetConfig)}
+          />
+        );
+      })}
     </div>
   );
 }

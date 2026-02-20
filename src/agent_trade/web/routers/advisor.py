@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Field
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -31,7 +31,7 @@ class AgentConfig(BaseModel):
 class AdvisorRequest(BaseModel):
     symbol: str
     agents: list[AgentConfig]
-    portfolio_value: float = 100_000
+    portfolio_value: float = Field(100_000, gt=0, le=1e15)  # Positive, max 1 quadrillion
 
 
 class Recommendation(BaseModel):
@@ -180,9 +180,16 @@ async def stream_job(job_id: str):
 @router.get("/advisor/experiments/{experiment_id}/agents")
 async def get_experiment_agents(experiment_id: str) -> list[ExperimentAgentInfo]:
     """Return agent names and philosophies from an experiment."""
-    game_state = load_game_state(experiment_id)
-    if not game_state:
-        raise HTTPException(status_code=404, detail="Experiment not found")
+    try:
+        game_state = load_game_state(experiment_id)
+        if not game_state:
+            raise HTTPException(status_code=404, detail="Experiment not found")
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error("Failed to load experiment %s: %s", experiment_id, e)
+        raise HTTPException(status_code=500, detail=f"Corrupt experiment data: {str(e)}")
+    except Exception as e:
+        logger.exception("Failed to load experiment %s", experiment_id)
+        raise HTTPException(status_code=500, detail=f"Failed to load experiment: {str(e)}")
 
     agents = []
     for agent in game_state.agents.values():
@@ -206,6 +213,15 @@ async def get_experiment_agents(experiment_id: str) -> list[ExperimentAgentInfo]
 
 def _job_to_status(job) -> AdvisorJobStatus:
     """Convert an AdvisorJob dataclass to an API response."""
+    recommendations = []
+    for r in job.recommendations:
+        try:
+            recommendations.append(Recommendation(**r))
+        except Exception as e:
+            logger.error("Invalid recommendation from %s: %s", r.get("agent_name"), e)
+            # Skip malformed recommendations rather than failing the entire response
+            continue
+
     return AdvisorJobStatus(
         job_id=job.job_id,
         symbol=job.symbol,
@@ -213,7 +229,7 @@ def _job_to_status(job) -> AdvisorJobStatus:
         started_at=job.started_at,
         completed_at=job.completed_at,
         error=job.error,
-        recommendations=[Recommendation(**r) for r in job.recommendations],
+        recommendations=recommendations,
         total_agents=len(job.agent_configs),
         completed_agents=len(job.recommendations),
     )
