@@ -184,6 +184,9 @@ async def get_experiment_agents(experiment_id: str) -> list[ExperimentAgentInfo]
         game_state = load_game_state(experiment_id)
         if not game_state:
             raise HTTPException(status_code=404, detail="Experiment not found")
+    except HTTPException:
+        # Re-raise HTTPException as-is (don't convert 404 to 500)
+        raise
     except (OSError, json.JSONDecodeError) as e:
         logger.error("Failed to load experiment %s: %s", experiment_id, e)
         raise HTTPException(status_code=500, detail=f"Corrupt experiment data: {str(e)}")
