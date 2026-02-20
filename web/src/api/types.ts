@@ -391,6 +391,7 @@ export interface AdvisorJobStatus {
   recommendations: AdvisorRecommendation[];
   total_agents: number;
   completed_agents: number;
+  dropped_count: number;
 }
 
 export interface ExperimentAgentInfo {

@@ -106,10 +106,21 @@ function PresetsGrid({
   onToggle: (a: AdvisorAgentConfig) => void;
   atLimit: boolean;
 }) {
-  const { data, isLoading } = useAdvisorPresets();
+  const { data, isLoading, isError, error } = useAdvisorPresets();
   const presets = data?.presets ?? [];
 
   if (isLoading) return <p className="text-sm text-muted-foreground py-4">Loading presets...</p>;
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border border-loss/30 bg-loss/5 px-4 py-3">
+        <p className="text-sm font-medium text-loss">Failed to load advisor presets</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {error instanceof Error ? error.message : 'Please try again or contact support.'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -229,11 +240,22 @@ function ExperimentPicker({
   onToggle: (a: AdvisorAgentConfig) => void;
   atLimit: boolean;
 }) {
-  const { data: experiments, isLoading: loadingExperiments } = useExperiments();
+  const { data: experiments, isLoading: loadingExperiments, isError: experimentsError, error: expError } = useExperiments();
   const [experimentId, setExperimentId] = useState<string>('');
-  const { data: agents, isLoading: loadingAgents } = useExperimentAgents(experimentId || null);
+  const { data: agents, isLoading: loadingAgents, isError: agentsError, error: agentError } = useExperimentAgents(experimentId || null);
 
   if (loadingExperiments) return <p className="text-sm text-muted-foreground py-4">Loading experiments...</p>;
+
+  if (experimentsError) {
+    return (
+      <div className="rounded-lg border border-loss/30 bg-loss/5 px-4 py-3">
+        <p className="text-sm font-medium text-loss">Failed to load experiments</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {expError instanceof Error ? expError.message : 'Please try again or contact support.'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -257,6 +279,15 @@ function ExperimentPicker({
       </div>
 
       {loadingAgents && <p className="text-sm text-muted-foreground">Loading agents...</p>}
+
+      {agentsError && experimentId && (
+        <div className="rounded-lg border border-loss/30 bg-loss/5 px-4 py-3">
+          <p className="text-sm font-medium text-loss">Failed to load agents from this experiment</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {agentError instanceof Error ? agentError.message : 'The experiment may not exist or has corrupt data.'}
+          </p>
+        </div>
+      )}
 
       {agents && agents.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

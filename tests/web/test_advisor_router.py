@@ -165,6 +165,25 @@ class TestJobStatusEndpoint:
         assert data["symbol"] == "NVDA"
         assert "status" in data
 
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("agent_trade.web.advisor_manager.run_agent")
+    def test_tracks_dropped_recommendations(self, mock_run_agent):
+        """Returns dropped_count=0 when all recommendations are valid."""
+        mock_run_agent.return_value = {"action": "BUY", "confidence": 0.7}
+
+        create_response = client.post(
+            "/api/v1/advisor/recommend",
+            json={
+                "symbol": "AAPL",
+                "agents": [{"name": "Test", "philosophy": "Value"}],
+            },
+        )
+        job_id = create_response.json()["job_id"]
+
+        status_response = client.get(f"/api/v1/advisor/jobs/{job_id}")
+        data = status_response.json()
+        assert data["dropped_count"] == 0
+
 
 class TestExperimentAgentsEndpoint:
     """Test GET /advisor/experiments/{experiment_id}/agents endpoint."""

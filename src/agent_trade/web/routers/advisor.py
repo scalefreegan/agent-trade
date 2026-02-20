@@ -56,6 +56,7 @@ class AdvisorJobStatus(BaseModel):
     recommendations: list[Recommendation] = Field(default_factory=list)
     total_agents: int = 0
     completed_agents: int = 0
+    dropped_count: int = 0  # Number of malformed recommendations dropped
 
 
 class DefaultPreset(BaseModel):
@@ -217,11 +218,14 @@ async def get_experiment_agents(experiment_id: str) -> list[ExperimentAgentInfo]
 def _job_to_status(job) -> AdvisorJobStatus:
     """Convert an AdvisorJob dataclass to an API response."""
     recommendations = []
+    dropped_count = 0
+
     for r in job.recommendations:
         try:
             recommendations.append(Recommendation(**r))
         except Exception as e:
             logger.error("Invalid recommendation from %s: %s", r.get("agent_name"), e)
+            dropped_count += 1
             # Skip malformed recommendations rather than failing the entire response
             continue
 
@@ -235,4 +239,5 @@ def _job_to_status(job) -> AdvisorJobStatus:
         recommendations=recommendations,
         total_agents=len(job.agent_configs),
         completed_agents=len(recommendations),  # Use filtered count for consistency
+        dropped_count=dropped_count,
     )

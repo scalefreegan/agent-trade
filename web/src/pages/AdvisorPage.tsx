@@ -149,6 +149,18 @@ export function AdvisorPage() {
             )}
           </Card>
 
+          {/* Warning when recommendations were dropped */}
+          {job && job.dropped_count > 0 && (
+            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-3">
+              <p className="text-sm font-medium text-yellow-600 dark:text-yellow-500">
+                Warning: {job.dropped_count} recommendation{job.dropped_count > 1 ? 's were' : ' was'} dropped due to validation errors
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Some advisors returned malformed recommendations. Check server logs for details.
+              </p>
+            </div>
+          )}
+
           {/* Consensus summary (show when at least 2 recommendations) */}
           {(job?.recommendations.length ?? 0) >= 2 && (
             <ConsensusSummary
