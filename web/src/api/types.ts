@@ -360,6 +360,7 @@ export interface AdvisorPresetsResponse {
 export interface AdvisorAgentConfig {
   name: string;
   philosophy: string;
+  agent_id?: string; // For experiment agents - unique identifier
 }
 
 export interface AdvisorRequest {

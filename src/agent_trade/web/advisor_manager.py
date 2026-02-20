@@ -175,24 +175,49 @@ class AdvisorManager:
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Process results
+        # Count failures
+        failures = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 agent_name = job.agent_configs[i]["name"]
+                error_msg = f"{agent_name}: {str(result)}"
+                failures.append(error_msg)
                 logger.error(f"Advisor {agent_name} failed: {result}")
 
-        # Mark job complete
+        # Determine final status
+        all_failed = len(failures) == len(results)
+        some_failed = len(failures) > 0
+
         with self._job_lock:
-            job.status = AdvisorStatus.COMPLETED
+            if all_failed:
+                job.status = AdvisorStatus.FAILED
+                job.error = f"All {len(failures)} advisor(s) failed: " + "; ".join(failures)
+            elif some_failed:
+                job.status = AdvisorStatus.COMPLETED
+                job.error = f"{len(failures)} of {len(results)} advisor(s) failed: " + "; ".join(failures)
+            else:
+                job.status = AdvisorStatus.COMPLETED
+                job.error = None
             job.completed_at = datetime.now()
 
-        job.events.put(
-            AdvisorEvent(
-                type="job_complete",
-                timestamp=datetime.now(),
-                message=f"All advisors finished for {job.symbol}",
+        # Emit appropriate terminal event
+        if all_failed:
+            job.events.put(
+                AdvisorEvent(
+                    type="job_error",
+                    timestamp=datetime.now(),
+                    message=f"All advisors failed for {job.symbol}",
+                    error=job.error,
+                )
             )
-        )
+        else:
+            job.events.put(
+                AdvisorEvent(
+                    type="job_complete",
+                    timestamp=datetime.now(),
+                    message=f"{len(results) - len(failures)}/{len(results)} advisors finished for {job.symbol}",
+                )
+            )
 
     async def _run_single_advisor(
         self,

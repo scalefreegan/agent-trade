@@ -19,17 +19,22 @@ interface AgentSelectorProps {
   maxAgents?: number;
 }
 
+// Generate unique key for an agent (handles name collisions in experiments)
+function agentKey(agent: AdvisorAgentConfig): string {
+  return agent.agent_id ? `exp:${agent.agent_id}` : `name:${agent.name}`;
+}
+
 export function AgentSelector({ selected, onSelectionChange, maxAgents = 10 }: AgentSelectorProps) {
   const [activeTab, setActiveTab] = useState<SelectorTab>('presets');
   const [customName, setCustomName] = useState('');
   const [customPhilosophy, setCustomPhilosophy] = useState('');
 
-  const isSelected = (name: string) => selected.some((a) => a.name === name);
+  const isSelected = (agent: AdvisorAgentConfig) => selected.some((a) => agentKey(a) === agentKey(agent));
   const atLimit = selected.length >= maxAgents;
 
   const toggleAgent = (agent: AdvisorAgentConfig) => {
-    if (isSelected(agent.name)) {
-      onSelectionChange(selected.filter((a) => a.name !== agent.name));
+    if (isSelected(agent)) {
+      onSelectionChange(selected.filter((a) => agentKey(a) !== agentKey(agent)));
     } else if (!atLimit) {
       onSelectionChange([...selected, agent]);
     }
@@ -38,8 +43,9 @@ export function AgentSelector({ selected, onSelectionChange, maxAgents = 10 }: A
   const addCustom = () => {
     const name = customName.trim();
     const philosophy = customPhilosophy.trim();
-    if (!name || !philosophy || atLimit || isSelected(name)) return;
-    onSelectionChange([...selected, { name, philosophy }]);
+    const tempAgent = { name, philosophy };
+    if (!name || !philosophy || atLimit || isSelected(tempAgent)) return;
+    onSelectionChange([...selected, tempAgent]);
     setCustomName('');
     setCustomPhilosophy('');
   };
@@ -72,7 +78,7 @@ export function AgentSelector({ selected, onSelectionChange, maxAgents = 10 }: A
           <div className="flex flex-wrap gap-2">
             {selected.map((a) => (
               <button
-                key={a.name}
+                key={agentKey(a)}
                 onClick={() => toggleAgent(a)}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
               >
@@ -251,11 +257,12 @@ function ExperimentPicker({
       {agents && agents.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {agents.map((agent) => {
-            const isActive = selected.some((a) => a.name === agent.name);
+            const agentConfig = { name: agent.name, philosophy: agent.philosophy, agent_id: agent.agent_id };
+            const isActive = selected.some((a) => agentKey(a) === agentKey(agentConfig));
             return (
               <button
                 key={agent.agent_id}
-                onClick={() => onToggle({ name: agent.name, philosophy: agent.philosophy })}
+                onClick={() => onToggle(agentConfig)}
                 disabled={atLimit && !isActive}
                 className={`
                   text-left rounded-lg border p-3 transition-all

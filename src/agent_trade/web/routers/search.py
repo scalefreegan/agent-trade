@@ -33,7 +33,10 @@ async def autocomplete(q: str = Query(..., min_length=1)) -> TickerSearchRespons
         quotes = getattr(search, "quotes", []) or []
     except Exception as e:
         logger.exception("yfinance Search failed for query=%s", q)
-        return TickerSearchResponse(query=q, results=[], count=0)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Stock search service unavailable: {str(e)}"
+        )
 
     results: list[TickerSearchResult] = []
     for item in quotes[:10]:

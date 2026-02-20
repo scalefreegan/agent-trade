@@ -45,11 +45,17 @@ export function ConsensusSummary({ recommendations, symbol }: ConsensusSummaryPr
     consensus = 'BUY';
   } else if (sellCount === maxVotes && sellCount > buyCount && sellCount > holdCount) {
     consensus = 'SELL';
+  } else if (holdCount === maxVotes && holdCount > buyCount && holdCount > sellCount) {
+    consensus = 'HOLD';
   } else {
     consensus = 'MIXED';
   }
 
-  const consensusVariant = consensus === 'BUY' ? 'success' : consensus === 'SELL' ? 'error' : 'warning';
+  const consensusVariant =
+    consensus === 'BUY' ? 'success'
+    : consensus === 'SELL' ? 'error'
+    : consensus === 'HOLD' ? 'neutral'
+    : 'warning';
 
   return (
     <Card>

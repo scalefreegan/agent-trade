@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStockNews } from '../../api/search';
 import { Card } from '../ui/Card';
 
@@ -24,6 +24,11 @@ function formatDate(dateStr: string | null): string {
 export function StockNews({ symbol }: StockNewsProps) {
   const { data, isLoading, error } = useStockNews(symbol);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset pagination when symbol changes or articles change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [symbol, data?.count]);
 
   if (isLoading) {
     return (
