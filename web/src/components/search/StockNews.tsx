@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useStockNews } from '../../api/search';
 import { Card } from '../ui/Card';
 
 interface StockNewsProps {
   symbol: string;
 }
+
+const ARTICLES_PER_PAGE = 5;
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -20,6 +23,7 @@ function formatDate(dateStr: string | null): string {
 
 export function StockNews({ symbol }: StockNewsProps) {
   const { data, isLoading, error } = useStockNews(symbol);
+  const [currentPage, setCurrentPage] = useState(1);
 
   if (isLoading) {
     return (
@@ -59,13 +63,23 @@ export function StockNews({ symbol }: StockNewsProps) {
     );
   }
 
+  // Pagination
+  const totalPages = Math.ceil(articles.length / ARTICLES_PER_PAGE);
+  const startIndex = (currentPage - 1) * ARTICLES_PER_PAGE;
+  const endIndex = startIndex + ARTICLES_PER_PAGE;
+  const paginatedArticles = articles.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
   return (
     <Card padding={false}>
       <div className="px-6 pt-6 pb-2">
         <h3 className="text-sm font-medium text-foreground">News</h3>
       </div>
       <div className="divide-y divide-border">
-        {articles.map((article, i) => (
+        {paginatedArticles.map((article, i) => (
           <a
             key={article.url ?? i}
             href={article.url ?? '#'}
@@ -96,6 +110,39 @@ export function StockNews({ symbol }: StockNewsProps) {
           </a>
         ))}
       </div>
+      {totalPages > 1 && (
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between">
+          <button
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="px-3 py-1.5 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Previous
+          </button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => goToPage(page)}
+                className={`w-8 h-8 text-sm font-medium rounded-lg transition-colors ${
+                  page === currentPage
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1.5 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </Card>
   );
 }
