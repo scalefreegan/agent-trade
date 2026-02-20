@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from agent_trade.web.api import app
 from agent_trade.models import StockInfo
+from agent_trade.web.news_summary_manager import SummaryStatus
 from decimal import Decimal
 
 
@@ -282,11 +283,10 @@ class TestNewsSummary:
         mock_job = Mock(
             job_id="summary_AAPL_123.456",
             symbol="AAPL",
-            status="running",
+            status=SummaryStatus.RUNNING,
             sections=[],
             error=None,
         )
-        mock_job.status.value = "running"
         mock_manager.start_job.return_value = mock_job
 
         articles = [
@@ -322,11 +322,10 @@ class TestNewsSummary:
         mock_job = Mock(
             job_id="summary_TSLA_123.456",
             symbol="TSLA",
-            status="running",
+            status=SummaryStatus.RUNNING,
             sections=[],
             error=None,
         )
-        mock_job.status.value = "running"
         mock_manager.get_job.return_value = mock_job
 
         response = client.get("/api/v1/search/stocks/AAPL/news/summary/summary_TSLA_123.456")
@@ -339,14 +338,13 @@ class TestNewsSummary:
         mock_job = Mock(
             job_id="summary_AAPL_123.456",
             symbol="AAPL",
-            status="completed",
+            status=SummaryStatus.COMPLETED,
             sections=[
                 {"title": "Overview", "content": "Summary..."},
                 {"title": "Key Themes", "content": "Themes..."},
             ],
             error=None,
         )
-        mock_job.status.value = "completed"
         mock_manager.get_job.return_value = mock_job
 
         response = client.get("/api/v1/search/stocks/AAPL/news/summary/summary_AAPL_123.456")
@@ -363,11 +361,10 @@ class TestNewsSummary:
         mock_job = Mock(
             job_id="summary_AAPL_123.456",
             symbol="AAPL",
-            status="failed",
+            status=SummaryStatus.FAILED,
             sections=[],
             error="Agent timeout",
         )
-        mock_job.status.value = "failed"
         mock_manager.get_job.return_value = mock_job
 
         response = client.get("/api/v1/search/stocks/AAPL/news/summary/summary_AAPL_123.456")

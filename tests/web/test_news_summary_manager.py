@@ -146,7 +146,7 @@ class TestParseSections:
     def test_raises_on_missing_sections_key(self, manager):
         """Raises ValueError when 'sections' key is missing."""
         result = {}
-        with pytest.raises(ValueError, match="sections must be a list"):
+        with pytest.raises(ValueError, match="sections list is empty"):
             manager._parse_summary_sections(result)
 
     def test_raises_on_empty_sections(self, manager):
@@ -225,14 +225,17 @@ class TestEviction:
 
     def test_evicts_old_cache_entries_on_overflow(self, manager):
         """Evicts least recently accessed cache entries when MAX_CACHE exceeded."""
+        from datetime import timedelta
+
         # Fill cache to max
+        base_time = datetime(2026, 1, 1)
         old_keys = []
         for i in range(manager.MAX_CACHE):
             key = f"key_{i}"
             job = Mock(job_id=f"job_{i}", symbol="TEST")
             with manager._lock:
                 manager._cache[key] = job
-                manager._cache_access[key] = datetime(2026, 1, 1 + i)
+                manager._cache_access[key] = base_time + timedelta(hours=i)
             old_keys.append(key)
 
         # Add one more (should trigger eviction of oldest)
@@ -251,12 +254,15 @@ class TestEviction:
 
     def test_evicts_old_jobs_but_keeps_cached_ones(self, manager):
         """Evicts old jobs but never evicts jobs still in cache."""
+        from datetime import timedelta
+
         # Create a cached job (old but in cache)
+        base_time = datetime(2026, 1, 1)
         cached_job = Mock(
             job_id="cached_job",
             symbol="AAPL",
             status=SummaryStatus.COMPLETED,
-            started_at=datetime(2026, 1, 1),
+            started_at=base_time,
         )
         cache_key = "AAPL:hash"
         with manager._lock:
@@ -269,7 +275,7 @@ class TestEviction:
                 job_id=f"job_{i}",
                 symbol="TEST",
                 status=SummaryStatus.RUNNING,
-                started_at=datetime(2026, 2, 1 + i),
+                started_at=base_time + timedelta(hours=i + 1),
             )
             with manager._lock:
                 manager._jobs[f"job_{i}"] = job
@@ -319,4 +325,4 @@ class TestFailureTransitions:
         time.sleep(0.5)
 
         assert job.status == SummaryStatus.FAILED
-        assert "timeout" in job.error.lower()
+        assert "timed out" in job.error.lower()
