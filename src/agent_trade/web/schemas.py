@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, Field, field_serializer
 
 
 class ExperimentListItem(BaseModel):
@@ -400,4 +400,102 @@ class RunStatusResponse(BaseModel):
     status: str  # "idle", "running", "completed", "failed"
     started_at: datetime
     completed_at: datetime | None = None
+    error: str | None = None
+
+
+# ==============================================================================
+# Stock Search Schemas
+# ==============================================================================
+
+
+class TickerSearchResult(BaseModel):
+    """Single ticker search result."""
+
+    symbol: str
+    name: str
+    exchange: str | None = None
+    type: str | None = None
+
+
+class TickerSearchResponse(BaseModel):
+    """Ticker autocomplete search response."""
+
+    query: str
+    results: list[TickerSearchResult]
+    count: int
+
+
+class StockInfoResponse(BaseModel):
+    """Stock info response for search."""
+
+    symbol: str
+    name: str | None = None
+    current_price: float | None = None
+    market_cap: int | None = None
+    sector: str | None = None
+    industry: str | None = None
+    pe_ratio: float | None = None
+    fifty_two_week_high: float | None = None
+    fifty_two_week_low: float | None = None
+    volume: int | None = None
+    average_volume: int | None = None
+    business_summary: str | None = None
+
+    @field_serializer(
+        "current_price", "pe_ratio", "fifty_two_week_high", "fifty_two_week_low",
+    )
+    def serialize_decimal(self, v: Any) -> float | None:
+        """Convert Decimal to float."""
+        if v is None:
+            return None
+        if isinstance(v, Decimal):
+            return float(v)
+        return v
+
+
+class HistoricalPricePoint(BaseModel):
+    """Single historical price point."""
+
+    date: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+
+    @field_serializer("open", "high", "low", "close")
+    def serialize_decimal(self, v: Any) -> float:
+        """Convert Decimal to float."""
+        if isinstance(v, Decimal):
+            return float(v)
+        return v
+
+
+class HistoricalPriceResponse(BaseModel):
+    """Historical price data response."""
+
+    symbol: str
+    period: str
+    count: int
+    data: list[HistoricalPricePoint]
+    error: str | None = None
+
+
+class StockNewsArticle(BaseModel):
+    """News article for stock search."""
+
+    title: str | None = None
+    description: str | None = None
+    url: str | None = None
+    source: str | None = None
+    published_at: str | None = None
+    tickers: list[str] = Field(default_factory=list)
+
+
+class StockNewsResponse(BaseModel):
+    """Stock news response."""
+
+    symbol: str
+    count: int
+    articles: list[StockNewsArticle]
     error: str | None = None

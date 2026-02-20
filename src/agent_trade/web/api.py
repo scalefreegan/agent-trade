@@ -9,11 +9,13 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from agent_trade.web.routers import (
+    advisor,
     agents,
     analysis,
     experiments,
     performance,
     runs,
+    search,
     state,
 )
 
@@ -63,6 +65,8 @@ app.include_router(agents.router, prefix="/api/v1")
 app.include_router(performance.router, prefix="/api/v1")
 app.include_router(runs.router, prefix="/api/v1")
 app.include_router(analysis.router, prefix="/api/v1")
+app.include_router(search.router, prefix="/api/v1")
+app.include_router(advisor.router, prefix="/api/v1")
 
 
 @app.get("/api/health")

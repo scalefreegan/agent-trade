@@ -276,3 +276,126 @@ export interface StartingPortfolioSpec {
   cash?: number;
   positions: PortfolioPositionSpec[];
 }
+
+// ==============================================================================
+// Stock Search Types
+// ==============================================================================
+
+export interface TickerSearchResult {
+  symbol: string;
+  name: string;
+  exchange: string | null;
+  type: string | null;
+}
+
+export interface TickerSearchResponse {
+  query: string;
+  results: TickerSearchResult[];
+  count: number;
+}
+
+export interface StockInfo {
+  symbol: string;
+  name: string | null;
+  current_price: number | null;
+  market_cap: number | null;
+  sector: string | null;
+  industry: string | null;
+  pe_ratio: number | null;
+  fifty_two_week_high: number | null;
+  fifty_two_week_low: number | null;
+  volume: number | null;
+  average_volume: number | null;
+  business_summary: string | null;
+}
+
+export interface HistoricalPricePoint {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface HistoricalPriceResponse {
+  symbol: string;
+  period: string;
+  count: number;
+  data: HistoricalPricePoint[];
+  error: string | null;
+}
+
+export interface StockNewsArticle {
+  title: string | null;
+  description: string | null;
+  url: string | null;
+  source: string | null;
+  published_at: string | null;
+  tickers: string[];
+}
+
+export interface StockNewsResponse {
+  symbol: string;
+  count: number;
+  articles: StockNewsArticle[];
+  error: string | null;
+}
+
+// ==============================================================================
+// Advisor Types
+// ==============================================================================
+
+export interface AdvisorPreset {
+  id: string;
+  name: string;
+  philosophy: string;
+  icon: string;
+}
+
+export interface AdvisorPresetsResponse {
+  presets: AdvisorPreset[];
+}
+
+export interface AdvisorAgentConfig {
+  name: string;
+  philosophy: string;
+  agent_id?: string; // For experiment agents - unique identifier
+}
+
+export interface AdvisorRequest {
+  symbol: string;
+  agents: AdvisorAgentConfig[];
+  portfolio_value?: number;
+}
+
+export interface AdvisorRecommendation {
+  agent_name: string;
+  action: 'BUY' | 'SELL' | 'HOLD';
+  confidence: number;
+  target_price: number | null;
+  current_price: number | null;
+  amount_guidance: string;
+  reasoning: string;
+  risk_factors: string[];
+  time_horizon: string;
+}
+
+export interface AdvisorJobStatus {
+  job_id: string;
+  symbol: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+  recommendations: AdvisorRecommendation[];
+  total_agents: number;
+  completed_agents: number;
+  dropped_count: number;
+}
+
+export interface ExperimentAgentInfo {
+  agent_id: string;
+  name: string;
+  philosophy: string;
+}

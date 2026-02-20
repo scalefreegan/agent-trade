@@ -1,6 +1,8 @@
 import { type RefObject } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { DashboardIcon } from '../../assets/icons/DashboardIcon';
+import { SearchIcon } from '../../assets/icons/SearchIcon';
+import { AdvisorIcon } from '../../assets/icons/AdvisorIcon';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -14,7 +16,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose, closeB
   const location = useLocation();
 
   const isActive = (path: string) =>
-    location.pathname === path
+    location.pathname.startsWith(path) && (path !== '/' || location.pathname === '/')
       ? 'bg-white/15 text-white'
       : 'text-white/70 hover:bg-white/10 hover:text-white';
 
@@ -75,6 +77,24 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose, closeB
             <DashboardIcon className="w-5 h-5 shrink-0" />
             <span className="ml-3 text-sm font-medium whitespace-nowrap">Dashboard</span>
           </Link>
+          <Link
+            to="/search"
+            onClick={onMobileClose}
+            aria-current={location.pathname.startsWith('/search') ? 'page' : undefined}
+            className={`flex items-center rounded-lg px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isActive('/search')}`}
+          >
+            <SearchIcon className="w-5 h-5 shrink-0" />
+            <span className="ml-3 text-sm font-medium whitespace-nowrap">Stock Search</span>
+          </Link>
+          <Link
+            to="/advisor"
+            onClick={onMobileClose}
+            aria-current={location.pathname.startsWith('/advisor') ? 'page' : undefined}
+            className={`flex items-center rounded-lg px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isActive('/advisor')}`}
+          >
+            <AdvisorIcon className="w-5 h-5 shrink-0" />
+            <span className="ml-3 text-sm font-medium whitespace-nowrap">Advisor</span>
+          </Link>
         </nav>
       </div>
     </>
@@ -116,6 +136,28 @@ function SidebarContent({ collapsed, onToggle, isActive }: SidebarContentProps) 
         >
           <DashboardIcon className="w-5 h-5 shrink-0" />
           {!collapsed && <span className="ml-3 text-sm font-medium whitespace-nowrap">Dashboard</span>}
+        </Link>
+        <Link
+          to="/search"
+          title={collapsed ? 'Stock Search' : undefined}
+          aria-current={location.pathname.startsWith('/search') ? 'page' : undefined}
+          className={`flex items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isActive('/search')} ${
+            collapsed ? 'justify-center px-0 py-3' : 'px-4 py-3'
+          }`}
+        >
+          <SearchIcon className="w-5 h-5 shrink-0" />
+          {!collapsed && <span className="ml-3 text-sm font-medium whitespace-nowrap">Stock Search</span>}
+        </Link>
+        <Link
+          to="/advisor"
+          title={collapsed ? 'Advisor' : undefined}
+          aria-current={location.pathname.startsWith('/advisor') ? 'page' : undefined}
+          className={`flex items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isActive('/advisor')} ${
+            collapsed ? 'justify-center px-0 py-3' : 'px-4 py-3'
+          }`}
+        >
+          <AdvisorIcon className="w-5 h-5 shrink-0" />
+          {!collapsed && <span className="ml-3 text-sm font-medium whitespace-nowrap">Advisor</span>}
         </Link>
       </nav>
 
