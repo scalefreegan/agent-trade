@@ -6,9 +6,9 @@ import logging
 from datetime import datetime
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException, Field
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..advisor_manager import AdvisorStatus, advisor_manager
 from ..advisor_presets import ADVISOR_PRESETS
