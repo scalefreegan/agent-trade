@@ -57,7 +57,7 @@ async def autocomplete(q: str = Query(..., min_length=1)) -> TickerSearchRespons
 
 @router.get("/stocks/{symbol}")
 async def stock_info(
-    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Z0-9.-]+$")
+    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Za-z0-9.-]+$")
 ) -> StockInfoResponse:
     """Get detailed stock information for a symbol."""
     loop = asyncio.get_running_loop()
@@ -93,7 +93,7 @@ async def stock_info(
 
 @router.get("/stocks/{symbol}/history")
 async def stock_history(
-    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Z0-9.-]+$"),
+    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Za-z0-9.-]+$"),
     period: str = Query("1mo", pattern="^(1d|5d|1mo|3mo|6mo|1y|2y|5y|max)$"),
 ) -> HistoricalPriceResponse:
     """Get historical price data for a symbol."""
@@ -137,7 +137,7 @@ async def stock_history(
 
 @router.get("/stocks/{symbol}/news")
 async def stock_news(
-    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Z0-9.-]+$"),
+    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Za-z0-9.-]+$"),
     limit: int = Query(15, ge=1, le=50),
 ) -> StockNewsResponse:
     """Get news articles for a stock symbol using NewsAPI."""

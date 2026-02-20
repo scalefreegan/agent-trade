@@ -26,7 +26,7 @@ export function SearchInput({ onSelect, initialValue = '' }: SearchInputProps) {
     return () => clearTimeout(timer);
   }, [input]);
 
-  const { data } = useTickerSearch(debouncedQuery);
+  const { data, isError, error } = useTickerSearch(debouncedQuery);
   const results = data?.results ?? [];
 
   // Show dropdown when we have results and input is focused
@@ -160,6 +160,13 @@ export function SearchInput({ onSelect, initialValue = '' }: SearchInputProps) {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Error message */}
+      {isError && debouncedQuery.length > 0 && (
+        <p className="mt-1 text-xs text-loss">
+          Search service unavailable. {error instanceof Error ? error.message : 'Please try again.'}
+        </p>
       )}
     </div>
   );
