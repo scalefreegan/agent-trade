@@ -342,6 +342,23 @@ export interface StockNewsResponse {
   error: string | null;
 }
 
+export interface NewsSummarySection {
+  title: string;
+  content: string;
+}
+
+export interface NewsSummaryJobResponse {
+  job_id: string;
+  symbol: string;
+  status: 'running' | 'completed' | 'failed';
+  sections: NewsSummarySection[];
+  error: string | null;
+}
+
+export interface NewsSummaryRequest {
+  articles: StockNewsArticle[];
+}
+
 // ==============================================================================
 // Advisor Types
 // ==============================================================================

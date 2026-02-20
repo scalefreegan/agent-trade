@@ -499,3 +499,31 @@ class StockNewsResponse(BaseModel):
     count: int
     articles: list[StockNewsArticle]
     error: str | None = None
+
+
+# ==============================================================================
+# News Summary Schemas
+# ==============================================================================
+
+
+class NewsSummarySection(BaseModel):
+    """A section in the news summary."""
+
+    title: str
+    content: str
+
+
+class NewsSummaryRequest(BaseModel):
+    """Request body for news summary generation."""
+
+    articles: list[StockNewsArticle]
+
+
+class NewsSummaryJobResponse(BaseModel):
+    """News summary job status response."""
+
+    job_id: str
+    symbol: str
+    status: str  # "running", "completed", "failed"
+    sections: list[NewsSummarySection] = Field(default_factory=list)
+    error: str | None = None

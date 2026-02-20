@@ -5,13 +5,17 @@ import logging
 from functools import partial
 
 import yfinance as yf
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, Body, HTTPException, Path, Query
 
 from agent_trade.news_data import search_news
 from agent_trade.stock_data import get_historical_prices, get_stock_info
+from agent_trade.web.news_summary_manager import news_summary_manager
 from agent_trade.web.schemas import (
     HistoricalPricePoint,
     HistoricalPriceResponse,
+    NewsSummaryJobResponse,
+    NewsSummaryRequest,
+    NewsSummarySection,
     StockInfoResponse,
     StockNewsArticle,
     StockNewsResponse,
@@ -183,4 +187,90 @@ async def stock_news(
         count=len(articles),
         articles=articles,
         error=news.error,
+    )
+
+
+@router.post("/stocks/{symbol}/news/summary")
+async def start_news_summary(
+    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Za-z0-9.-]+$"),
+    body: NewsSummaryRequest = Body(...),
+) -> NewsSummaryJobResponse:
+    """Start an AI summary generation job for news articles.
+
+    Args:
+        symbol: Stock symbol
+        body: Request body containing articles to summarize (1-20 articles)
+
+    Returns:
+        NewsSummaryJobResponse with job_id and initial status
+    """
+    # Validate article count
+    if not body.articles or len(body.articles) > 20:
+        raise HTTPException(
+            status_code=400,
+            detail="Must provide between 1 and 20 articles",
+        )
+
+    # Convert to dict format for manager
+    articles_data = [
+        {
+            "title": a.title,
+            "source": a.source,
+            "description": a.description,
+            "published_at": a.published_at,
+        }
+        for a in body.articles
+    ]
+
+    # Start job
+    job = news_summary_manager.start_job(symbol.upper(), articles_data)
+
+    # Convert to response
+    return NewsSummaryJobResponse(
+        job_id=job.job_id,
+        symbol=job.symbol,
+        status=job.status.value,
+        sections=[
+            NewsSummarySection(title=s["title"], content=s["content"])
+            for s in job.sections
+        ],
+        error=job.error,
+    )
+
+
+@router.get("/stocks/{symbol}/news/summary/{job_id}")
+async def get_news_summary_status(
+    symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Za-z0-9.-]+$"),
+    job_id: str = Path(...),
+) -> NewsSummaryJobResponse:
+    """Get the status of a news summary generation job.
+
+    Args:
+        symbol: Stock symbol
+        job_id: Job identifier from start_news_summary
+
+    Returns:
+        NewsSummaryJobResponse with current status and sections (if completed)
+    """
+    job = news_summary_manager.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    # Verify symbol matches
+    if job.symbol != symbol.upper():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job {job_id} is for symbol {job.symbol}, not {symbol.upper()}",
+        )
+
+    return NewsSummaryJobResponse(
+        job_id=job.job_id,
+        symbol=job.symbol,
+        status=job.status.value,
+        sections=[
+            NewsSummarySection(title=s["title"], content=s["content"])
+            for s in job.sections
+        ],
+        error=job.error,
     )

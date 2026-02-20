@@ -1,11 +1,13 @@
 // TanStack Query hooks for stock search
-import { useQuery } from '@tanstack/react-query';
-import { fetchApi } from './client';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { fetchApi, postApi } from './client';
 import type {
   TickerSearchResponse,
   StockInfo,
   HistoricalPriceResponse,
   StockNewsResponse,
+  NewsSummaryRequest,
+  NewsSummaryJobResponse,
 } from './types';
 
 export function useTickerSearch(query: string) {
@@ -52,5 +54,28 @@ export function useStockNews(symbol: string | null) {
       fetchApi<StockNewsResponse>(`/search/stocks/${symbol}/news?limit=15`),
     enabled: !!symbol,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useStartNewsSummary(symbol: string) {
+  return useMutation({
+    mutationFn: (body: NewsSummaryRequest) =>
+      postApi<NewsSummaryJobResponse>(
+        `/search/stocks/${symbol}/news/summary`,
+        body
+      ),
+  });
+}
+
+export function useNewsSummaryStatus(symbol: string, jobId: string | null) {
+  return useQuery({
+    queryKey: ['newsSummary', symbol, jobId],
+    queryFn: () =>
+      fetchApi<NewsSummaryJobResponse>(
+        `/search/stocks/${symbol}/news/summary/${jobId}`
+      ),
+    enabled: !!jobId,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'running' ? 2000 : false,
   });
 }
