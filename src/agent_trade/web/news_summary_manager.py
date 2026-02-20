@@ -13,7 +13,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from agent_trade.experiment.claude_wrapper import query_claude_code
+from ..claude_wrapper import run_agent
 
 logger = logging.getLogger(__name__)
 
@@ -167,8 +167,8 @@ class NewsSummaryManager:
         Returns:
             Agent response text
         """
-        result = await query_claude_code(
-            user_prompt="Generate the summary as JSON according to the format specified.",
+        result = await run_agent(
+            prompt="Generate the summary as JSON according to the format specified.",
             system_prompt=system_prompt,
             max_turns=1,
             timeout=120,
