@@ -57,18 +57,37 @@ class NewsSummaryManager:
     def _evict_old_jobs(self) -> None:
         """Evict oldest jobs when MAX_JOBS is exceeded.
 
+        Never evicts jobs that are still in cache (to prevent 404 on cached job_ids).
         Must be called with self._lock held.
         """
         if len(self._jobs) <= self.MAX_JOBS:
             return
 
-        # Sort by started_at, keep most recent
-        sorted_jobs = sorted(
-            self._jobs.items(),
+        # Get job IDs that are in cache (must keep these)
+        cached_job_ids = {job.job_id for job in self._cache.values()}
+
+        # Separate cached and non-cached jobs
+        cached_jobs = {
+            job_id: job
+            for job_id, job in self._jobs.items()
+            if job_id in cached_job_ids
+        }
+        other_jobs = {
+            job_id: job
+            for job_id, job in self._jobs.items()
+            if job_id not in cached_job_ids
+        }
+
+        # Keep all cached jobs + most recent non-cached jobs
+        max_other = max(0, self.MAX_JOBS - len(cached_jobs))
+        sorted_other = sorted(
+            other_jobs.items(),
             key=lambda x: x[1].started_at,
             reverse=True,
         )
-        self._jobs = dict(sorted_jobs[: self.MAX_JOBS])
+        kept_other = dict(sorted_other[:max_other])
+
+        self._jobs = {**cached_jobs, **kept_other}
 
     def _evict_old_cache(self) -> None:
         """Evict least recently accessed cache entries when MAX_CACHE is exceeded.
@@ -154,6 +173,8 @@ class NewsSummaryManager:
     def get_job(self, job_id: str) -> SummaryJob | None:
         """Get job by ID.
 
+        Checks both active jobs and cache to handle cached job IDs.
+
         Args:
             job_id: Job identifier
 
@@ -161,7 +182,18 @@ class NewsSummaryManager:
             SummaryJob if found, None otherwise
         """
         with self._lock:
-            return self._jobs.get(job_id)
+            # First check active jobs
+            job = self._jobs.get(job_id)
+            if job:
+                return job
+
+            # If not in active jobs, check cache (for cached job IDs)
+            # Search cache values for matching job_id
+            for cached_job in self._cache.values():
+                if cached_job.job_id == job_id:
+                    return cached_job
+
+            return None
 
     def _run_summary(
         self,
@@ -190,12 +222,8 @@ class NewsSummaryManager:
                 self._run_agent(system_prompt)
             )
 
-            # Parse sections
+            # Parse sections (raises ValueError if invalid or empty)
             sections = self._parse_summary_sections(result)
-
-            # Validate we have sections
-            if not sections:
-                raise ValueError("Agent returned empty sections list")
 
             # Update job
             job.status = SummaryStatus.COMPLETED
@@ -311,32 +339,28 @@ Do not wrap your response in code blocks. Return ONLY the raw JSON object.
 
         Returns:
             List of section dicts with 'title' and 'content' keys
+
+        Raises:
+            ValueError: If sections are missing, malformed, or invalid
         """
-        try:
-            sections = result.get("sections", [])
+        sections = result.get("sections", [])
 
-            # Validate sections
-            if not isinstance(sections, list):
-                raise ValueError("sections must be a list")
+        # Validate sections
+        if not isinstance(sections, list):
+            raise ValueError("sections must be a list")
 
-            for section in sections:
-                if not isinstance(section, dict):
-                    raise ValueError("Each section must be a dict")
-                if "title" not in section or "content" not in section:
-                    raise ValueError("Each section must have 'title' and 'content'")
+        if not sections:
+            raise ValueError("sections list is empty")
 
-            return sections
+        for i, section in enumerate(sections):
+            if not isinstance(section, dict):
+                raise ValueError(f"Section {i} is not a dict")
+            if "title" not in section or "content" not in section:
+                raise ValueError(f"Section {i} missing 'title' or 'content'")
+            if not section["title"] or not section["content"]:
+                raise ValueError(f"Section {i} has empty 'title' or 'content'")
 
-        except (KeyError, ValueError) as e:
-            logger.error(f"Failed to parse summary sections: {e}")
-            logger.error(f"Agent response: {result}")
-            # Return error section
-            return [
-                {
-                    "title": "Error",
-                    "content": f"Failed to parse summary: {str(e)}",
-                }
-            ]
+        return sections
 
 
 # Global manager instance

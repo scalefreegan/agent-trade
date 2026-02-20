@@ -182,7 +182,12 @@ export function StockNews({ symbol }: StockNewsProps) {
 
       {activeTab === 'articles' && (
         <>
-          <div className="flex-1 divide-y divide-border overflow-y-auto min-h-0">
+          <div
+            id="panel-articles"
+            role="tabpanel"
+            aria-labelledby="tab-articles"
+            className="flex-1 divide-y divide-border overflow-y-auto min-h-0"
+          >
             {paginatedArticles.map((article, i) => (
               <a
                 key={article.url ?? i}
@@ -224,7 +229,12 @@ export function StockNews({ symbol }: StockNewsProps) {
 
       {activeTab === 'summary' && (
         <>
-          <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
+          <div
+            id="panel-summary"
+            role="tabpanel"
+            aria-labelledby="tab-summary"
+            className="flex-1 overflow-y-auto min-h-0 px-6 py-4"
+          >
             {!summaryJobId && (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <p className="text-sm text-muted-foreground text-center">
