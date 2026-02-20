@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 import queue
 import threading
 import uuid
@@ -134,6 +135,14 @@ class AdvisorManager:
         Returns:
             AdvisorJob instance.
         """
+        # CRITICAL: Ensure ANTHROPIC_API_KEY is not set to force Claude Code subscription usage
+        if os.getenv("ANTHROPIC_API_KEY"):
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY must not be set when running advisor agents. "
+                "Agents must use Claude Code subscription via the 'claude' CLI. "
+                "Unset the environment variable or use 'make web-backend'."
+            )
+
         job_id = str(uuid.uuid4())
 
         with self._job_lock:
