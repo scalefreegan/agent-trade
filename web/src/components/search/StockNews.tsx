@@ -74,11 +74,11 @@ export function StockNews({ symbol }: StockNewsProps) {
   };
 
   return (
-    <Card padding={false}>
+    <Card padding={false} className="h-full flex flex-col">
       <div className="px-6 pt-6 pb-2">
         <h3 className="text-sm font-medium text-foreground">News</h3>
       </div>
-      <div className="divide-y divide-border">
+      <div className="flex-1 divide-y divide-border overflow-y-auto min-h-0">
         {paginatedArticles.map((article, i) => (
           <a
             key={article.url ?? i}
@@ -111,7 +111,7 @@ export function StockNews({ symbol }: StockNewsProps) {
         ))}
       </div>
       {totalPages > 1 && (
-        <div className="px-6 py-4 border-t border-border flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between flex-shrink-0">
           <button
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 1}

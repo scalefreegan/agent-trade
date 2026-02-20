@@ -57,10 +57,10 @@ export function SearchPage() {
         <div className="space-y-6">
           <StockOverview stock={stock} />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 h-[600px]">
               <StockChart symbol={stock.symbol} />
             </div>
-            <div>
+            <div className="h-[600px]">
               <StockNews symbol={stock.symbol} />
             </div>
           </div>

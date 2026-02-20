@@ -65,7 +65,7 @@ export function StockChart({ symbol }: StockChartProps) {
   };
 
   return (
-    <Card>
+    <Card className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-foreground">Price History</h3>
         <div className="flex gap-1">
@@ -85,58 +85,60 @@ export function StockChart({ symbol }: StockChartProps) {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">
-          Loading chart...
-        </div>
-      ) : error ? (
-        <div className="h-64 flex items-center justify-center text-loss text-sm">
-          Failed to load chart data
-        </div>
-      ) : chartData.length === 0 ? (
-        <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">
-          No data available for this period
-        </div>
-      ) : (
-        <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-            <defs>
-              <linearGradient id={`gradient-${symbol}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={lineColor} stopOpacity={0.2} />
-                <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
-            <XAxis
-              dataKey="date"
-              tick={{ fill: ct.axis, fontSize: 11 }}
-              stroke={ct.axisStroke}
-              tickLine={false}
-              axisLine={false}
-              minTickGap={40}
-            />
-            <YAxis
-              tick={{ fill: ct.axis, fontSize: 11 }}
-              stroke={ct.axisStroke}
-              tickLine={false}
-              axisLine={false}
-              domain={['auto', 'auto']}
-              tickFormatter={(v: number) => `$${v.toFixed(0)}`}
-              width={55}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Area
-              type="monotone"
-              dataKey="close"
-              stroke={lineColor}
-              strokeWidth={2}
-              fill={`url(#gradient-${symbol})`}
-              dot={false}
-              activeDot={{ r: 4, fill: lineColor }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      )}
+      <div className="flex-1 min-h-0">
+        {isLoading ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+            Loading chart...
+          </div>
+        ) : error ? (
+          <div className="h-full flex items-center justify-center text-loss text-sm">
+            Failed to load chart data
+          </div>
+        ) : chartData.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+            No data available for this period
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+              <defs>
+                <linearGradient id={`gradient-${symbol}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={lineColor} stopOpacity={0.2} />
+                  <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: ct.axis, fontSize: 11 }}
+                stroke={ct.axisStroke}
+                tickLine={false}
+                axisLine={false}
+                minTickGap={40}
+              />
+              <YAxis
+                tick={{ fill: ct.axis, fontSize: 11 }}
+                stroke={ct.axisStroke}
+                tickLine={false}
+                axisLine={false}
+                domain={['auto', 'auto']}
+                tickFormatter={(v: number) => `$${v.toFixed(0)}`}
+                width={55}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Area
+                type="monotone"
+                dataKey="close"
+                stroke={lineColor}
+                strokeWidth={2}
+                fill={`url(#gradient-${symbol})`}
+                dot={false}
+                activeDot={{ r: 4, fill: lineColor }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
     </Card>
   );
 }
