@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from agent_trade.web.api import app
 from agent_trade.models import StockInfo
+from agent_trade.web.news_summary_manager import SummaryStatus
 from decimal import Decimal
 
 
@@ -251,3 +252,124 @@ class TestStockNews:
             response = client.get("/api/v1/search/stocks/msft/news")
             assert response.status_code == 200
             assert response.json()["symbol"] == "MSFT"
+
+
+class TestNewsSummary:
+    """Test POST /search/stocks/{symbol}/news/summary and GET endpoints."""
+
+    def test_start_summary_requires_articles(self):
+        """Returns 422 when articles list is empty."""
+        response = client.post(
+            "/api/v1/search/stocks/AAPL/news/summary",
+            json={"articles": []},
+        )
+        assert response.status_code == 422
+
+    def test_start_summary_enforces_max_articles(self):
+        """Returns 422 when articles exceed maximum (20)."""
+        articles = [
+            {"title": f"Article {i}", "source": "Test", "description": "...", "published_at": "2026-02-20"}
+            for i in range(21)
+        ]
+        response = client.post(
+            "/api/v1/search/stocks/AAPL/news/summary",
+            json={"articles": articles},
+        )
+        assert response.status_code == 422
+
+    @patch("agent_trade.web.routers.search.news_summary_manager")
+    def test_start_summary_returns_job_id(self, mock_manager):
+        """Returns job_id and running status on successful start."""
+        mock_job = Mock(
+            job_id="summary_AAPL_123.456",
+            symbol="AAPL",
+            status=SummaryStatus.RUNNING,
+            sections=[],
+            error=None,
+        )
+        mock_manager.start_job.return_value = mock_job
+
+        articles = [
+            {"title": "Article 1", "source": "Test", "description": "...", "published_at": "2026-02-20"}
+        ]
+        response = client.post(
+            "/api/v1/search/stocks/AAPL/news/summary",
+            json={"articles": articles},
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["job_id"] == "summary_AAPL_123.456"
+        assert data["symbol"] == "AAPL"
+        assert data["status"] == "running"
+
+    def test_get_summary_validates_job_id_format(self):
+        """Returns 422 for malformed job_id."""
+        response = client.get("/api/v1/search/stocks/AAPL/news/summary/invalid@id")
+        assert response.status_code == 422
+
+    @patch("agent_trade.web.routers.search.news_summary_manager")
+    def test_get_summary_returns_404_for_unknown_job(self, mock_manager):
+        """Returns 404 when job_id not found."""
+        mock_manager.get_job.return_value = None
+
+        response = client.get("/api/v1/search/stocks/AAPL/news/summary/summary_AAPL_123.456")
+        assert response.status_code == 404
+
+    @patch("agent_trade.web.routers.search.news_summary_manager")
+    def test_get_summary_returns_400_for_symbol_mismatch(self, mock_manager):
+        """Returns 400 when job symbol doesn't match path symbol."""
+        mock_job = Mock(
+            job_id="summary_TSLA_123.456",
+            symbol="TSLA",
+            status=SummaryStatus.RUNNING,
+            sections=[],
+            error=None,
+        )
+        mock_manager.get_job.return_value = mock_job
+
+        response = client.get("/api/v1/search/stocks/AAPL/news/summary/summary_TSLA_123.456")
+        assert response.status_code == 400
+        assert "symbol" in response.json()["detail"].lower()
+
+    @patch("agent_trade.web.routers.search.news_summary_manager")
+    def test_get_summary_returns_completed_job(self, mock_manager):
+        """Returns completed job with sections."""
+        mock_job = Mock(
+            job_id="summary_AAPL_123.456",
+            symbol="AAPL",
+            status=SummaryStatus.COMPLETED,
+            sections=[
+                {"title": "Overview", "content": "Summary..."},
+                {"title": "Key Themes", "content": "Themes..."},
+            ],
+            error=None,
+        )
+        mock_manager.get_job.return_value = mock_job
+
+        response = client.get("/api/v1/search/stocks/AAPL/news/summary/summary_AAPL_123.456")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["status"] == "completed"
+        assert len(data["sections"]) == 2
+        assert data["sections"][0]["title"] == "Overview"
+
+    @patch("agent_trade.web.routers.search.news_summary_manager")
+    def test_get_summary_returns_failed_job(self, mock_manager):
+        """Returns failed job with error message."""
+        mock_job = Mock(
+            job_id="summary_AAPL_123.456",
+            symbol="AAPL",
+            status=SummaryStatus.FAILED,
+            sections=[],
+            error="Agent timeout",
+        )
+        mock_manager.get_job.return_value = mock_job
+
+        response = client.get("/api/v1/search/stocks/AAPL/news/summary/summary_AAPL_123.456")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["status"] == "failed"
+        assert data["error"] == "Agent timeout"

@@ -3,6 +3,7 @@ import { Card } from '../components/ui/Card';
 import { AgentSelector } from '../components/advisor/AgentSelector';
 import { RecommendationCard } from '../components/advisor/RecommendationCard';
 import { ConsensusSummary } from '../components/advisor/ConsensusSummary';
+import { SearchInput } from '../components/search/SearchInput';
 import { useStartRecommendation, useAdvisorJobStatus } from '../api/advisor';
 import type { AdvisorAgentConfig } from '../api/types';
 
@@ -56,19 +57,12 @@ export function AdvisorPage() {
         <div className="space-y-6">
           {/* Symbol + Portfolio value */}
           <Card>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div>
-                <label htmlFor="symbol-input" className="block text-sm font-medium text-foreground mb-1">
+                <label htmlFor="symbol-input" className="block text-sm font-medium text-foreground mb-2">
                   Stock Symbol
                 </label>
-                <input
-                  id="symbol-input"
-                  type="text"
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                  placeholder="e.g. AAPL"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <SearchInput onSelect={setSymbol} initialValue={symbol} />
               </div>
               <div>
                 <label htmlFor="portfolio-value" className="block text-sm font-medium text-foreground mb-1">

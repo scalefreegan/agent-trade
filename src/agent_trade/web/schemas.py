@@ -1,9 +1,9 @@
 """Response schemas for API - converts Decimal to float for JSON serialization."""
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, model_validator
 
 
 class ExperimentListItem(BaseModel):
@@ -499,3 +499,38 @@ class StockNewsResponse(BaseModel):
     count: int
     articles: list[StockNewsArticle]
     error: str | None = None
+
+
+# ==============================================================================
+# News Summary Schemas
+# ==============================================================================
+
+
+class NewsSummarySection(BaseModel):
+    """A section in the news summary."""
+
+    title: str
+    content: str
+
+
+class NewsSummaryRequest(BaseModel):
+    """Request body for news summary generation."""
+
+    articles: list[StockNewsArticle] = Field(min_length=1, max_length=20)
+
+
+class NewsSummaryJobResponse(BaseModel):
+    """News summary job status response."""
+
+    job_id: str
+    symbol: str
+    status: Literal["running", "completed", "failed"]
+    sections: list[NewsSummarySection] = Field(default_factory=list)
+    error: str | None = None
+
+    @model_validator(mode="after")
+    def validate_error_on_failure(self) -> "NewsSummaryJobResponse":
+        """Ensure error is set when status is failed."""
+        if self.status == "failed" and not self.error:
+            self.error = "Summary generation failed"
+        return self
