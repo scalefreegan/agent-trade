@@ -231,5 +231,5 @@ def _job_to_status(job) -> AdvisorJobStatus:
         error=job.error,
         recommendations=recommendations,
         total_agents=len(job.agent_configs),
-        completed_agents=len(job.recommendations),
+        completed_agents=len(recommendations),  # Use filtered count for consistency
     )

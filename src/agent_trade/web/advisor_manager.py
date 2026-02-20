@@ -258,11 +258,12 @@ class AdvisorManager:
                 agent_name, philosophy, symbol, portfolio_value
             )
 
-            # run_agent handles its own timeout/cleanup - no outer wait_for to avoid subprocess leak
+            # run_agent handles timeout internally and kills subprocess on expiry
             result = await run_agent(
                 prompt=user_prompt,
                 system_prompt=system_prompt,
                 max_turns=15,
+                timeout=300,  # 5 minute wall-clock timeout
             )
 
             # Validate the recommendation has required fields
