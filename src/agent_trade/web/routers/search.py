@@ -7,7 +7,7 @@ from functools import partial
 import yfinance as yf
 from fastapi import APIRouter, HTTPException, Query
 
-from agent_trade.news_data import get_stock_news
+from agent_trade.news_data import search_news
 from agent_trade.stock_data import get_historical_prices, get_stock_info
 from agent_trade.web.schemas import (
     HistoricalPricePoint,
@@ -119,11 +119,12 @@ async def stock_news(
     symbol: str,
     limit: int = Query(15, ge=1, le=50),
 ) -> StockNewsResponse:
-    """Get news articles for a stock symbol."""
+    """Get news articles for a stock symbol using NewsAPI."""
     loop = asyncio.get_running_loop()
     try:
+        # Use NewsAPI search like the agent game does
         news = await loop.run_in_executor(
-            None, partial(get_stock_news, [symbol.upper()], limit)
+            None, partial(search_news, f"{symbol.upper()} stock", limit)
         )
     except ValueError:
         # API key not configured — return empty with error
@@ -131,7 +132,7 @@ async def stock_news(
             symbol=symbol.upper(),
             count=0,
             articles=[],
-            error="News API not configured (TIINGO_API_KEY not set)",
+            error="News API not configured (NEWSAPI_KEY not set)",
         )
     except Exception as e:
         logger.exception("Failed to get news for %s", symbol)
@@ -142,14 +143,9 @@ async def stock_news(
             error=str(e),
         )
 
-    # Deduplicate by URL
-    seen_urls: set[str] = set()
+    # Convert NewsAPI articles to stock news format
     articles: list[StockNewsArticle] = []
     for a in news.articles:
-        if a.url and a.url in seen_urls:
-            continue
-        if a.url:
-            seen_urls.add(a.url)
         articles.append(
             StockNewsArticle(
                 title=a.title,
@@ -157,7 +153,7 @@ async def stock_news(
                 url=a.url,
                 source=a.source,
                 published_at=a.published_at,
-                tickers=a.tickers,
+                tickers=[symbol.upper()],  # Tag with the searched symbol
             )
         )
 
