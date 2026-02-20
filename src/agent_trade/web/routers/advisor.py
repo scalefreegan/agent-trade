@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -36,24 +36,24 @@ class AdvisorRequest(BaseModel):
 
 class Recommendation(BaseModel):
     agent_name: str
-    action: str  # BUY | SELL | HOLD
+    action: Literal["BUY", "SELL", "HOLD"]
     confidence: float
     target_price: float | None = None
     current_price: float | None = None
     amount_guidance: str = ""
     reasoning: str = ""
-    risk_factors: list[str] = []
+    risk_factors: list[str] = Field(default_factory=list)
     time_horizon: str = "Unknown"
 
 
 class AdvisorJobStatus(BaseModel):
     job_id: str
     symbol: str
-    status: str  # pending | running | completed | failed
+    status: Literal["pending", "running", "completed", "failed"]
     started_at: datetime
     completed_at: datetime | None = None
     error: str | None = None
-    recommendations: list[Recommendation] = []
+    recommendations: list[Recommendation] = Field(default_factory=list)
     total_agents: int = 0
     completed_agents: int = 0
 

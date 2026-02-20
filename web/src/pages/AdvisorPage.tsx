@@ -162,8 +162,8 @@ export function AdvisorPage() {
             <div>
               <h3 className="text-sm font-medium text-foreground mb-3">Individual Recommendations</h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {job!.recommendations.map((rec) => (
-                  <RecommendationCard key={rec.agent_name} recommendation={rec} />
+                {job!.recommendations.map((rec, idx) => (
+                  <RecommendationCard key={`${rec.agent_name}-${idx}`} recommendation={rec} />
                 ))}
               </div>
             </div>

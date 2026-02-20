@@ -489,7 +489,7 @@ class StockNewsArticle(BaseModel):
     url: str | None = None
     source: str | None = None
     published_at: str | None = None
-    tickers: list[str] = []
+    tickers: list[str] = Field(default_factory=list)
 
 
 class StockNewsResponse(BaseModel):
