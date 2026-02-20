@@ -158,17 +158,17 @@ class NewsSummaryManager:
         finally:
             loop.close()
 
-    async def _run_agent(self, system_prompt: str) -> str:
+    async def _run_agent(self, system_prompt: str) -> dict[str, Any]:
         """Run Claude agent with system prompt.
 
         Args:
             system_prompt: System prompt for the agent
 
         Returns:
-            Agent response text
+            Parsed JSON dict from agent
         """
         result = await run_agent(
-            prompt="Generate the summary as JSON according to the format specified.",
+            prompt="Analyze the articles and respond with ONLY the JSON object - no markdown, no code blocks, no extra text.",
             system_prompt=system_prompt,
             max_turns=1,
             timeout=120,
@@ -216,11 +216,10 @@ Analyze these articles and create a structured summary with the following sectio
 3. **Impact Analysis**: What these developments might mean for the stock (interpret significance, mention both opportunities and risks)
 4. **Sources**: List the most relevant articles by number and title
 
-# Response Format
+# Required Output Format
 
-Return your summary as JSON in this exact format:
+You MUST respond with ONLY a JSON object (no markdown code blocks, no extra text, no commentary):
 
-```json
 {{
   "sections": [
     {{"title": "Overview", "content": "..."}},
@@ -229,38 +228,24 @@ Return your summary as JSON in this exact format:
     {{"title": "Sources", "content": "..."}}
   ]
 }}
-```
 
-Use markdown formatting in the content fields. For the Sources section, reference articles by number (e.g., "Article 1: Title...").
+Use markdown formatting in the content fields (bullet points, bold, etc.).
+For the Sources section, reference articles by number (e.g., "1. **Article Title** - Source").
+Do not wrap your response in code blocks. Return ONLY the raw JSON object.
 """
         return prompt
 
-    def _parse_summary_sections(self, result: str) -> list[dict[str, str]]:
+    def _parse_summary_sections(self, result: dict[str, Any]) -> list[dict[str, str]]:
         """Parse sections from agent response.
 
         Args:
-            result: Agent response text
+            result: Parsed JSON dict from agent
 
         Returns:
             List of section dicts with 'title' and 'content' keys
         """
-        # Try to find JSON in the response
-        # Agent might wrap it in markdown code blocks
-        result_stripped = result.strip()
-
-        # Remove markdown code fences if present
-        if result_stripped.startswith("```"):
-            lines = result_stripped.split("\n")
-            # Remove first line (```json or ```)
-            lines = lines[1:]
-            # Remove last line if it's just ```
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            result_stripped = "\n".join(lines)
-
         try:
-            data = json.loads(result_stripped)
-            sections = data.get("sections", [])
+            sections = result.get("sections", [])
 
             # Validate sections
             if not isinstance(sections, list):
@@ -274,7 +259,7 @@ Use markdown formatting in the content fields. For the Sources section, referenc
 
             return sections
 
-        except (json.JSONDecodeError, ValueError) as e:
+        except (KeyError, ValueError) as e:
             logger.error(f"Failed to parse summary sections: {e}")
             logger.error(f"Agent response: {result}")
             # Return error section
