@@ -184,6 +184,60 @@ class TestJobStatusEndpoint:
         data = status_response.json()
         assert data["dropped_count"] == 0
 
+    def test_counts_malformed_recommendations_as_dropped(self):
+        """Returns dropped_count > 0 when some recommendations are malformed."""
+        from agent_trade.web.advisor_manager import advisor_manager, AdvisorJob, AdvisorStatus
+        from datetime import datetime
+
+        # Create a job with both valid and invalid recommendations
+        job = AdvisorJob(
+            job_id="test-job-malformed",
+            symbol="TSLA",
+            status=AdvisorStatus.COMPLETED,
+            started_at=datetime.now(),
+            agent_configs=[
+                {"name": "ValidAgent", "philosophy": "Value"},
+                {"name": "InvalidAgent1", "philosophy": "Growth"},
+                {"name": "InvalidAgent2", "philosophy": "Momentum"},
+            ],
+            recommendations=[
+                # Valid recommendation
+                {
+                    "agent_name": "ValidAgent",
+                    "action": "BUY",
+                    "confidence": 0.8,
+                    "reasoning": "Good value",
+                },
+                # Invalid: confidence is a string (not float)
+                {
+                    "agent_name": "InvalidAgent1",
+                    "action": "SELL",
+                    "confidence": "not-a-number",
+                    "reasoning": "Overvalued",
+                },
+                # Invalid: action is malformed (not BUY/SELL/HOLD)
+                {
+                    "agent_name": "InvalidAgent2",
+                    "action": 123,  # should be string
+                    "confidence": 0.5,
+                    "reasoning": "Neutral",
+                },
+            ],
+        )
+
+        # Manually add to the singleton manager
+        advisor_manager._jobs[job.job_id] = job
+
+        # Fetch status
+        response = client.get(f"/api/v1/advisor/jobs/{job.job_id}")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["dropped_count"] == 2  # Two malformed recommendations
+        assert len(data["recommendations"]) == 1  # Only valid one remains
+        assert data["recommendations"][0]["agent_name"] == "ValidAgent"
+        assert data["completed_agents"] == 1  # Based on filtered count
+
 
 class TestExperimentAgentsEndpoint:
     """Test GET /advisor/experiments/{experiment_id}/agents endpoint."""

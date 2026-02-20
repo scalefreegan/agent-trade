@@ -13,7 +13,7 @@ export function AdvisorPage() {
   const [jobId, setJobId] = useState<string | null>(null);
 
   const startMutation = useStartRecommendation();
-  const { data: job } = useAdvisorJobStatus(jobId);
+  const { data: job, isError: jobPollingError, error: jobError } = useAdvisorJobStatus(jobId);
 
   const isRunning = job?.status === 'running' || job?.status === 'pending';
   const isComplete = job?.status === 'completed';
@@ -148,6 +148,22 @@ export function AdvisorPage() {
               </div>
             )}
           </Card>
+
+          {/* Error when job status polling fails */}
+          {jobPollingError && (
+            <div className="rounded-lg border border-loss/30 bg-loss/5 px-4 py-3">
+              <p className="text-sm font-medium text-loss">Failed to retrieve job status</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {jobError instanceof Error ? jobError.message : 'Unable to fetch recommendation progress. Please try again.'}
+              </p>
+              <button
+                onClick={handleReset}
+                className="mt-3 text-xs text-primary hover:underline"
+              >
+                Start a new search
+              </button>
+            </div>
+          )}
 
           {/* Warning when recommendations were dropped */}
           {job && job.dropped_count > 0 && (
