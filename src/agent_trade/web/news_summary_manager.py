@@ -5,7 +5,6 @@ Spawns Claude agents to synthesize news articles into structured summaries.
 
 import asyncio
 import hashlib
-import json
 import logging
 import threading
 from dataclasses import dataclass, field
@@ -40,12 +39,57 @@ class SummaryJob:
 
 
 class NewsSummaryManager:
-    """Manages news summary generation jobs."""
+    """Manages news summary generation jobs.
+
+    Maintains bounded in-memory storage for jobs and cache with LRU eviction.
+    """
+
+    MAX_JOBS = 100  # Maximum concurrent/recent jobs to track
+    MAX_CACHE = 50  # Maximum cached summaries
 
     def __init__(self) -> None:
         """Initialize the news summary manager."""
         self._jobs: dict[str, SummaryJob] = {}
         self._cache: dict[str, SummaryJob] = {}
+        self._cache_access: dict[str, datetime] = {}  # Track last access for LRU
+        self._lock = threading.Lock()
+
+    def _evict_old_jobs(self) -> None:
+        """Evict oldest jobs when MAX_JOBS is exceeded.
+
+        Must be called with self._lock held.
+        """
+        if len(self._jobs) <= self.MAX_JOBS:
+            return
+
+        # Sort by started_at, keep most recent
+        sorted_jobs = sorted(
+            self._jobs.items(),
+            key=lambda x: x[1].started_at,
+            reverse=True,
+        )
+        self._jobs = dict(sorted_jobs[: self.MAX_JOBS])
+
+    def _evict_old_cache(self) -> None:
+        """Evict least recently accessed cache entries when MAX_CACHE is exceeded.
+
+        Must be called with self._lock held.
+        """
+        if len(self._cache) <= self.MAX_CACHE:
+            return
+
+        # Sort by last access time, keep most recent
+        sorted_cache = sorted(
+            self._cache_access.items(),
+            key=lambda x: x[1],
+            reverse=True,
+        )
+        keys_to_keep = {k for k, _ in sorted_cache[: self.MAX_CACHE]}
+
+        self._cache = {k: v for k, v in self._cache.items() if k in keys_to_keep}
+        self._cache_access = {
+            k: v for k, v in self._cache_access.items() if k in keys_to_keep
+        }
 
     def _compute_cache_key(self, symbol: str, articles: list[dict[str, Any]]) -> str:
         """Compute cache key from symbol and article titles.
@@ -58,7 +102,9 @@ class NewsSummaryManager:
             Cache key string
         """
         titles = sorted([a.get("title", "") or "" for a in articles])
-        titles_hash = hashlib.sha256("".join(titles).encode()).hexdigest()[:16]
+        # Use null delimiter to avoid hash collisions (e.g., ["ab","c"] vs ["a","bc"])
+        titles_str = "\x00".join(titles)
+        titles_hash = hashlib.sha256(titles_str.encode()).hexdigest()[:16]
         return f"{symbol}:{titles_hash}"
 
     def start_job(self, symbol: str, articles: list[dict[str, Any]]) -> SummaryJob:
@@ -73,27 +119,33 @@ class NewsSummaryManager:
         """
         # Check cache first
         cache_key = self._compute_cache_key(symbol, articles)
-        if cache_key in self._cache:
-            cached_job = self._cache[cache_key]
-            if cached_job.status == SummaryStatus.COMPLETED:
-                logger.info(f"Returning cached summary for {symbol}")
-                return cached_job
+        with self._lock:
+            if cache_key in self._cache:
+                cached_job = self._cache[cache_key]
+                if cached_job.status == SummaryStatus.COMPLETED:
+                    # Update access time for LRU
+                    self._cache_access[cache_key] = datetime.now()
+                    logger.info("Returning cached summary for %s", symbol)
+                    return cached_job
 
-        # Create new job
-        job_id = f"summary_{symbol}_{datetime.now().timestamp()}"
-        job = SummaryJob(
-            job_id=job_id,
-            symbol=symbol,
-            status=SummaryStatus.RUNNING,
-            started_at=datetime.now(),
-        )
-        self._jobs[job_id] = job
+            # Create new job
+            job_id = f"summary_{symbol}_{datetime.now().timestamp()}"
+            job = SummaryJob(
+                job_id=job_id,
+                symbol=symbol,
+                status=SummaryStatus.RUNNING,
+                started_at=datetime.now(),
+            )
+            self._jobs[job_id] = job
+
+            # Evict old jobs if needed
+            self._evict_old_jobs()
 
         # Spawn background thread
         thread = threading.Thread(
             target=self._run_summary,
             args=(job, symbol, articles, cache_key),
-            daemon=True,
+            daemon=False,  # Non-daemon to prevent orphaned work
         )
         thread.start()
 
@@ -108,7 +160,8 @@ class NewsSummaryManager:
         Returns:
             SummaryJob if found, None otherwise
         """
-        return self._jobs.get(job_id)
+        with self._lock:
+            return self._jobs.get(job_id)
 
     def _run_summary(
         self,
@@ -125,6 +178,7 @@ class NewsSummaryManager:
             articles: List of article dicts
             cache_key: Cache key for this job
         """
+        loop = None
         try:
             # Create new event loop for this thread
             loop = asyncio.new_event_loop()
@@ -139,24 +193,38 @@ class NewsSummaryManager:
             # Parse sections
             sections = self._parse_summary_sections(result)
 
+            # Validate we have sections
+            if not sections:
+                raise ValueError("Agent returned empty sections list")
+
             # Update job
             job.status = SummaryStatus.COMPLETED
             job.sections = sections
             job.completed_at = datetime.now()
 
             # Cache completed job
-            self._cache[cache_key] = job
+            with self._lock:
+                self._cache[cache_key] = job
+                self._cache_access[cache_key] = datetime.now()
+                self._evict_old_cache()
 
-            logger.info(f"Summary completed for {symbol} with {len(sections)} sections")
+            logger.info("Summary completed for %s with %d sections", symbol, len(sections))
 
-        except Exception as e:
-            logger.exception(f"Error generating summary for {symbol}")
+        except (RuntimeError, TimeoutError, ValueError) as e:
+            logger.error("Error generating summary for %s: %s", symbol, str(e))
             job.status = SummaryStatus.FAILED
             job.error = str(e)
             job.completed_at = datetime.now()
 
+        except Exception as e:
+            logger.exception("Unexpected error generating summary for %s", symbol)
+            job.status = SummaryStatus.FAILED
+            job.error = f"Unexpected error: {str(e)}"
+            job.completed_at = datetime.now()
+
         finally:
-            loop.close()
+            if loop is not None:
+                loop.close()
 
     async def _run_agent(self, system_prompt: str) -> dict[str, Any]:
         """Run Claude agent with system prompt.

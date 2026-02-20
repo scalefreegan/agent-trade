@@ -204,13 +204,6 @@ async def start_news_summary(
     Returns:
         NewsSummaryJobResponse with job_id and initial status
     """
-    # Validate article count
-    if not body.articles or len(body.articles) > 20:
-        raise HTTPException(
-            status_code=400,
-            detail="Must provide between 1 and 20 articles",
-        )
-
     # Convert to dict format for manager
     articles_data = [
         {
@@ -241,7 +234,7 @@ async def start_news_summary(
 @router.get("/stocks/{symbol}/news/summary/{job_id}")
 async def get_news_summary_status(
     symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Za-z0-9.-]+$"),
-    job_id: str = Path(...),
+    job_id: str = Path(..., pattern="^summary_[A-Z0-9.-]+_[0-9.]+$", max_length=100),
 ) -> NewsSummaryJobResponse:
     """Get the status of a news summary generation job.
 

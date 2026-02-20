@@ -175,7 +175,7 @@ export function StockNews({ symbol }: StockNewsProps) {
             { id: 'articles', label: 'Articles' },
             { id: 'summary', label: 'AI Summary' },
           ]}
-          activeTab={activeTab}
+          active={activeTab}
           onChange={(tab) => setActiveTab(tab as 'articles' | 'summary')}
         />
       </div>
@@ -242,9 +242,40 @@ export function StockNews({ symbol }: StockNewsProps) {
                 </button>
                 {startSummaryMutation.isError && (
                   <p className="text-sm text-loss">
-                    Failed to start summary generation
+                    {startSummaryMutation.error instanceof Error
+                      ? startSummaryMutation.error.message
+                      : 'Failed to start summary generation'}
                   </p>
                 )}
+              </div>
+            )}
+
+            {summaryJobId && summaryStatus.isLoading && (
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <div className="animate-pulse space-y-3 w-full">
+                  <div className="h-4 bg-muted rounded w-1/4" />
+                  <div className="h-3 bg-muted rounded w-full" />
+                  <div className="h-3 bg-muted rounded w-5/6" />
+                  <div className="h-3 bg-muted rounded w-4/5" />
+                </div>
+                <p className="text-sm text-muted-foreground">Loading status...</p>
+              </div>
+            )}
+
+            {summaryJobId && summaryStatus.isError && (
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <p className="text-sm text-loss">
+                  Failed to fetch summary status.{' '}
+                  {summaryStatus.error instanceof Error
+                    ? summaryStatus.error.message
+                    : 'Please try again.'}
+                </p>
+                <button
+                  onClick={handleGenerateSummary}
+                  className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Retry
+                </button>
               </div>
             )}
 
