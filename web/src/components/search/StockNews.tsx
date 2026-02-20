@@ -6,7 +6,7 @@ interface StockNewsProps {
   symbol: string;
 }
 
-const ARTICLES_PER_PAGE = 5;
+const ARTICLES_PER_PAGE = 3;
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '';
