@@ -6,6 +6,7 @@ with FIFO lot processing, applies tiered taxes, updates portfolios, and
 eliminates bankrupt agents.
 """
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -71,12 +72,17 @@ def process_daily_cycle(
         )
 
     # Step 1: Load previous day's errors (if any) for feedback
-    previous_outcome = load_latest_daily_outcome(game_state.config.experiment_id)
-    previous_errors = previous_outcome.errors if previous_outcome else {}
+    previous_errors = {}
+    try:
+        previous_outcome = load_latest_daily_outcome(game_state.config.experiment_id)
+        if previous_outcome:
+            previous_errors = previous_outcome.errors
+    except Exception as e:
+        # Don't fail the daily cycle if we can't load previous errors
+        logger.warning(f"Failed to load previous day's errors: {e}")
 
     # Step 2: Spawn all agents to get decisions
     logger.info(f"Spawning {len(active_agents)} agents for decisions")
-    import asyncio
 
     decisions = asyncio.run(
         spawn_all_agents(

@@ -145,24 +145,38 @@ class TestLoadLatestDailyOutcome:
 
     def test_load_latest_outcome_from_multiple_files(self, tmp_path):
         """When multiple outcome files exist, load the most recent."""
-        outcomes_dir = tmp_path / "outcomes"
-        outcomes_dir.mkdir()
+        # Create experiment directory structure
+        exp_dir = tmp_path / "exp_test"
+        outcomes_dir = exp_dir / "daily_outcomes"
+        outcomes_dir.mkdir(parents=True)
 
-        # Create three outcome files
-        dates = ["2026-02-18", "2026-02-19", "2026-02-20"]
-        for date in dates:
+        # Create three outcome files with distinct errors
+        outcomes = [
+            ("2026-02-18", {"agent_001": "Error on 2026-02-18"}),
+            ("2026-02-19", {"agent_001": "Error on 2026-02-19"}),
+            ("2026-02-20", {"agent_001": "Error on 2026-02-20"}),
+        ]
+        for date, errors in outcomes:
             outcome = DailyOutcome(
                 date=date,
                 transactions=[],
                 portfolio_values={},
                 eliminations=[],
-                errors={},
+                errors=errors,
             )
             outcome_path = outcomes_dir / f"{date}.json"
             outcome_path.write_text(json.dumps(outcome.model_dump(mode="json")))
 
-        # This test is incomplete - just pass for now
-        pass
+        # Mock get_experiment_dir and verify latest is returned
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir:
+            mock_get_dir.return_value = exp_dir
+
+            result = load_latest_daily_outcome("exp_test")
+
+        # Should load the most recent (2026-02-20)
+        assert result is not None
+        assert result.date == "2026-02-20"
+        assert result.errors == {"agent_001": "Error on 2026-02-20"}
 
     def test_load_latest_outcome_with_proper_structure(self, tmp_path):
         """Load the latest outcome when files exist in correct directory structure."""
