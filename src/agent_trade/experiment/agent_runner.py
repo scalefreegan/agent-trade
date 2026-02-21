@@ -369,9 +369,9 @@ def _build_system_prompt(
     previous_error_section = ""
     if previous_error:
         previous_error_section = f"""
-## Previous Day Order Errors
+## Previous Run Order Errors
 
-⚠️ One or more of your orders from the previous trading day failed:
+⚠️ One or more of your orders from the previous run failed:
 
 {previous_error}
 

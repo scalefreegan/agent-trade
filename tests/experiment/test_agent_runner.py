@@ -354,8 +354,8 @@ class TestBuildSystemPromptPreviousErrors:
         config = make_config()
         prompt = _build_system_prompt(agent, config, "2026-02-20", {}, previous_error=None)
 
-        assert "Previous Day Order Errors" not in prompt
-        assert "⚠️ One or more of your orders from the previous trading day failed:" not in prompt
+        assert "Previous Run Order Errors" not in prompt
+        assert "⚠️ One or more of your orders from the previous run failed:" not in prompt
 
     def test_previous_error_section_present(self):
         """When previous error exists, it should appear between Recent Learnings and Trading Rules."""
@@ -364,13 +364,13 @@ class TestBuildSystemPromptPreviousErrors:
         error_msg = "Order failed (buy DUK): Position limit exceeded: DUK would be 53.1% of portfolio (max: 50%)"
         prompt = _build_system_prompt(agent, config, "2026-02-20", {}, previous_error=error_msg)
 
-        assert "## Previous Day Order Errors" in prompt
-        assert "⚠️ One or more of your orders from the previous trading day failed:" in prompt
+        assert "## Previous Run Order Errors" in prompt
+        assert "⚠️ One or more of your orders from the previous run failed:" in prompt
         assert error_msg in prompt
 
         # Verify section appears between Recent Learnings and Trading Rules
         learnings_pos = prompt.find("## Recent Learnings")
-        errors_pos = prompt.find("## Previous Day Order Errors")
+        errors_pos = prompt.find("## Previous Run Order Errors")
         rules_pos = prompt.find("## Trading Rules")
 
         assert learnings_pos < errors_pos < rules_pos
