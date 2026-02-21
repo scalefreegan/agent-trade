@@ -118,6 +118,7 @@ async def spawn_agent(
     date: str,
     current_prices: dict[str, Decimal],
     decisions_dir: Path,
+    previous_error: Optional[str] = None,
 ) -> DailyDecision:
     """
     Spawn a single agent for daily trading decisions.
@@ -128,13 +129,14 @@ async def spawn_agent(
         date: Trading date (YYYY-MM-DD)
         current_prices: Current market prices for held stocks
         decisions_dir: Directory to save decision output
+        previous_error: Optional error message from previous day's orders
 
     Returns:
         DailyDecision with orders and strategy updates
     """
     start_time = time.time()
 
-    system_prompt = _build_system_prompt(agent, config, date, current_prices)
+    system_prompt = _build_system_prompt(agent, config, date, current_prices, previous_error)
     task_prompt = _build_task_prompt(agent, date)
 
     try:
@@ -198,6 +200,7 @@ async def spawn_all_agents(
     decisions_base_dir: Path,
     timeout: int = 600,
     progress_callback: Optional[Callable[[str, Optional[str], Optional[str]], None]] = None,
+    previous_errors: Optional[dict[str, str]] = None,
 ) -> dict[str, DailyDecision]:
     """
     Spawn all active agents in parallel for daily decisions.
@@ -210,10 +213,13 @@ async def spawn_all_agents(
         timeout: Maximum time per agent in seconds (default: 10 minutes)
         progress_callback: Optional callback for progress events.
             Called with (event_type: str, agent_id: Optional[str], message: Optional[str])
+        previous_errors: Optional dict mapping agent_id to error messages from previous day
 
     Returns:
         Dictionary mapping agent_id to DailyDecision
     """
+    if previous_errors is None:
+        previous_errors = {}
     # Get current prices for all held stocks
     all_symbols = set()
     for agent in agents:
@@ -234,8 +240,11 @@ async def spawn_all_agents(
         if progress_callback:
             progress_callback("agent_start", agent.agent_id, f"Starting agent {agent.name}")
 
+        # Get previous error for this agent (if any)
+        agent_previous_error = previous_errors.get(agent.agent_id)
+
         task = asyncio.wait_for(
-            spawn_agent(agent, config, date, current_prices, decisions_dir),
+            spawn_agent(agent, config, date, current_prices, decisions_dir, agent_previous_error),
             timeout=timeout,
         )
         agent_tasks.append(task)
@@ -297,6 +306,7 @@ def _build_system_prompt(
     config: ExperimentConfig,
     date: str,
     current_prices: dict[str, Decimal],
+    previous_error: Optional[str] = None,
 ) -> str:
     """Build system prompt with agent context."""
     missing_prices = []
@@ -355,6 +365,19 @@ def _build_system_prompt(
     if agent.guidance:
         agent_guidance_section = f"\n## Additional Guidance\n\n{agent.guidance}\n"
 
+    # Build optional previous error section
+    previous_error_section = ""
+    if previous_error:
+        previous_error_section = f"""
+## Previous Run Order Errors
+
+⚠️ One or more of your orders from the previous run failed:
+
+{previous_error}
+
+Please review the error(s) and adjust your strategy accordingly.
+"""
+
     return f"""# Trading Agent: {agent.name} ({agent.agent_id})
 
 You are an autonomous trading agent competing in a stock market simulation.
@@ -397,7 +420,7 @@ Every day you must research the market and act on what you find.
 ## Recent Learnings
 
 {learnings_text}
-
+{previous_error_section}
 ## Trading Rules
 
 - **Tax Rates** (tiered by holding period):
@@ -405,7 +428,6 @@ Every day you must research the market and act on what you find.
   - Long-term (>= {config.long_term_holding_days} days): {int(config.long_term_tax_rate * 100)}% on capital gains
   - Losses not taxed or deductible
   - FIFO accounting: oldest shares sold first
-- **Max Position**: {int(config.max_position_pct * 100)}% of portfolio in one stock
 - **Min Trade**: ${config.min_trade_amount}
 - **No short selling** or margin trading
 - **Fractional shares** allowed
