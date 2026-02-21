@@ -396,7 +396,7 @@ class TestBuildSystemPromptPreviousErrors:
         config = make_config()
         prompt = _build_system_prompt(agent, config, "2026-02-20", {}, previous_error="")
 
-        assert "Previous Day Order Errors" not in prompt
+        assert "Previous Run Order Errors" not in prompt
 
 
 # ---------------------------------------------------------------------------

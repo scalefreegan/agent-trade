@@ -437,6 +437,105 @@ class TestProcessDailyCycleIntegration:
             call_kwargs = mock_spawn.call_args.kwargs
             assert call_kwargs["previous_errors"] == {}
 
+    def test_order_sorting_sells_before_buys_in_daily_cycle(self, tmp_path):
+        """Integration test: sells execute before buys in process_daily_cycle."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        # Create agent with existing position
+        config = make_config()
+        config.experiment_id = "exp_test"
+        agent = make_agent()
+        agent.portfolio.cash = Decimal("1000.00")
+        # Add existing position: 10 shares of AAPL
+        agent.portfolio.positions = [
+            StockPosition(
+                symbol="AAPL",
+                lots=[
+                    TaxLot(
+                        shares=Decimal("10"),
+                        cost_basis=Decimal("100.00"),
+                        purchase_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                    )
+                ],
+            )
+        ]
+
+        game_state = GameState(
+            config=config,
+            agents={agent.agent_id: agent},
+            trading_day=1,
+            last_run=None,
+        )
+
+        exp_dir = tmp_path / "exp_test"
+        exp_dir.mkdir()
+
+        # Mock dependencies
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir, \
+             patch("agent_trade.experiment.coordinator.spawn_all_agents") as mock_spawn, \
+             patch("agent_trade.experiment.coordinator.get_current_prices") as mock_prices:
+
+            mock_get_dir.return_value = exp_dir
+            # AAPL at $150/share, MSFT at $200/share
+            mock_prices.return_value = {"AAPL": Decimal("150.00"), "MSFT": Decimal("200.00")}
+
+            # Agent submits: BUY MSFT $1500, SELL AAPL 5 shares (in that order)
+            # Without sorting, BUY would fail (insufficient cash: only $1000)
+            # With sorting, SELL executes first → cash becomes $1750 → BUY succeeds
+            mock_spawn.return_value = {
+                agent.agent_id: DailyDecision(
+                    date="2026-02-20",
+                    research_notes="Rotating from AAPL to MSFT",
+                    orders=[
+                        # BUY first (should be reordered to execute second)
+                        Order(
+                            action="buy",
+                            symbol="MSFT",
+                            amount=Decimal("1500.00"),
+                            reasoning="MSFT looks good",
+                        ),
+                        # SELL second (should be reordered to execute first)
+                        Order(
+                            action="sell",
+                            symbol="AAPL",
+                            amount=Decimal("5"),
+                            reasoning="Taking profits on AAPL",
+                        ),
+                    ],
+                    strategy_updates=None,
+                    alerts=[],
+                    execution_time_ms=100.0,
+                )
+            }
+
+            # Run daily cycle
+            outcome = process_daily_cycle(
+                game_state=game_state,
+                date="2026-02-20",
+                decisions_base_dir=tmp_path / "decisions",
+                timeout=300,
+            )
+
+            # Verify both orders executed successfully (no errors)
+            assert len(outcome.errors) == 0, f"Expected no errors, got: {outcome.errors}"
+            assert len(outcome.transactions) == 2
+
+            # Verify execution order: SELL then BUY
+            assert outcome.transactions[0].action == "sell"
+            assert outcome.transactions[0].symbol == "AAPL"
+            assert outcome.transactions[1].action == "buy"
+            assert outcome.transactions[1].symbol == "MSFT"
+
+            # Verify portfolio state after both trades
+            aapl_position = agent.portfolio.get_position("AAPL")
+            assert aapl_position is not None
+            assert aapl_position.total_shares == Decimal("5")  # 10 - 5 sold
+
+            msft_position = agent.portfolio.get_position("MSFT")
+            assert msft_position is not None
+            # $1500 / $200 = 7.5 shares
+            assert msft_position.total_shares == Decimal("7.5")
+
 
 # ---------------------------------------------------------------------------
 # Regression test for position limit removal

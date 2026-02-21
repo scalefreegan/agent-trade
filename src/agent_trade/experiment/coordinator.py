@@ -27,6 +27,9 @@ from .models import (
 )
 from .transaction_processor import execute_order
 
+# Note: get_experiment_dir and save_strategy are imported inline within functions
+# to avoid potential circular import issues with config and strategy_manager modules
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,9 +80,14 @@ def process_daily_cycle(
         previous_outcome = load_latest_daily_outcome(game_state.config.experiment_id)
         if previous_outcome:
             previous_errors = previous_outcome.errors
-    except Exception as e:
+    except (OSError, json.JSONDecodeError) as e:
         # Don't fail the daily cycle if we can't load previous errors
+        # (file missing, unreadable, or malformed JSON)
         logger.warning(f"Failed to load previous day's errors: {e}")
+    except Exception as e:
+        # Unexpected error (e.g., ValidationError) - log with traceback
+        logger.error(f"Unexpected error loading previous errors: {e}", exc_info=True)
+        # Continue with empty errors rather than failing the cycle
 
     # Step 2: Spawn all agents to get decisions
     logger.info(f"Spawning {len(active_agents)} agents for decisions")
