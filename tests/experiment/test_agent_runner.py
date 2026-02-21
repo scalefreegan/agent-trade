@@ -339,3 +339,94 @@ class TestBuildSystemPromptGuidance:
         assert "Explore ESG investing" in prompt
         assert "## Additional Guidance" in prompt
         assert "Extra focus on solar energy" in prompt
+
+
+# ---------------------------------------------------------------------------
+# _build_system_prompt — previous error feedback
+# ---------------------------------------------------------------------------
+
+
+class TestBuildSystemPromptPreviousErrors:
+    """Verify that previous day's order errors appear in the system prompt."""
+
+    def test_no_previous_error_section_absent(self):
+        """When no previous error, the section should not appear."""
+        agent = make_agent()
+        config = make_config()
+        prompt = _build_system_prompt(agent, config, "2026-02-20", {}, previous_error=None)
+
+        assert "Previous Day Order Errors" not in prompt
+        assert "⚠️ One or more of your orders from the previous trading day failed:" not in prompt
+
+    def test_previous_error_section_present(self):
+        """When previous error exists, it should appear between Recent Learnings and Trading Rules."""
+        agent = make_agent()
+        config = make_config()
+        error_msg = "Order failed (buy DUK): Position limit exceeded: DUK would be 53.1% of portfolio (max: 50%)"
+        prompt = _build_system_prompt(agent, config, "2026-02-20", {}, previous_error=error_msg)
+
+        assert "## Previous Day Order Errors" in prompt
+        assert "⚠️ One or more of your orders from the previous trading day failed:" in prompt
+        assert error_msg in prompt
+
+        # Verify section appears between Recent Learnings and Trading Rules
+        learnings_pos = prompt.find("## Recent Learnings")
+        errors_pos = prompt.find("## Previous Day Order Errors")
+        rules_pos = prompt.find("## Trading Rules")
+
+        assert learnings_pos < errors_pos < rules_pos
+
+    def test_previous_error_with_multiple_failures(self):
+        """Multiple order failures should all appear in the error section."""
+        agent = make_agent()
+        config = make_config()
+        error_msg = (
+            "Order failed (sell GIS): Sell value $45.00 below minimum $50.00; "
+            "Order failed (buy DUK): Position limit exceeded"
+        )
+        prompt = _build_system_prompt(agent, config, "2026-02-20", {}, previous_error=error_msg)
+
+        assert "sell GIS" in prompt
+        assert "buy DUK" in prompt
+        assert "Sell value $45.00 below minimum $50.00" in prompt
+        assert "Position limit exceeded" in prompt
+
+    def test_previous_error_empty_string_treated_as_no_error(self):
+        """Empty string error should not show the error section."""
+        agent = make_agent()
+        config = make_config()
+        prompt = _build_system_prompt(agent, config, "2026-02-20", {}, previous_error="")
+
+        assert "Previous Day Order Errors" not in prompt
+
+
+# ---------------------------------------------------------------------------
+# _build_system_prompt — max position removal
+# ---------------------------------------------------------------------------
+
+
+class TestBuildSystemPromptMaxPositionRemoval:
+    """Verify that max position limit is removed from Trading Rules."""
+
+    def test_max_position_not_in_prompt(self):
+        """Max Position line should not appear in Trading Rules section."""
+        agent = make_agent()
+        config = make_config()
+        prompt = _build_system_prompt(agent, config, "2026-02-20", {})
+
+        # Verify the max position line is NOT present
+        assert "Max Position" not in prompt
+        assert "50% of portfolio in one stock" not in prompt
+
+    def test_other_trading_rules_still_present(self):
+        """Other trading rules should remain in the prompt."""
+        agent = make_agent()
+        config = make_config()
+        prompt = _build_system_prompt(agent, config, "2026-02-20", {})
+
+        # Verify other rules are still there
+        assert "Tax Rates" in prompt
+        assert "Min Trade" in prompt
+        assert "No short selling" in prompt
+        assert "Fractional shares" in prompt
+        assert "FIFO accounting" in prompt

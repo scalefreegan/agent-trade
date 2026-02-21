@@ -39,10 +39,11 @@ def process_daily_cycle(
     """
     Process a complete daily trading cycle.
 
-    1. Spawn all active agents to get decisions
-    2. Validate and execute all orders
-    3. Update portfolios and eliminate bankrupt agents
-    4. Generate daily outcome report
+    1. Load previous day's errors for feedback
+    2. Spawn all active agents to get decisions
+    3. Validate and execute all orders
+    4. Update portfolios and eliminate bankrupt agents
+    5. Generate daily outcome report
 
     Args:
         game_state: Current game state (modified in-place)
@@ -69,7 +70,11 @@ def process_daily_cycle(
             errors={"game": "No active agents remaining"},
         )
 
-    # Step 1: Spawn all agents to get decisions
+    # Step 1: Load previous day's errors (if any) for feedback
+    previous_outcome = load_latest_daily_outcome(game_state.config.experiment_id)
+    previous_errors = previous_outcome.errors if previous_outcome else {}
+
+    # Step 2: Spawn all agents to get decisions
     logger.info(f"Spawning {len(active_agents)} agents for decisions")
     import asyncio
 
@@ -81,10 +86,11 @@ def process_daily_cycle(
             decisions_base_dir=decisions_base_dir,
             timeout=timeout,
             progress_callback=progress_callback,
+            previous_errors=previous_errors,
         )
     )
 
-    # Step 2: Collect all orders and get market prices
+    # Step 3: Collect all orders and get market prices
     all_orders: dict[str, list[Order]] = {}
     symbols_needed = set()
 
@@ -96,14 +102,17 @@ def process_daily_cycle(
     # Get current market prices
     current_prices = get_current_prices(list(symbols_needed))
 
-    # Step 3: Validate and execute orders
+    # Step 4: Validate and execute orders
     transactions: list[ExecutedTransaction] = []
     errors: dict[str, str] = {}
 
     for agent_id, orders in all_orders.items():
         agent = game_state.agents[agent_id]
 
-        for order in orders:
+        # Sort orders: sells before buys to ensure freed cash is available
+        sorted_orders = sorted(orders, key=lambda o: (0 if o.action == "sell" else 1))
+
+        for order in sorted_orders:
             try:
                 # Get current price
                 if order.symbol not in current_prices:
@@ -113,41 +122,8 @@ def process_daily_cycle(
 
                 current_price = current_prices[order.symbol]
 
-                # Validate position limits for buys
-                if order.action == "buy":
-                    # Check max position limit
-                    total_value = agent.portfolio.total_value(
-                        current_prices, strict=False
-                    )
-                    position = agent.portfolio.get_position(order.symbol)
-                    current_position_value = (
-                        position.total_shares * current_price
-                        if position
-                        else Decimal("0")
-                    )
-                    new_position_value = current_position_value + order.amount
-
-                    max_position_value = (
-                        total_value * game_state.config.max_position_pct
-                    )
-
-                    if new_position_value > max_position_value:
-                        # Calculate percentage only if total_value > 0 to avoid divide-by-zero
-                        if total_value > 0:
-                            pct = (new_position_value / total_value * 100)
-                            raise ValueError(
-                                f"Position limit exceeded: {order.symbol} would be "
-                                f"{pct:.1f}% of portfolio "
-                                f"(max: {game_state.config.max_position_pct * 100:.0f}%)"
-                            )
-                        else:
-                            raise ValueError(
-                                f"Position limit exceeded: {order.symbol} purchase of "
-                                f"${new_position_value:.2f} exceeds maximum "
-                                f"${max_position_value:.2f}"
-                            )
-
-                elif order.action == "sell":
+                # Validate minimum trade value for sells
+                if order.action == "sell":
                     # Check minimum trade value for sells
                     sell_value = order.amount * current_price
                     if sell_value < game_state.config.min_trade_amount:
@@ -181,7 +157,7 @@ def process_daily_cycle(
                 else:
                     errors[agent_id] = error_msg
 
-    # Step 4: Apply strategy updates and sync strategy.md
+    # Step 5: Apply strategy updates and sync strategy.md
     from .strategy_manager import save_strategy
 
     for agent_id, decision in decisions.items():
@@ -195,7 +171,7 @@ def process_daily_cycle(
             except OSError as e:
                 logger.warning(f"Failed to sync strategy.md for {agent_id}: {e}")
 
-    # Step 5: Calculate portfolio values and check for eliminations
+    # Step 6: Calculate portfolio values and check for eliminations
     # Get all symbols across all agents
     all_symbols = set()
     for agent in game_state.agents.values():
@@ -226,7 +202,7 @@ def process_daily_cycle(
             logger.error(f"Failed to calculate portfolio value for {agent_id}: {e}")
             portfolio_values[agent_id] = Decimal("0")
 
-    # Step 6: Update game state
+    # Step 7: Update game state
     # Only increment trading_day when this is a new calendar date — reruns on the
     # same day (e.g. re-clicking "Run Day") should not advance the counter.
     last_run_date = game_state.last_run.strftime("%Y-%m-%d") if game_state.last_run else None
@@ -304,6 +280,48 @@ def load_game_state(experiment_id: str) -> Optional[GameState]:
         return GameState.model_validate(data)
     except (OSError, json.JSONDecodeError) as e:
         logger.error(f"Failed to load game state: {e}")
+        raise
+
+
+def load_latest_daily_outcome(experiment_id: str) -> Optional[DailyOutcome]:
+    """
+    Load the most recent daily outcome from disk.
+
+    Args:
+        experiment_id: Experiment ID
+
+    Returns:
+        DailyOutcome if found, None if outcomes directory is empty or doesn't exist
+
+    Raises:
+        OSError: If file read fails
+        json.JSONDecodeError: If outcome file is malformed
+        pydantic.ValidationError: If outcome data doesn't match schema
+    """
+    from .config import get_experiment_dir
+
+    outcomes_dir = get_experiment_dir(experiment_id) / "daily_outcomes"
+
+    if not outcomes_dir.exists():
+        logger.debug(f"Outcomes directory not found at {outcomes_dir}")
+        return None
+
+    # Get all outcome files sorted by name (YYYY-MM-DD.json)
+    outcome_files = sorted(outcomes_dir.glob("*.json"), reverse=True)
+
+    if not outcome_files:
+        logger.debug(f"No outcome files found in {outcomes_dir}")
+        return None
+
+    latest_file = outcome_files[0]
+
+    try:
+        with open(latest_file, "r") as f:
+            data = json.load(f)
+        logger.info(f"Loaded latest outcome from {latest_file}")
+        return DailyOutcome.model_validate(data)
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error(f"Failed to load latest outcome: {e}")
         raise
 
 
