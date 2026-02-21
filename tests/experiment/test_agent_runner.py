@@ -5,6 +5,7 @@ Tests for agent_runner.py focusing on:
 """
 
 import asyncio
+import json
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -117,7 +118,6 @@ class TestSpawnAgentTimeoutClassification:
 
         files = list(tmp_path.glob("*.json"))
         assert len(files) == 1
-        import json
         data = json.loads(files[0].read_text())
         assert "error" in data
         assert "TIMEOUT" in data["error"]
@@ -128,7 +128,6 @@ class TestSpawnAgentTimeoutClassification:
 
         files = list(tmp_path.glob("*.json"))
         assert len(files) == 1
-        import json
         data = json.loads(files[0].read_text())
         assert "error" in data
         assert "ERROR" in data["error"]

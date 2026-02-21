@@ -147,7 +147,8 @@ def process_daily_cycle(
                     f"{order.symbol} @ ${current_price:.2f}"
                 )
 
-            except Exception as e:
+            except ValueError as e:
+                # Expected validation/processing error
                 error_msg = f"Order failed ({order.action} {order.symbol}): {str(e)}"
                 logger.warning(f"Agent {agent_id}: {error_msg}")
 
@@ -156,6 +157,15 @@ def process_daily_cycle(
                     errors[agent_id] += f"; {error_msg}"
                 else:
                     errors[agent_id] = error_msg
+
+            except Exception as e:
+                # Unexpected error - log with full traceback and re-raise
+                logger.error(
+                    f"Unexpected error executing order for {agent_id}: "
+                    f"{order.action} {order.symbol}",
+                    exc_info=True
+                )
+                raise
 
     # Step 5: Apply strategy updates and sync strategy.md
     from .strategy_manager import save_strategy
