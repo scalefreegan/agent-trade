@@ -91,7 +91,7 @@ def run_daily_cycle(
         logger.info(f"Running daily cycle for {experiment_id} on {date}")
         outcome = process_daily_cycle(
             game_state=game_state,
-            date=date,
+            trading_date=date,
             decisions_base_dir=decisions_dir,
             timeout=timeout,
             progress_callback=progress_callback,

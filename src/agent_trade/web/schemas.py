@@ -27,6 +27,9 @@ class ExperimentDetail(BaseModel):
     num_agents: int
     status: str
     current_day: int | None = None
+    trading_mode: str = "stocks_only"
+    options_enabled: bool = False
+    futures_enabled: bool = False
 
     @field_serializer("starting_capital")
     def serialize_decimal(self, v: Any) -> float:
@@ -78,13 +81,64 @@ class StockPositionResponse(BaseModel):
         return v
 
 
+class OptionPositionResponse(BaseModel):
+    """Option position information."""
+
+    underlying: str
+    contract_type: str  # "call" or "put"
+    strike_price: float
+    expiration_date: str
+    contracts: int
+    premium_per_share: float
+    total_premium: float
+    intrinsic_value: float | None = None
+
+    @field_serializer("strike_price", "premium_per_share", "total_premium", "intrinsic_value")
+    def serialize_decimal(self, v: Any) -> float | None:
+        """Convert Decimal to float."""
+        if v is None:
+            return None
+        if isinstance(v, Decimal):
+            return float(v)
+        return v
+
+
+class FuturesPositionResponse(BaseModel):
+    """Futures position information."""
+
+    symbol: str
+    direction: str  # "long" or "short"
+    contracts: int
+    entry_price: float
+    contract_multiplier: float
+    expiration_date: str
+    margin_per_contract: float
+    total_margin: float
+    unrealized_pnl: float | None = None
+
+    @field_serializer(
+        "entry_price", "contract_multiplier", "margin_per_contract",
+        "total_margin", "unrealized_pnl",
+    )
+    def serialize_decimal(self, v: Any) -> float | None:
+        """Convert Decimal to float."""
+        if v is None:
+            return None
+        if isinstance(v, Decimal):
+            return float(v)
+        return v
+
+
 class PortfolioResponse(BaseModel):
     """Portfolio state."""
 
     cash: float
     positions: dict[str, StockPositionResponse]
+    option_positions: list[OptionPositionResponse] = Field(default_factory=list)
+    futures_positions: list[FuturesPositionResponse] = Field(default_factory=list)
+    margin_used: float = 0.0
 
-    @field_serializer("cash")
+    @field_serializer("cash", "margin_used")
     def serialize_decimal(self, v: Any) -> float:
         """Convert Decimal to float."""
         if isinstance(v, Decimal):

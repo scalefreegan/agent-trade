@@ -2,6 +2,7 @@
 Pydantic models for the trading experiment.
 
 All financial amounts use Decimal for precision to avoid floating-point errors.
+Supports stocks, options, and futures instruments via trading mode configuration.
 """
 
 from datetime import date, datetime, timezone
@@ -9,6 +10,14 @@ from decimal import Decimal
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+# ==============================================================================
+# Trading Mode Types
+# ==============================================================================
+
+TradingMode = Literal["stocks_only", "multi_instrument"]
+InstrumentType = Literal["stock", "option", "future"]
 
 
 # ==============================================================================
@@ -67,22 +76,137 @@ class StockPosition(BaseModel):
         return sum(lot.shares * lot.cost_basis for lot in self.lots)
 
 
+class OptionPosition(BaseModel):
+    """
+    An options contract position.
+
+    Each position represents one or more contracts on the same underlying,
+    strike, expiration, and type. Each contract controls 100 shares.
+    """
+
+    underlying: str  # Underlying ticker (e.g., "AAPL")
+    contract_type: Literal["call", "put"]
+    strike_price: Decimal
+    expiration_date: date
+    contracts: int  # Number of contracts (each = 100 shares)
+    premium_per_share: Decimal  # Premium paid per share at open
+    opened_date: datetime
+
+    @property
+    def total_premium(self) -> Decimal:
+        """Total premium paid to open this position."""
+        return self.premium_per_share * Decimal("100") * self.contracts
+
+    @property
+    def shares_controlled(self) -> int:
+        """Total shares controlled by these contracts."""
+        return self.contracts * 100
+
+    @property
+    def position_key(self) -> str:
+        """Unique key for this position: UNDERLYING_TYPE_STRIKE_EXPIRY."""
+        exp_str = self.expiration_date.isoformat()
+        return f"{self.underlying}_{self.contract_type}_{self.strike_price}_{exp_str}"
+
+    def is_expired(self, as_of: date) -> bool:
+        """Check if the option has expired as of the given date."""
+        return as_of >= self.expiration_date
+
+    def intrinsic_value(self, underlying_price: Decimal) -> Decimal:
+        """Calculate intrinsic value per share given the underlying price."""
+        if self.contract_type == "call":
+            return max(underlying_price - self.strike_price, Decimal("0"))
+        else:  # put
+            return max(self.strike_price - underlying_price, Decimal("0"))
+
+    def total_intrinsic_value(self, underlying_price: Decimal) -> Decimal:
+        """Total intrinsic value of all contracts."""
+        return self.intrinsic_value(underlying_price) * Decimal("100") * self.contracts
+
+
+class FuturesPosition(BaseModel):
+    """
+    A futures contract position.
+
+    Futures are marked-to-market daily. P&L is realized through margin accounting.
+    """
+
+    symbol: str  # Futures symbol (e.g., "ES", "NQ", "CL")
+    direction: Literal["long", "short"]
+    contracts: int
+    entry_price: Decimal  # Price at which position was opened
+    contract_multiplier: Decimal  # Dollar value per point (e.g., $50 for ES)
+    expiration_date: date
+    opened_date: datetime
+    margin_per_contract: Decimal  # Required margin per contract
+
+    @property
+    def notional_value(self) -> Decimal:
+        """Total notional value of the position."""
+        return self.entry_price * self.contract_multiplier * self.contracts
+
+    @property
+    def total_margin(self) -> Decimal:
+        """Total margin required for this position."""
+        return self.margin_per_contract * self.contracts
+
+    @property
+    def position_key(self) -> str:
+        """Unique key: SYMBOL_DIRECTION_EXPIRY."""
+        exp_str = self.expiration_date.isoformat()
+        return f"{self.symbol}_{self.direction}_{exp_str}"
+
+    def is_expired(self, as_of: date) -> bool:
+        """Check if the futures contract has expired."""
+        return as_of >= self.expiration_date
+
+    def unrealized_pnl(self, current_price: Decimal) -> Decimal:
+        """Calculate unrealized P&L at the given current price."""
+        price_diff = current_price - self.entry_price
+        if self.direction == "short":
+            price_diff = -price_diff
+        return price_diff * self.contract_multiplier * self.contracts
+
+
 class Portfolio(BaseModel):
-    """Agent's portfolio: cash + stock positions."""
+    """Agent's portfolio: cash + stock positions + derivative positions."""
 
     cash: Decimal
     positions: list[StockPosition] = Field(default_factory=list)
+    option_positions: list[OptionPosition] = Field(default_factory=list)
+    futures_positions: list[FuturesPosition] = Field(default_factory=list)
+    margin_used: Decimal = Decimal("0")  # Total margin reserved for futures
 
     def get_position(self, symbol: str) -> Optional[StockPosition]:
-        """Get position for a specific symbol, or None if not held."""
+        """Get stock position for a specific symbol, or None if not held."""
         return next((p for p in self.positions if p.symbol == symbol), None)
+
+    def get_option_position(self, position_key: str) -> Optional[OptionPosition]:
+        """Get option position by its unique key, or None if not held."""
+        return next(
+            (p for p in self.option_positions if p.position_key == position_key), None
+        )
+
+    def get_option_positions_for_underlying(self, underlying: str) -> list[OptionPosition]:
+        """Get all option positions for a given underlying symbol."""
+        return [p for p in self.option_positions if p.underlying == underlying]
+
+    def get_futures_position(self, position_key: str) -> Optional[FuturesPosition]:
+        """Get futures position by its unique key, or None if not held."""
+        return next(
+            (p for p in self.futures_positions if p.position_key == position_key), None
+        )
 
     def total_value(self, current_prices: dict[str, Decimal], strict: bool = True) -> Decimal:
         """
         Calculate total portfolio value at current market prices.
 
+        Includes stock positions, option intrinsic values, and futures unrealized P&L.
+
         Args:
-            current_prices: Dictionary mapping symbols to current prices
+            current_prices: Dictionary mapping symbols to current prices.
+                For options, uses underlying symbol prices.
+                For futures, uses futures symbol prices.
             strict: If True, raise KeyError when a held symbol has no price.
                    If False, treat missing prices as 0 (can undervalue portfolio).
 
@@ -97,12 +221,34 @@ class Portfolio(BaseModel):
                         f"Missing market price for held symbol {p.symbol}. "
                         f"Cannot accurately value portfolio."
                     )
-                # Fall back to 0 if not strict (for backward compatibility)
                 price = Decimal("0")
             else:
                 price = current_prices[p.symbol]
             stock_value += p.total_shares * price
-        return self.cash + stock_value
+
+        # Value option positions at intrinsic value
+        options_value = Decimal("0")
+        for opt in self.option_positions:
+            if opt.underlying in current_prices:
+                options_value += opt.total_intrinsic_value(current_prices[opt.underlying])
+            elif strict:
+                raise KeyError(
+                    f"Missing market price for option underlying {opt.underlying}. "
+                    f"Cannot accurately value portfolio."
+                )
+
+        # Value futures positions at unrealized P&L
+        futures_pnl = Decimal("0")
+        for fut in self.futures_positions:
+            if fut.symbol in current_prices:
+                futures_pnl += fut.unrealized_pnl(current_prices[fut.symbol])
+            elif strict:
+                raise KeyError(
+                    f"Missing market price for futures symbol {fut.symbol}. "
+                    f"Cannot accurately value portfolio."
+                )
+
+        return self.cash + stock_value + options_value + futures_pnl
 
 
 class Order(BaseModel):
@@ -134,6 +280,78 @@ class Order(BaseModel):
             return False, "Must sell positive number of shares"
         if self.amount > shares_owned:
             return False, f"Insufficient shares: {shares_owned} owned"
+        return True, None
+
+
+class OptionOrder(BaseModel):
+    """
+    Agent's order for options trading.
+
+    buy_to_open: Purchase option contracts
+    sell_to_close: Sell existing option contracts
+    """
+
+    action: Literal["buy_to_open", "sell_to_close"]
+    underlying: str  # Underlying ticker (e.g., "AAPL")
+    contract_type: Literal["call", "put"]
+    strike_price: Decimal
+    expiration_date: str  # YYYY-MM-DD
+    contracts: int  # Number of contracts
+    reasoning: str
+
+    def validate_buy(
+        self, cash_available: Decimal, estimated_premium: Decimal, min_trade: Decimal = Decimal("1.00")
+    ) -> tuple[bool, Optional[str]]:
+        """Validate a buy_to_open order."""
+        if self.contracts <= 0:
+            return False, "Must buy positive number of contracts"
+        total_cost = estimated_premium * Decimal("100") * self.contracts
+        if total_cost < min_trade:
+            return False, f"Trade value ${total_cost:.2f} below minimum ${min_trade}"
+        if total_cost > cash_available:
+            return False, f"Insufficient cash: need ${total_cost:.2f}, have ${cash_available:.2f}"
+        return True, None
+
+    def validate_sell(self, contracts_owned: int) -> tuple[bool, Optional[str]]:
+        """Validate a sell_to_close order."""
+        if self.contracts <= 0:
+            return False, "Must sell positive number of contracts"
+        if self.contracts > contracts_owned:
+            return False, f"Insufficient contracts: {contracts_owned} owned, trying to sell {self.contracts}"
+        return True, None
+
+
+class FuturesOrder(BaseModel):
+    """
+    Agent's order for futures trading.
+
+    open_long: Open a long futures position
+    open_short: Open a short futures position
+    close: Close an existing futures position
+    """
+
+    action: Literal["open_long", "open_short", "close"]
+    symbol: str  # Futures symbol (e.g., "ES", "NQ", "CL")
+    contracts: int
+    reasoning: str
+
+    def validate_open(
+        self, cash_available: Decimal, margin_per_contract: Decimal
+    ) -> tuple[bool, Optional[str]]:
+        """Validate opening a futures position."""
+        if self.contracts <= 0:
+            return False, "Must trade positive number of contracts"
+        total_margin = margin_per_contract * self.contracts
+        if total_margin > cash_available:
+            return False, f"Insufficient margin: need ${total_margin:.2f}, have ${cash_available:.2f}"
+        return True, None
+
+    def validate_close(self, contracts_owned: int) -> tuple[bool, Optional[str]]:
+        """Validate closing a futures position."""
+        if self.contracts <= 0:
+            return False, "Must close positive number of contracts"
+        if self.contracts > contracts_owned:
+            return False, f"Insufficient contracts: {contracts_owned} open, trying to close {self.contracts}"
         return True, None
 
 
@@ -173,6 +391,38 @@ class ExecutedTransaction(BaseModel):
     def total_value(self) -> Decimal:
         """Total transaction value."""
         return self.shares * self.price_per_share
+
+
+class ExecutedOptionTransaction(BaseModel):
+    """Record of an executed options trade."""
+
+    timestamp: datetime
+    agent_id: str
+    action: Literal["buy_to_open", "sell_to_close", "expired", "exercised"]
+    underlying: str
+    contract_type: Literal["call", "put"]
+    strike_price: Decimal
+    expiration_date: date
+    contracts: int
+    premium_per_share: Decimal  # Premium at execution
+    total_premium: Decimal  # Total cash exchanged (premium * 100 * contracts)
+    net_amount: Decimal  # Cash effect (negative for buys, positive for sells)
+    realized_pnl: Decimal = Decimal("0")  # For closes/exercises
+
+
+class ExecutedFuturesTransaction(BaseModel):
+    """Record of an executed futures trade."""
+
+    timestamp: datetime
+    agent_id: str
+    action: Literal["open_long", "open_short", "close", "expired"]
+    symbol: str
+    contracts: int
+    price: Decimal
+    contract_multiplier: Decimal
+    margin_impact: Decimal  # Change in margin used (positive = margin added)
+    realized_pnl: Decimal = Decimal("0")  # For closes
+    net_amount: Decimal  # Cash effect
 
 
 # ==============================================================================
@@ -243,6 +493,13 @@ class ExperimentConfig(BaseModel):
     created_at: datetime
     status: Literal["active", "paused", "completed"]
     guidance: Optional[str] = None  # Free-text guidance injected into all agent prompts
+    # Multi-instrument trading mode settings
+    trading_mode: TradingMode = "stocks_only"
+    options_enabled: bool = False
+    futures_enabled: bool = False
+    max_options_pct: Decimal = Decimal("0.20")  # Max 20% of portfolio in options premium
+    max_futures_leverage: Decimal = Decimal("5.0")  # Max notional / portfolio value ratio
+    default_futures_margin_pct: Decimal = Decimal("0.10")  # 10% initial margin
 
 
 class AgentState(BaseModel):
@@ -361,7 +618,9 @@ class DailyDecision(BaseModel):
 
     date: str  # YYYY-MM-DD
     research_notes: str  # Agent's research and analysis
-    orders: list[Order]  # Buy/sell orders
+    orders: list[Order]  # Stock buy/sell orders
+    option_orders: list[OptionOrder] = Field(default_factory=list)  # Options orders
+    futures_orders: list[FuturesOrder] = Field(default_factory=list)  # Futures orders
     strategy_updates: Optional[StrategyLearning] = None
     alerts: list[Alert] = Field(default_factory=list)
     execution_time_ms: float
@@ -372,6 +631,8 @@ class DailyOutcome(BaseModel):
 
     date: str  # YYYY-MM-DD
     transactions: list[ExecutedTransaction]
+    option_transactions: list[ExecutedOptionTransaction] = Field(default_factory=list)
+    futures_transactions: list[ExecutedFuturesTransaction] = Field(default_factory=list)
     portfolio_values: dict[str, Decimal]  # agent_id -> total value
     eliminations: list[str] = Field(default_factory=list)  # agent_ids eliminated
     errors: dict[str, str] = Field(default_factory=dict)  # agent_id -> error msg

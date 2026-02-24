@@ -18,8 +18,17 @@ from typing import Callable, Optional
 from pydantic import ValidationError
 
 from ..claude_wrapper import run_agent
-from .market_data import get_current_prices
-from .models import AgentState, Alert, DailyDecision, ExperimentConfig, Order, StrategyLearning
+from .market_data import get_current_prices, FUTURES_SPECS
+from .models import (
+    AgentState,
+    Alert,
+    DailyDecision,
+    ExperimentConfig,
+    FuturesOrder,
+    OptionOrder,
+    Order,
+    StrategyLearning,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +91,45 @@ def _parse_structured_response(
         except (KeyError, TypeError, ValueError, ValidationError) as e:
             logger.warning(f"Agent {agent_id}: skipping malformed alert {a}: {e}")
 
+    # Parse option orders (multi-instrument mode)
+    option_orders: list[OptionOrder] = []
+    for o in data.get("option_orders", []):
+        try:
+            option_orders.append(
+                OptionOrder(
+                    action=o["action"],
+                    underlying=o["underlying"],
+                    contract_type=o["contract_type"],
+                    strike_price=Decimal(str(o["strike_price"])),
+                    expiration_date=o["expiration_date"],
+                    contracts=int(o["contracts"]),
+                    reasoning=o.get("reasoning", ""),
+                )
+            )
+        except (KeyError, ValueError, InvalidOperation) as e:
+            logger.warning(f"Agent {agent_id}: skipping malformed option order {o}: {e}")
+
+    # Parse futures orders (multi-instrument mode)
+    futures_orders: list[FuturesOrder] = []
+    for o in data.get("futures_orders", []):
+        try:
+            futures_orders.append(
+                FuturesOrder(
+                    action=o["action"],
+                    symbol=o["symbol"],
+                    contracts=int(o["contracts"]),
+                    reasoning=o.get("reasoning", ""),
+                )
+            )
+        except (KeyError, ValueError, InvalidOperation) as e:
+            logger.warning(f"Agent {agent_id}: skipping malformed futures order {o}: {e}")
+
     return DailyDecision(
         date=date,
         research_notes=data.get("research_notes", ""),
         orders=orders,
+        option_orders=option_orders,
+        futures_orders=futures_orders,
         strategy_updates=strategy_updates,
         alerts=alerts,
         execution_time_ms=0.0,  # Set by caller
@@ -378,7 +422,7 @@ def _build_system_prompt(
 Please review the error(s) and adjust your strategy accordingly.
 """
 
-    return f"""# Trading Agent: {agent.name} ({agent.agent_id})
+    prompt = f"""# Trading Agent: {agent.name} ({agent.agent_id})
 
 You are an autonomous trading agent competing in a stock market simulation.
 Your mandate is to **actively trade on signals** to maximize portfolio value.
@@ -459,7 +503,7 @@ You also have web search for broader research.
 
 Respond with a JSON object matching this schema exactly:
 - `research_notes` (string): Your analysis and reasoning
-- `orders` (array): List of trades. Each trade:
+- `orders` (array): List of stock trades. Each trade:
   - `action`: "buy" or "sell"
   - `symbol`: ticker symbol (e.g., "AAPL")
   - `amount`: dollar amount for buys, number of shares for sells
@@ -470,6 +514,114 @@ Respond with a JSON object matching this schema exactly:
   Each alert: `symbol`, `thesis` (2-3 sentences), `confidence` ("high" or "very_high"),
   `catalyst` (specific event driving the opportunity), `time_horizon` (e.g. "1-2 weeks")
 """
+
+    # Add multi-instrument sections if enabled
+    if config.trading_mode == "multi_instrument":
+        prompt += _build_derivatives_prompt_section(agent, config, current_prices)
+
+    return prompt
+
+
+def _build_derivatives_prompt_section(
+    agent: AgentState,
+    config: ExperimentConfig,
+    current_prices: dict[str, Decimal],
+) -> str:
+    """Build the derivative instruments section for multi-instrument mode."""
+    sections = []
+
+    # Options positions display
+    options_text = ""
+    if agent.portfolio.option_positions:
+        for opt in agent.portfolio.option_positions:
+            underlying_price = current_prices.get(opt.underlying, Decimal("0"))
+            intrinsic = opt.intrinsic_value(underlying_price)
+            total_intrinsic = opt.total_intrinsic_value(underlying_price)
+            status = "ITM" if intrinsic > 0 else "OTM"
+            options_text += (
+                f"- {opt.contracts} {opt.contract_type.upper()} {opt.underlying} "
+                f"${opt.strike_price} exp {opt.expiration_date} "
+                f"(premium paid: ${opt.premium_per_share}/sh, "
+                f"intrinsic: ${intrinsic}/sh, status: {status}, "
+                f"total value: ${total_intrinsic:.2f})\n"
+            )
+    else:
+        options_text = "- *No option positions*\n"
+
+    # Futures positions display
+    futures_text = ""
+    if agent.portfolio.futures_positions:
+        for fut in agent.portfolio.futures_positions:
+            current_fut_price = current_prices.get(fut.symbol, fut.entry_price)
+            unrealized = fut.unrealized_pnl(current_fut_price)
+            futures_text += (
+                f"- {fut.direction.upper()} {fut.contracts} {fut.symbol} "
+                f"at ${fut.entry_price} (current: ${current_fut_price}, "
+                f"P&L: ${unrealized:.2f}, margin: ${fut.total_margin:.2f})\n"
+            )
+    else:
+        futures_text = "- *No futures positions*\n"
+
+    sections.append(f"""
+## Derivative Positions
+
+**Option Positions**:
+{options_text}
+**Futures Positions**:
+{futures_text}
+**Margin Used**: ${agent.portfolio.margin_used:.2f}
+""")
+
+    # Available instruments
+    instruments_section = ""
+    if config.options_enabled:
+        instruments_section += """
+### Options Trading
+- **Buy to open** calls or puts on any optionable stock
+- **Sell to close** existing option positions
+- Each contract controls 100 shares
+- Max options allocation: """ + f"{int(config.max_options_pct * 100)}% of portfolio in premiums\n"
+
+    if config.futures_enabled:
+        futures_list = "\n".join(
+            f"  - **{sym}** ({spec['name']}): ${spec['multiplier']}/point, "
+            f"margin ${spec['margin']}/contract"
+            for sym, spec in FUTURES_SPECS.items()
+        )
+        instruments_section += f"""
+### Futures Trading
+- Open **long** or **short** positions on futures contracts
+- **Close** existing positions to realize P&L
+- Max leverage: {config.max_futures_leverage}x portfolio value
+- Available contracts:
+{futures_list}
+"""
+
+    sections.append(f"""
+## Available Derivative Instruments
+{instruments_section}""")
+
+    # Extended output format
+    sections.append("""
+## Derivative Order Format (additional JSON fields)
+
+In addition to stock `orders`, include these arrays when trading derivatives:
+- `option_orders` (array): List of option trades. Each:
+  - `action`: "buy_to_open" or "sell_to_close"
+  - `underlying`: ticker symbol (e.g., "AAPL")
+  - `contract_type`: "call" or "put"
+  - `strike_price`: strike price (number)
+  - `expiration_date`: "YYYY-MM-DD"
+  - `contracts`: number of contracts
+  - `reasoning`: why you're making this trade
+- `futures_orders` (array): List of futures trades. Each:
+  - `action`: "open_long", "open_short", or "close"
+  - `symbol`: futures symbol (e.g., "ES", "NQ", "CL")
+  - `contracts`: number of contracts
+  - `reasoning`: why you're making this trade
+""")
+
+    return "\n".join(sections)
 
 
 def _build_task_prompt(agent: AgentState, date: str) -> str:

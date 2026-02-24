@@ -68,6 +68,9 @@ def init(
     cash_interest_rate: float = typer.Option(0.05, "--cash-interest-rate", help="Annual interest rate on uninvested cash (e.g. 0.05 for 5%)"),
     init_file: Optional[Path] = typer.Option(None, "--init-file", help="JSON file with agent initialization spec"),
     guidance: Optional[str] = typer.Option(None, "--guidance", help="Free-text guidance injected into all agent prompts"),
+    trading_mode: str = typer.Option("stocks_only", "--trading-mode", "-m", help="Trading mode: stocks_only or multi_instrument"),
+    enable_options: bool = typer.Option(False, "--options", help="Enable options trading (auto-enabled with multi_instrument)"),
+    enable_futures: bool = typer.Option(False, "--futures", help="Enable futures trading (auto-enabled with multi_instrument)"),
 ):
     """Initialize a new trading experiment.
 
@@ -80,6 +83,10 @@ def init(
         agent-trade-experiment init -n "Custom" --init-file spec.json
 
         agent-trade-experiment init -n "Test" --guidance "Focus on dividend stocks"
+
+        agent-trade-experiment init -n "Derivatives" -m multi_instrument --capital 10000
+
+        agent-trade-experiment init -n "Options Only" -m multi_instrument --options
     """
     # Load init spec from file if provided
     init_spec: Optional[ExperimentInitSpec] = None
@@ -106,7 +113,12 @@ def init(
     exp_dir = get_experiment_dir(experiment_id)
     exp_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create config (inject guidance if provided)
+    # Validate trading mode
+    if trading_mode not in ("stocks_only", "multi_instrument"):
+        console.print(f"[red]Error:[/red] Invalid trading mode '{trading_mode}'. Use 'stocks_only' or 'multi_instrument'")
+        raise typer.Exit(1)
+
+    # Create config (inject guidance and trading mode if provided)
     config = create_experiment_config(
         experiment_id=experiment_id,
         name=name,
@@ -117,6 +129,9 @@ def init(
         long_term_holding_days=long_term_days,
         cash_interest_rate=Decimal(str(cash_interest_rate)),
         guidance=effective_guidance,
+        trading_mode=trading_mode,
+        options_enabled=enable_options,
+        futures_enabled=enable_futures,
     )
 
     # Save config
@@ -153,6 +168,16 @@ def init(
         with open(portfolio_file, "w") as f:
             f.write(agent.portfolio.model_dump_json(indent=2))
 
+    # Build trading mode display
+    mode_info = f"Trading Mode: {config.trading_mode}\n"
+    if config.trading_mode == "multi_instrument":
+        instruments = []
+        if config.options_enabled:
+            instruments.append("Options")
+        if config.futures_enabled:
+            instruments.append("Futures")
+        mode_info += f"Instruments: Stocks + {', '.join(instruments)}\n"
+
     console.print(Panel(
         f"[green]Experiment initialized successfully![/green]\n\n"
         f"ID: {experiment_id}\n"
@@ -162,6 +187,7 @@ def init(
         f"Short-term Tax: {short_term_tax*100:.0f}%\n"
         f"Long-term Tax: {long_term_tax*100:.0f}%\n"
         f"Long-term Holding Period: {long_term_days} days\n"
+        f"{mode_info}"
         + (f"Guidance: {effective_guidance[:60]}{'...' if effective_guidance and len(effective_guidance) > 60 else ''}\n" if effective_guidance else "")
         + (f"Init file: {init_file}\n" if init_file else "")
         + f"\nLocation: {exp_dir}",
