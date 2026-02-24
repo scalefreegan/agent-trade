@@ -65,6 +65,7 @@ def init(
     short_term_tax: float = typer.Option(0.35, "--short-term-tax", help="Short-term capital gains tax rate"),
     long_term_tax: float = typer.Option(0.15, "--long-term-tax", help="Long-term capital gains tax rate"),
     long_term_days: int = typer.Option(365, "--long-term-days", help="Days for long-term holding period"),
+    cash_interest_rate: float = typer.Option(0.05, "--cash-interest-rate", help="Annual interest rate on uninvested cash (e.g. 0.05 for 5%)"),
     init_file: Optional[Path] = typer.Option(None, "--init-file", help="JSON file with agent initialization spec"),
     guidance: Optional[str] = typer.Option(None, "--guidance", help="Free-text guidance injected into all agent prompts"),
 ):
@@ -114,6 +115,7 @@ def init(
         short_term_tax_rate=Decimal(str(short_term_tax)),
         long_term_tax_rate=Decimal(str(long_term_tax)),
         long_term_holding_days=long_term_days,
+        cash_interest_rate=Decimal(str(cash_interest_rate)),
         guidance=effective_guidance,
     )
 

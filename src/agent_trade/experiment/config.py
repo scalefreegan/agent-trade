@@ -25,6 +25,7 @@ DEFAULT_LONG_TERM_TAX_RATE = Decimal("0.15")  # 15% for >= 1 year
 DEFAULT_LONG_TERM_HOLDING_DAYS = 365  # 1 year
 DEFAULT_MAX_POSITION_PCT = Decimal("0.50")  # 50% max in one stock
 DEFAULT_MIN_TRADE_AMOUNT = Decimal("1.00")  # $1.00 minimum trade
+DEFAULT_CASH_INTEREST_RATE = Decimal("0.05")  # 5% annual interest on cash
 DEFAULT_STARTING_CAPITAL = Decimal("1000.00")  # $1000 per agent
 DEFAULT_NUM_AGENTS = 10
 
@@ -45,6 +46,7 @@ def create_experiment_config(
     long_term_holding_days: int = DEFAULT_LONG_TERM_HOLDING_DAYS,
     max_position_pct: Decimal = DEFAULT_MAX_POSITION_PCT,
     min_trade_amount: Decimal = DEFAULT_MIN_TRADE_AMOUNT,
+    cash_interest_rate: Decimal = DEFAULT_CASH_INTEREST_RATE,
     guidance: Optional[str] = None,
 ) -> ExperimentConfig:
     """Create a new experiment configuration with defaults."""
@@ -58,6 +60,7 @@ def create_experiment_config(
         long_term_holding_days=long_term_holding_days,
         max_position_pct=max_position_pct,
         min_trade_amount=min_trade_amount,
+        cash_interest_rate=cash_interest_rate,
         created_at=datetime.now(timezone.utc),
         status="active",
         guidance=guidance,

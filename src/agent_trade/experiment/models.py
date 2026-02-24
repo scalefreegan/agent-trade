@@ -239,6 +239,7 @@ class ExperimentConfig(BaseModel):
     long_term_holding_days: int = 365
     max_position_pct: Decimal = Decimal("0.50")
     min_trade_amount: Decimal = Decimal("1.00")
+    cash_interest_rate: Decimal = Decimal("0.05")  # Annual rate (5% default), applied daily
     created_at: datetime
     status: Literal["active", "paused", "completed"]
     guidance: Optional[str] = None  # Free-text guidance injected into all agent prompts
@@ -335,6 +336,16 @@ class GameState(BaseModel):
 # ==============================================================================
 
 
+class InterestPayment(BaseModel):
+    """Record of daily interest credited to an agent's cash balance."""
+
+    timestamp: datetime
+    agent_id: str
+    cash_balance: Decimal  # Balance before interest
+    daily_rate: Decimal  # Daily rate applied
+    amount: Decimal  # Interest amount credited
+
+
 class Alert(BaseModel):
     """High-conviction opportunity flag raised by an agent."""
 
@@ -364,3 +375,4 @@ class DailyOutcome(BaseModel):
     portfolio_values: dict[str, Decimal]  # agent_id -> total value
     eliminations: list[str] = Field(default_factory=list)  # agent_ids eliminated
     errors: dict[str, str] = Field(default_factory=dict)  # agent_id -> error msg
+    interest_payments: list[InterestPayment] = Field(default_factory=list)
