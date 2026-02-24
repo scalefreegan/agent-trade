@@ -31,6 +31,8 @@ function useBreadcrumbs(): Crumb[] {
     crumbs.push({ label: `Experiment ${experimentId}` });
   } else if (pathname.startsWith('/search')) {
     crumbs.push({ label: 'Stock Search' });
+  } else if (pathname.startsWith('/predictions')) {
+    crumbs.push({ label: 'Predictions' });
   } else if (pathname.startsWith('/advisor')) {
     crumbs.push({ label: 'Advisor' });
   }
