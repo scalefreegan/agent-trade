@@ -18,21 +18,25 @@ export function MarketCard({ market }: MarketCardProps) {
 
   const kalshiUrl = eventTicker ? `https://kalshi.com/markets/${eventTicker}` : '#';
 
-  // Convert cents to percentage
-  const yesPrice = market.yes_bid ? (market.yes_bid / 100).toFixed(1) : '—';
-  const noPrice = market.no_bid ? (market.no_bid / 100).toFixed(1) : '—';
+  // Kalshi returns prices in cents (1-99), display as percentage
+  const yesPrice = market.yes_bid ? `${market.yes_bid}` : '—';
+  const noPrice = market.no_bid ? `${market.no_bid}` : '—';
 
-  // Format close time
+  // Format close time with validation
   const closeDate = new Date(market.close_time);
-  const isClosingSoon = closeDate.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000; // 7 days
-  const closeDateStr = closeDate.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const isValidDate = !isNaN(closeDate.getTime());
+  const isClosingSoon = isValidDate && closeDate.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000; // 7 days
+  const closeDateStr = isValidDate
+    ? closeDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : '—';
 
-  // Format volume
-  const formatVolume = (vol: number) => {
+  // Format volume with validation
+  const formatVolume = (vol: number | undefined | null) => {
+    if (vol == null || isNaN(vol)) return '—';
     if (vol >= 1_000_000) return `$${(vol / 1_000_000).toFixed(1)}M`;
     if (vol >= 1_000) return `$${(vol / 1_000).toFixed(1)}K`;
     return `$${vol}`;
@@ -71,11 +75,11 @@ export function MarketCard({ market }: MarketCardProps) {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">Yes</div>
-              <div className="text-2xl font-bold text-gain">{yesPrice}¢</div>
+              <div className="text-2xl font-bold text-gain">{yesPrice}%</div>
             </div>
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">No</div>
-              <div className="text-2xl font-bold text-loss">{noPrice}¢</div>
+              <div className="text-2xl font-bold text-loss">{noPrice}%</div>
             </div>
           </div>
 

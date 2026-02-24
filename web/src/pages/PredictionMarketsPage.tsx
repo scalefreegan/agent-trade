@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useKalshiEvents, type KalshiMarket } from '../api/kalshi';
 import { MarketCard } from '../components/predictions/MarketCard';
 import { SortControls, type SortOption } from '../components/predictions/SortControls';
@@ -17,24 +17,24 @@ export function PredictionMarketsPage() {
   });
 
   // Accumulate markets from all loaded pages
-  useMemo(() => {
-    if (data?.events) {
-      const newMarkets = data.events.flatMap((event) =>
-        (event.markets || []).map((market) => ({
-          ...market,
-          eventTicker: event.ticker,
-          eventTitle: event.title,
-        }))
-      );
-      if (cursor) {
-        // Append to existing markets
-        setAllMarkets((prev) => [...prev, ...newMarkets]);
-      } else {
-        // Reset markets (new filter/sort)
-        setAllMarkets(newMarkets);
-      }
+  useEffect(() => {
+    if (!data?.events || error) return;
+
+    const newMarkets = data.events.flatMap((event) =>
+      (event.markets || []).map((market) => ({
+        ...market,
+        eventTicker: event.ticker,
+        eventTitle: event.title,
+      }))
+    );
+    if (cursor) {
+      // Append to existing markets
+      setAllMarkets((prev) => [...prev, ...newMarkets]);
+    } else {
+      // Reset markets (new filter/sort)
+      setAllMarkets(newMarkets);
     }
-  }, [data, cursor]);
+  }, [data, cursor, error]);
 
   // Client-side sorting
   const sortedMarkets = useMemo(() => {
@@ -57,8 +57,10 @@ export function PredictionMarketsPage() {
         return markets.sort(
           (a, b) => new Date(b.created_time).getTime() - new Date(a.created_time).getTime()
         );
-      default:
+      default: {
+        const _exhaustive: never = sortBy;
         return markets;
+      }
     }
   }, [allMarkets, sortBy]);
 
@@ -119,7 +121,9 @@ export function PredictionMarketsPage() {
       {error && (
         <div className="bg-loss/10 border border-loss/20 rounded-lg p-4 text-loss text-sm">
           Failed to load prediction markets. Please try again later.
-          <div className="text-xs mt-1 opacity-75">{error.message}</div>
+          <div className="text-xs mt-1 opacity-75">
+            {error instanceof Error ? error.message : String(error)}
+          </div>
         </div>
       )}
 

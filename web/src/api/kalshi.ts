@@ -61,14 +61,28 @@ async function fetchKalshi<T>(endpoint: string, params?: FetchKalshiParams): Pro
     });
   }
 
-  const response = await fetch(url.toString());
+  let response: Response;
+  try {
+    response = await fetch(url.toString());
+  } catch (err) {
+    console.error('Kalshi API network error:', err);
+    throw new Error(`Network error: ${err instanceof Error ? err.message : 'Failed to reach Kalshi API'}`);
+  }
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => response.statusText);
+    const errorText = await response.text().catch((err) => {
+      console.error('Failed to read error response:', err);
+      return response.statusText;
+    });
     throw new Error(`Kalshi API error: ${response.status} - ${errorText}`);
   }
 
-  return response.json();
+  try {
+    return await response.json();
+  } catch (err) {
+    console.error('Failed to parse Kalshi API response:', err);
+    throw new Error('Invalid JSON response from Kalshi API');
+  }
 }
 
 // React Query hooks
@@ -81,7 +95,7 @@ export interface UseKalshiEventsParams {
 
 export function useKalshiEvents(params: UseKalshiEventsParams = {}) {
   const {
-    status = 'open',
+    status,
     limit = 20,
     cursor,
     with_nested_markets = true,
@@ -109,7 +123,7 @@ export interface UseKalshiMarketsParams {
 
 export function useKalshiMarkets(params: UseKalshiMarketsParams = {}) {
   const {
-    status = 'open',
+    status,
     limit = 40,
     cursor,
     event_ticker,
