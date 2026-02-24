@@ -23,20 +23,33 @@ const PERIODS = [
   { value: '5y', label: '5Y' },
 ] as const;
 
+type ViewMode = 'price' | 'percent';
+
 interface StockChartProps {
   symbol: string;
 }
 
 export function StockChart({ symbol }: StockChartProps) {
   const [period, setPeriod] = useState('3mo');
+  const [viewMode, setViewMode] = useState<ViewMode>('price');
   const { data, isLoading, error } = useStockHistory(symbol, period);
   const ct = useChartTheme();
 
-  const chartData =
+  const rawData =
     data?.data.map((p) => ({
       date: p.date,
       close: p.close,
     })) ?? [];
+
+  const basePrice = rawData.length > 0 ? rawData[0].close : 0;
+
+  const chartData =
+    viewMode === 'percent' && basePrice !== 0
+      ? rawData.map((p) => ({
+          date: p.date,
+          close: ((p.close - basePrice) / basePrice) * 100,
+        }))
+      : rawData;
 
   // Determine if price went up or down over the period
   const isGain =
@@ -47,6 +60,7 @@ export function StockChart({ symbol }: StockChartProps) {
 
   const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
     if (!active || !payload || payload.length === 0) return null;
+    const val = payload[0].value as number;
     return (
       <div
         className="rounded-lg px-3 py-2 text-sm shadow-lg"
@@ -58,26 +72,47 @@ export function StockChart({ symbol }: StockChartProps) {
       >
         <p className="font-medium">{label}</p>
         <p style={{ color: lineColor }}>
-          ${payload[0].value?.toFixed(2)}
+          {viewMode === 'percent'
+            ? `${val >= 0 ? '+' : ''}${val.toFixed(2)}%`
+            : `$${val.toFixed(2)}`}
         </p>
       </div>
     );
   };
 
+  const toggleBtnClass = (active: boolean) =>
+    `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+      active
+        ? 'bg-primary text-primary-foreground'
+        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+    }`;
+
   return (
     <Card className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-foreground">Price History</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-foreground">Price History</h3>
+          <div className="flex gap-0.5 ml-2 bg-muted rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('price')}
+              className={toggleBtnClass(viewMode === 'price')}
+            >
+              $
+            </button>
+            <button
+              onClick={() => setViewMode('percent')}
+              className={toggleBtnClass(viewMode === 'percent')}
+            >
+              %
+            </button>
+          </div>
+        </div>
         <div className="flex gap-1">
           {PERIODS.map((p) => (
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                period === p.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
+              className={toggleBtnClass(period === p.value)}
             >
               {p.label}
             </button>
@@ -122,7 +157,11 @@ export function StockChart({ symbol }: StockChartProps) {
                 tickLine={false}
                 axisLine={false}
                 domain={['auto', 'auto']}
-                tickFormatter={(v: number) => `$${v.toFixed(0)}`}
+                tickFormatter={
+                  viewMode === 'percent'
+                    ? (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`
+                    : (v: number) => `$${v.toFixed(0)}`
+                }
                 width={55}
               />
               <Tooltip content={<CustomTooltip />} />

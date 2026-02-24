@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
 import type { HoldingsInfo as HoldingsInfoType } from '../../api/types';
 import { Card } from '../ui/Card';
-import { Badge } from '../ui/Badge';
 import { useChartTheme } from '../../hooks/useChartTheme';
+
+type PriceViewMode = 'price' | 'percent';
 
 interface HoldingsInfoProps {
   data: HoldingsInfoType;
@@ -31,13 +32,33 @@ function formatDate(dateStr: string) {
   });
 }
 
-function Sparkline({ data, color }: { data: { date: string; close: number }[]; color: string }) {
+function toPercentChange(data: { date: string; close: number }[]) {
+  if (data.length === 0) return [];
+  const base = data[0].close;
+  if (base === 0) return data.map((p) => ({ date: p.date, close: 0 }));
+  return data.map((p) => ({
+    date: p.date,
+    close: ((p.close - base) / base) * 100,
+  }));
+}
+
+function Sparkline({
+  data,
+  color,
+  viewMode,
+}: {
+  data: { date: string; close: number }[];
+  color: string;
+  viewMode: PriceViewMode;
+}) {
   const ct = useChartTheme();
   if (data.length < 2) return null;
 
+  const chartData = viewMode === 'percent' ? toPercentChange(data) : data;
+
   return (
     <ResponsiveContainer width="100%" height={64}>
-      <LineChart data={data} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
+      <LineChart data={chartData} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
         <Tooltip
           contentStyle={{
             backgroundColor: ct.tooltip.bg,
@@ -47,7 +68,12 @@ function Sparkline({ data, color }: { data: { date: string; close: number }[]; c
             fontSize: '0.75rem',
             color: ct.tooltip.text,
           }}
-          formatter={(v: number) => [formatCurrency(v), 'Close']}
+          formatter={(v: number) => [
+            viewMode === 'percent'
+              ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
+              : formatCurrency(v),
+            viewMode === 'percent' ? 'Change' : 'Close',
+          ]}
           labelFormatter={(label: string) => label}
         />
         <Line
@@ -66,6 +92,7 @@ function Sparkline({ data, color }: { data: { date: string; close: number }[]; c
 export function HoldingsInfo({ data }: HoldingsInfoProps) {
   const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
   const [summaryExpanded, setSummaryExpanded] = useState<Set<string>>(new Set());
+  const [priceView, setPriceView] = useState<PriceViewMode>('price');
   const ct = useChartTheme();
 
   const toggleSummary = (symbol: string) => {
@@ -87,6 +114,13 @@ export function HoldingsInfo({ data }: HoldingsInfoProps) {
     );
   }
 
+  const toggleBtnClass = (active: boolean) =>
+    `px-2 py-0.5 text-xs font-medium rounded-md transition-colors ${
+      active
+        ? 'bg-primary text-primary-foreground'
+        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+    }`;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 mb-2 pb-3 border-b-2 border-primary">
@@ -94,6 +128,23 @@ export function HoldingsInfo({ data }: HoldingsInfoProps) {
         <span className="text-xs font-mono text-muted-foreground">
           {data.holdings.length} position{data.holdings.length !== 1 ? 's' : ''}
         </span>
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Sparklines</span>
+          <div className="flex gap-0.5 bg-muted rounded-lg p-0.5">
+            <button
+              onClick={() => setPriceView('price')}
+              className={toggleBtnClass(priceView === 'price')}
+            >
+              $
+            </button>
+            <button
+              onClick={() => setPriceView('percent')}
+              className={toggleBtnClass(priceView === 'percent')}
+            >
+              %
+            </button>
+          </div>
+        </div>
       </div>
 
       {data.holdings.map((holding) => {
@@ -201,8 +252,10 @@ export function HoldingsInfo({ data }: HoldingsInfoProps) {
             {/* ── 90-day sparkline ── */}
             {holding.price_history.length >= 2 && (
               <div className="mt-4">
-                <div className="text-xs text-muted-foreground mb-1">90-day price</div>
-                <Sparkline data={holding.price_history} color={sparkColor} />
+                <div className="text-xs text-muted-foreground mb-1">
+                  {priceView === 'percent' ? '90-day change' : '90-day price'}
+                </div>
+                <Sparkline data={holding.price_history} color={sparkColor} viewMode={priceView} />
               </div>
             )}
 
