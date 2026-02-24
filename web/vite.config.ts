@@ -10,6 +10,11 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/kalshi-api': {
+        target: 'https://api.elections.kalshi.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/kalshi-api/, '/trade-api/v2'),
+      },
     },
   },
 })

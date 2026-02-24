@@ -2,6 +2,7 @@ import { type RefObject } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { DashboardIcon } from '../../assets/icons/DashboardIcon';
 import { SearchIcon } from '../../assets/icons/SearchIcon';
+import { PredictionIcon } from '../../assets/icons/PredictionIcon';
 import { AdvisorIcon } from '../../assets/icons/AdvisorIcon';
 
 interface SidebarProps {
@@ -87,6 +88,15 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose, closeB
             <span className="ml-3 text-sm font-medium whitespace-nowrap">Stock Search</span>
           </Link>
           <Link
+            to="/predictions"
+            onClick={onMobileClose}
+            aria-current={location.pathname.startsWith('/predictions') ? 'page' : undefined}
+            className={`flex items-center rounded-lg px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isActive('/predictions')}`}
+          >
+            <PredictionIcon className="w-5 h-5 shrink-0" />
+            <span className="ml-3 text-sm font-medium whitespace-nowrap">Predictions</span>
+          </Link>
+          <Link
             to="/advisor"
             onClick={onMobileClose}
             aria-current={location.pathname.startsWith('/advisor') ? 'page' : undefined}
@@ -147,6 +157,17 @@ function SidebarContent({ collapsed, onToggle, isActive }: SidebarContentProps) 
         >
           <SearchIcon className="w-5 h-5 shrink-0" />
           {!collapsed && <span className="ml-3 text-sm font-medium whitespace-nowrap">Stock Search</span>}
+        </Link>
+        <Link
+          to="/predictions"
+          title={collapsed ? 'Predictions' : undefined}
+          aria-current={location.pathname.startsWith('/predictions') ? 'page' : undefined}
+          className={`flex items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isActive('/predictions')} ${
+            collapsed ? 'justify-center px-0 py-3' : 'px-4 py-3'
+          }`}
+        >
+          <PredictionIcon className="w-5 h-5 shrink-0" />
+          {!collapsed && <span className="ml-3 text-sm font-medium whitespace-nowrap">Predictions</span>}
         </Link>
         <Link
           to="/advisor"
