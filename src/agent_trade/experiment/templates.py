@@ -145,6 +145,35 @@ Portfolio value may be materially understated. These positions are valued at $0.
 
 """
 
+    # Format derivative positions
+    options_md = ""
+    if portfolio.option_positions:
+        options_md = "\n**Option Positions**:\n"
+        for opt in portfolio.option_positions:
+            underlying_price = current_prices.get(opt.underlying, Decimal("0"))
+            intrinsic = opt.intrinsic_value(underlying_price)
+            status = "ITM" if intrinsic > 0 else "OTM"
+            options_md += (
+                f"- {opt.contracts} {opt.contract_type.upper()} {opt.underlying} "
+                f"${opt.strike_price} exp {opt.expiration_date} "
+                f"({status}, intrinsic: ${intrinsic}/sh)\n"
+            )
+
+    futures_md = ""
+    if portfolio.futures_positions:
+        futures_md = "\n**Futures Positions**:\n"
+        for fut in portfolio.futures_positions:
+            current_fut_price = current_prices.get(fut.symbol, fut.entry_price)
+            unrealized = fut.unrealized_pnl(current_fut_price)
+            futures_md += (
+                f"- {fut.direction.upper()} {fut.contracts} {fut.symbol} "
+                f"at ${fut.entry_price} (P&L: ${unrealized:.2f})\n"
+            )
+
+    margin_md = ""
+    if portfolio.margin_used > 0:
+        margin_md = f"\n**Margin Used**: ${portfolio.margin_used:.2f}\n"
+
     return f"""# Daily Trading Decision: {date}
 
 **Agent**: {agent_id}
@@ -155,7 +184,7 @@ Portfolio value may be materially understated. These positions are valued at $0.
 
 **Stock Positions**:
 {positions_md}
-**Total Portfolio Value**: ${total_value:.2f}
+{options_md}{futures_md}{margin_md}**Total Portfolio Value**: ${total_value:.2f}
 
 {price_warning}---
 

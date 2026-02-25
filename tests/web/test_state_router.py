@@ -11,8 +11,10 @@ from agent_trade.experiment.models import (
     AgentState,
     AgentStrategy,
     ExperimentConfig,
+    FuturesPosition,
     GameState,
     InvestmentThesis,
+    OptionPosition,
     Portfolio,
     StockPosition,
     TaxLot,
@@ -338,3 +340,206 @@ class TestGetLeaderboard:
         response = client.get("/experiments/unknown/leaderboard")
 
         assert response.status_code == 404
+
+
+class TestDerivativePositionsInGameState:
+    """Derivative positions (options/futures) appear in game state response."""
+
+    @patch("agent_trade.web.routers.state.get_cached_prices")
+    def test_option_positions_in_state(self, mock_prices, app, client):
+        """Option positions appear in game state response with intrinsic value."""
+        from datetime import date
+
+        config = ExperimentConfig(
+            experiment_id="exp1",
+            name="Derivatives Test",
+            num_agents=1,
+            starting_capital=Decimal("100000"),
+            created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            status="active",
+        )
+        agent = AgentState(
+            agent_id="agent_001",
+            name="Options Trader",
+            status="active",
+            portfolio=Portfolio(
+                cash=Decimal("90000"),
+                positions=[],
+                option_positions=[
+                    OptionPosition(
+                        underlying="AAPL",
+                        contract_type="call",
+                        strike_price=Decimal("150"),
+                        expiration_date=date(2026, 6, 20),
+                        contracts=3,
+                        premium_per_share=Decimal("5"),
+                        opened_date=datetime(2026, 1, 10, tzinfo=timezone.utc),
+                    ),
+                ],
+            ),
+            strategy=_make_strategy(),
+            created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+        state = GameState(
+            config=config,
+            agents={"agent_001": agent},
+            trading_day=5,
+            last_run=datetime(2026, 1, 15, tzinfo=timezone.utc),
+        )
+        app.dependency_overrides[load_experiment_state] = lambda experiment_id: state
+        mock_prices.return_value = {"AAPL": Decimal("160")}
+
+        response = client.get("/experiments/exp1/state")
+
+        assert response.status_code == 200
+        data = response.json()
+        portfolio = data["agents"][0]["portfolio"]
+        assert len(portfolio["option_positions"]) == 1
+        opt = portfolio["option_positions"][0]
+        assert opt["underlying"] == "AAPL"
+        assert opt["contract_type"] == "call"
+        assert opt["strike_price"] == 150.0
+        assert opt["contracts"] == 3
+        assert opt["premium_per_share"] == 5.0
+        assert opt["total_premium"] == 1500.0  # 5 * 100 * 3
+        # Intrinsic: (160-150)*100*3 = 3000
+        assert opt["intrinsic_value"] == 3000.0
+        assert portfolio["futures_positions"] == []
+        assert portfolio["margin_used"] == 0.0
+
+    @patch("agent_trade.web.routers.state.get_cached_prices")
+    def test_futures_positions_in_state(self, mock_prices, app, client):
+        """Futures positions appear in game state with unrealized P&L."""
+        from datetime import date
+
+        config = ExperimentConfig(
+            experiment_id="exp1",
+            name="Futures Test",
+            num_agents=1,
+            starting_capital=Decimal("100000"),
+            created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            status="active",
+        )
+        agent = AgentState(
+            agent_id="agent_001",
+            name="Futures Trader",
+            status="active",
+            portfolio=Portfolio(
+                cash=Decimal("50000"),
+                positions=[],
+                futures_positions=[
+                    FuturesPosition(
+                        symbol="ES",
+                        direction="long",
+                        contracts=2,
+                        entry_price=Decimal("5000"),
+                        contract_multiplier=Decimal("50"),
+                        expiration_date=date(2026, 6, 20),
+                        opened_date=datetime(2026, 1, 10, tzinfo=timezone.utc),
+                        margin_per_contract=Decimal("12500"),
+                    ),
+                ],
+                margin_used=Decimal("25000"),
+            ),
+            strategy=_make_strategy(),
+            created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+        state = GameState(
+            config=config,
+            agents={"agent_001": agent},
+            trading_day=5,
+            last_run=datetime(2026, 1, 15, tzinfo=timezone.utc),
+        )
+        app.dependency_overrides[load_experiment_state] = lambda experiment_id: state
+        mock_prices.return_value = {"ES": Decimal("5100")}
+
+        response = client.get("/experiments/exp1/state")
+
+        assert response.status_code == 200
+        data = response.json()
+        portfolio = data["agents"][0]["portfolio"]
+        assert portfolio["margin_used"] == 25000.0
+        assert len(portfolio["futures_positions"]) == 1
+        fut = portfolio["futures_positions"][0]
+        assert fut["symbol"] == "ES"
+        assert fut["direction"] == "long"
+        assert fut["contracts"] == 2
+        assert fut["entry_price"] == 5000.0
+        assert fut["contract_multiplier"] == 50.0
+        assert fut["margin_per_contract"] == 12500.0
+        assert fut["total_margin"] == 25000.0
+        # Unrealized P&L: (5100-5000)*50*2 = 10000
+        assert fut["unrealized_pnl"] == 10000.0
+        assert portfolio["option_positions"] == []
+
+    @patch("agent_trade.web.routers.state.get_cached_prices")
+    def test_derivative_symbols_included_in_price_fetch(self, mock_prices, app, client):
+        """Price fetch includes derivative underlyings/symbols."""
+        from datetime import date
+
+        config = ExperimentConfig(
+            experiment_id="exp1",
+            name="Test",
+            num_agents=1,
+            starting_capital=Decimal("100000"),
+            created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            status="active",
+        )
+        agent = AgentState(
+            agent_id="agent_001",
+            name="Mixed Trader",
+            status="active",
+            portfolio=Portfolio(
+                cash=Decimal("50000"),
+                positions=[
+                    StockPosition(
+                        symbol="MSFT",
+                        lots=[TaxLot(shares=Decimal("5"), cost_basis=Decimal("300"), purchase_date=datetime(2026, 1, 5, tzinfo=timezone.utc))],
+                    ),
+                ],
+                option_positions=[
+                    OptionPosition(
+                        underlying="AAPL",
+                        contract_type="put",
+                        strike_price=Decimal("140"),
+                        expiration_date=date(2026, 6, 20),
+                        contracts=1,
+                        premium_per_share=Decimal("3"),
+                        opened_date=datetime(2026, 1, 10, tzinfo=timezone.utc),
+                    ),
+                ],
+                futures_positions=[
+                    FuturesPosition(
+                        symbol="NQ",
+                        direction="short",
+                        contracts=1,
+                        entry_price=Decimal("18000"),
+                        contract_multiplier=Decimal("20"),
+                        expiration_date=date(2026, 6, 20),
+                        opened_date=datetime(2026, 1, 10, tzinfo=timezone.utc),
+                        margin_per_contract=Decimal("16000"),
+                    ),
+                ],
+                margin_used=Decimal("16000"),
+            ),
+            strategy=_make_strategy(),
+            created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+        state = GameState(
+            config=config,
+            agents={"agent_001": agent},
+            trading_day=5,
+        )
+        app.dependency_overrides[load_experiment_state] = lambda experiment_id: state
+        mock_prices.return_value = {
+            "MSFT": Decimal("310"),
+            "AAPL": Decimal("135"),
+            "NQ": Decimal("17800"),
+        }
+
+        response = client.get("/experiments/exp1/state")
+
+        assert response.status_code == 200
+        # Verify get_cached_prices was called with all 3 symbols
+        called_symbols = set(mock_prices.call_args[0][0])
+        assert called_symbols == {"MSFT", "AAPL", "NQ"}

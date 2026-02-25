@@ -376,7 +376,7 @@ class TestProcessDailyCycleIntegration:
             # Run daily cycle
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )
@@ -433,7 +433,7 @@ class TestProcessDailyCycleIntegration:
             # Should not raise - should log warning and continue
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )
@@ -517,7 +517,7 @@ class TestProcessDailyCycleIntegration:
             # Run daily cycle
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )
@@ -618,7 +618,7 @@ class TestPositionLimitRemoval:
             # Run daily cycle
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )
@@ -832,7 +832,7 @@ class TestProcessDailyCycleOrchestration:
 
         outcome = process_daily_cycle(
             game_state=game_state,
-            date="2026-02-20",
+            trading_date="2026-02-20",
             decisions_base_dir=tmp_path / "decisions",
             timeout=300,
         )
@@ -867,7 +867,7 @@ class TestProcessDailyCycleOrchestration:
 
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )
@@ -908,7 +908,7 @@ class TestProcessDailyCycleOrchestration:
 
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )
@@ -966,7 +966,7 @@ class TestProcessDailyCycleOrchestration:
 
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )
@@ -1007,7 +1007,7 @@ class TestProcessDailyCycleOrchestration:
 
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )
@@ -1053,7 +1053,7 @@ class TestProcessDailyCycleOrchestration:
 
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )
@@ -1105,7 +1105,7 @@ class TestProcessDailyCycleOrchestration:
             # Should NOT raise despite save_strategy failure
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )
@@ -1140,7 +1140,7 @@ class TestProcessDailyCycleOrchestration:
 
             outcome = process_daily_cycle(
                 game_state=game_state,
-                date="2026-02-20",
+                trading_date="2026-02-20",
                 decisions_base_dir=tmp_path / "decisions",
                 timeout=300,
             )

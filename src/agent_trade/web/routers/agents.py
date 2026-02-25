@@ -22,6 +22,7 @@ from agent_trade.experiment.strategy_manager import (
     load_strategy,
     save_strategy,
 )
+from agent_trade.experiment.models import Portfolio
 from agent_trade.web.schemas import (
     AgentDetailResponse,
     AgentStateResponse,
@@ -31,8 +32,10 @@ from agent_trade.web.schemas import (
     BenchmarkSeries,
     BuyReasonEntry,
     DecisionLogEntry,
+    FuturesPositionResponse,
     HoldingRationaleResponse,
     HoldingsInfoResponse,
+    OptionPositionResponse,
     PricePoint,
     InvestmentThesisResponse,
     PortfolioMetrics,
@@ -92,6 +95,95 @@ def _build_portfolio_metrics(
     )
 
 
+def _build_portfolio_response(
+    portfolio: Portfolio,
+    current_prices: dict[str, Decimal],
+) -> PortfolioResponse:
+    """Build a PortfolioResponse with stock, option, and futures positions."""
+    positions: dict[str, StockPositionResponse] = {}
+    for pos in portfolio.positions:
+        current_price = current_prices.get(pos.symbol)
+        current_value = None
+        unrealized_gain = None
+        if current_price is not None:
+            current_value = pos.total_shares * current_price
+            unrealized_gain = current_value - pos.total_cost
+
+        positions[pos.symbol] = StockPositionResponse(
+            symbol=pos.symbol,
+            total_shares=float(pos.total_shares),
+            total_cost_basis=float(pos.total_cost),
+            current_price=float(current_price) if current_price else None,
+            current_value=float(current_value) if current_value else None,
+            unrealized_gain=float(unrealized_gain) if unrealized_gain else None,
+            lots=[
+                TaxLotResponse(
+                    shares=float(lot.shares),
+                    cost_basis=float(lot.cost_basis),
+                    purchase_date=lot.purchase_date,
+                )
+                for lot in pos.lots
+            ],
+        )
+
+    option_positions = [
+        OptionPositionResponse(
+            underlying=opt.underlying,
+            contract_type=opt.contract_type,
+            strike_price=float(opt.strike_price),
+            expiration_date=opt.expiration_date.isoformat(),
+            contracts=opt.contracts,
+            premium_per_share=float(opt.premium_per_share),
+            total_premium=float(opt.total_premium),
+            intrinsic_value=(
+                float(opt.total_intrinsic_value(current_prices[opt.underlying]))
+                if opt.underlying in current_prices
+                else None
+            ),
+        )
+        for opt in portfolio.option_positions
+    ]
+
+    futures_positions = [
+        FuturesPositionResponse(
+            symbol=fut.symbol,
+            direction=fut.direction,
+            contracts=fut.contracts,
+            entry_price=float(fut.entry_price),
+            contract_multiplier=float(fut.contract_multiplier),
+            expiration_date=fut.expiration_date.isoformat(),
+            margin_per_contract=float(fut.margin_per_contract),
+            total_margin=float(fut.total_margin),
+            unrealized_pnl=(
+                float(fut.unrealized_pnl(current_prices[fut.symbol]))
+                if fut.symbol in current_prices
+                else None
+            ),
+        )
+        for fut in portfolio.futures_positions
+    ]
+
+    return PortfolioResponse(
+        cash=float(portfolio.cash),
+        positions=positions,
+        option_positions=option_positions,
+        futures_positions=futures_positions,
+        margin_used=float(portfolio.margin_used),
+    )
+
+
+def _collect_portfolio_symbols(portfolio: Portfolio) -> set[str]:
+    """Collect all symbols needed for pricing from a portfolio (stocks + derivatives)."""
+    symbols: set[str] = set()
+    for pos in portfolio.positions:
+        symbols.add(pos.symbol)
+    for opt in portfolio.option_positions:
+        symbols.add(opt.underlying)
+    for fut in portfolio.futures_positions:
+        symbols.add(fut.symbol)
+    return symbols
+
+
 @router.get("/experiments/{experiment_id}/agents")
 async def list_agents(experiment_id: str) -> list[AgentStateResponse]:
     """List all agents in an experiment."""
@@ -104,52 +196,21 @@ async def list_agents(experiment_id: str) -> list[AgentStateResponse]:
     if game_state is None:
         raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
 
-    # Get all symbols for pricing
-    all_symbols = set()
+    # Get all symbols for pricing (stocks + derivatives)
+    all_symbols: set[str] = set()
     for agent in game_state.agents.values():
-        for position in agent.portfolio.positions:
-            all_symbols.add(position.symbol)
+        all_symbols.update(_collect_portfolio_symbols(agent.portfolio))
 
     current_prices = get_current_prices(list(all_symbols)) if all_symbols else {}
 
     # Convert to response format
     agents = []
     for agent in game_state.agents.values():
-        # Build positions with current prices
-        positions = {}
-        for pos in agent.portfolio.positions:
-            current_price = current_prices.get(pos.symbol)
-            current_value = None
-            unrealized_gain = None
-            if current_price is not None:
-                current_value = pos.total_shares * current_price
-                unrealized_gain = current_value - pos.total_cost
-
-            positions[pos.symbol] = StockPositionResponse(
-                symbol=pos.symbol,
-                total_shares=float(pos.total_shares),
-                total_cost_basis=float(pos.average_cost_basis),
-                current_price=float(current_price) if current_price else None,
-                current_value=float(current_value) if current_value else None,
-                unrealized_gain=float(unrealized_gain) if unrealized_gain else None,
-                lots=[
-                    TaxLotResponse(
-                        shares=float(lot.shares),
-                        cost_basis=float(lot.cost_basis),
-                        purchase_date=lot.purchase_date,
-                    )
-                    for lot in pos.lots
-                ],
-            )
-
         agents.append(
             AgentStateResponse(
                 agent_id=agent.agent_id,
                 name=agent.name,
-                portfolio=PortfolioResponse(
-                    cash=float(agent.portfolio.cash),
-                    positions=positions,
-                ),
+                portfolio=_build_portfolio_response(agent.portfolio, current_prices),
                 status=agent.status,
             )
         )
@@ -175,41 +236,12 @@ async def get_agent_detail(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    # Get current prices for portfolio valuation
-    symbols = [pos.symbol for pos in agent.portfolio.positions]
-    current_prices = get_current_prices(symbols) if symbols else {}
+    # Get current prices for portfolio valuation (stocks + derivatives)
+    symbols = _collect_portfolio_symbols(agent.portfolio)
+    current_prices = get_current_prices(list(symbols)) if symbols else {}
 
     # Build portfolio response
-    positions = {}
-    for pos in agent.portfolio.positions:
-        current_price = current_prices.get(pos.symbol)
-        current_value = None
-        unrealized_gain = None
-        if current_price is not None:
-            current_value = pos.total_shares * current_price
-            unrealized_gain = current_value - pos.total_cost
-
-        positions[pos.symbol] = StockPositionResponse(
-            symbol=pos.symbol,
-            total_shares=float(pos.total_shares),
-            total_cost_basis=float(pos.average_cost_basis),
-            current_price=float(current_price) if current_price else None,
-            current_value=float(current_value) if current_value else None,
-            unrealized_gain=float(unrealized_gain) if unrealized_gain else None,
-            lots=[
-                TaxLotResponse(
-                    shares=float(lot.shares),
-                    cost_basis=float(lot.cost_basis),
-                    purchase_date=lot.purchase_date,
-                )
-                for lot in pos.lots
-            ],
-        )
-
-    portfolio_resp = PortfolioResponse(
-        cash=float(agent.portfolio.cash),
-        positions=positions,
-    )
+    portfolio_resp = _build_portfolio_response(agent.portfolio, current_prices)
 
     # Calculate metrics using portfolio_tracker
     try:
@@ -349,7 +381,7 @@ async def get_agent_transactions(
     total_tax_paid = Decimal("0")
 
     for outcome in outcomes:
-        # Filter transactions by agent_id (transactions is a flat list)
+        # Filter stock transactions by agent_id (transactions is a flat list)
         agent_transactions = [
             txn for txn in outcome.transactions if txn.agent_id == agent_id
         ]
@@ -373,6 +405,44 @@ async def get_agent_transactions(
             else:  # "sell"
                 total_sell_volume += txn.gross_amount
                 total_tax_paid += txn.tax_amount
+
+        # Option transactions
+        for txn in outcome.option_transactions:
+            if txn.agent_id != agent_id:
+                continue
+            transactions.append(
+                TransactionRecord(
+                    date=outcome.date,
+                    action=txn.action.upper(),
+                    symbol=f"{txn.underlying} {txn.contract_type.upper()} {txn.strike_price} {txn.expiration_date}",
+                    shares=float(txn.contracts),
+                    price=float(txn.premium_per_share),
+                    total=float(txn.total_premium),
+                )
+            )
+            if txn.action == "buy_to_open":
+                total_buy_volume += txn.total_premium
+            else:
+                total_sell_volume += txn.total_premium
+
+        # Futures transactions
+        for txn in outcome.futures_transactions:
+            if txn.agent_id != agent_id:
+                continue
+            transactions.append(
+                TransactionRecord(
+                    date=outcome.date,
+                    action=txn.action.upper(),
+                    symbol=txn.symbol,
+                    shares=float(txn.contracts),
+                    price=float(txn.price),
+                    total=float(abs(txn.net_amount)),
+                )
+            )
+            if txn.action in ("open_long", "open_short"):
+                total_buy_volume += abs(txn.net_amount)
+            else:
+                total_sell_volume += abs(txn.net_amount)
 
     return TransactionHistoryResponse(
         transactions=transactions,

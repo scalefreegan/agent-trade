@@ -29,6 +29,12 @@ DEFAULT_CASH_INTEREST_RATE = Decimal("0.05")  # 5% annual interest on cash
 DEFAULT_STARTING_CAPITAL = Decimal("1000.00")  # $1000 per agent
 DEFAULT_NUM_AGENTS = 10
 
+# Multi-instrument trading mode defaults
+DEFAULT_TRADING_MODE = "stocks_only"
+DEFAULT_MAX_OPTIONS_PCT = Decimal("0.20")  # 20% max portfolio in options premium
+DEFAULT_MAX_FUTURES_LEVERAGE = Decimal("5.0")  # 5x max notional/portfolio ratio
+DEFAULT_FUTURES_MARGIN_PCT = Decimal("0.10")  # 10% initial margin
+
 
 def get_experiment_dir(experiment_id: str) -> Path:
     """Get the directory path for an experiment."""
@@ -48,8 +54,19 @@ def create_experiment_config(
     min_trade_amount: Decimal = DEFAULT_MIN_TRADE_AMOUNT,
     cash_interest_rate: Decimal = DEFAULT_CASH_INTEREST_RATE,
     guidance: Optional[str] = None,
+    trading_mode: str = DEFAULT_TRADING_MODE,
+    options_enabled: bool = False,
+    futures_enabled: bool = False,
+    max_options_pct: Decimal = DEFAULT_MAX_OPTIONS_PCT,
+    max_futures_leverage: Decimal = DEFAULT_MAX_FUTURES_LEVERAGE,
 ) -> ExperimentConfig:
     """Create a new experiment configuration with defaults."""
+    # Auto-enable instruments when trading_mode is multi_instrument
+    if trading_mode == "multi_instrument":
+        if not options_enabled and not futures_enabled:
+            options_enabled = True
+            futures_enabled = True
+
     return ExperimentConfig(
         experiment_id=experiment_id,
         name=name,
@@ -64,6 +81,11 @@ def create_experiment_config(
         created_at=datetime.now(timezone.utc),
         status="active",
         guidance=guidance,
+        trading_mode=trading_mode,
+        options_enabled=options_enabled,
+        futures_enabled=futures_enabled,
+        max_options_pct=max_options_pct,
+        max_futures_leverage=max_futures_leverage,
     )
 
 

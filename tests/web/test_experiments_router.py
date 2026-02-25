@@ -284,6 +284,76 @@ class TestCreateExperiment:
         assert response.status_code == 422
 
 
+class TestExperimentDetailTradingMode:
+    """ExperimentDetail should include trading_mode, options_enabled, futures_enabled."""
+
+    @patch("agent_trade.web.routers.experiments.load_game_state")
+    def test_default_stocks_only(self, mock_load_gs, app, client, mock_config):
+        """Default config → stocks_only, options/futures disabled."""
+        app.dependency_overrides[load_experiment_config] = lambda experiment_id: mock_config
+        mock_load_gs.return_value = None
+
+        response = client.get("/experiments/test")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["trading_mode"] == "stocks_only"
+        assert data["options_enabled"] is False
+        assert data["futures_enabled"] is False
+
+    @patch("agent_trade.web.routers.experiments.load_game_state")
+    def test_multi_instrument_config(self, mock_load_gs, app, client):
+        """Config with multi_instrument mode → fields reflect config."""
+        config = ExperimentConfig(
+            experiment_id="multi",
+            name="Multi Instrument",
+            num_agents=3,
+            starting_capital=Decimal("10000"),
+            created_at=datetime(2026, 1, 15, tzinfo=timezone.utc),
+            status="active",
+            trading_mode="multi_instrument",
+            options_enabled=True,
+            futures_enabled=True,
+        )
+        app.dependency_overrides[load_experiment_config] = lambda experiment_id: config
+        mock_load_gs.return_value = None
+
+        response = client.get("/experiments/multi")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["trading_mode"] == "multi_instrument"
+        assert data["options_enabled"] is True
+        assert data["futures_enabled"] is True
+
+    @patch("agent_trade.web.routers.experiments.load_game_state")
+    @patch("agent_trade.web.routers.experiments.save_config")
+    def test_update_preserves_trading_mode(self, mock_save, mock_load_gs, app, client):
+        """PATCH rename preserves trading_mode fields in response."""
+        config = ExperimentConfig(
+            experiment_id="multi",
+            name="Old Name",
+            num_agents=2,
+            starting_capital=Decimal("5000"),
+            created_at=datetime(2026, 1, 15, tzinfo=timezone.utc),
+            status="active",
+            trading_mode="multi_instrument",
+            options_enabled=True,
+            futures_enabled=False,
+        )
+        app.dependency_overrides[load_experiment_config] = lambda experiment_id: config
+        mock_load_gs.return_value = None
+
+        response = client.patch("/experiments/multi", json={"name": "Renamed"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Renamed"
+        assert data["trading_mode"] == "multi_instrument"
+        assert data["options_enabled"] is True
+        assert data["futures_enabled"] is False
+
+
 class TestDeleteExperiment:
     """Tests for DELETE /experiments/{experiment_id}"""
 

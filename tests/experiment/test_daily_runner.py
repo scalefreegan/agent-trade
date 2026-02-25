@@ -274,7 +274,7 @@ class TestRunDailyCycle:
         mock_process.assert_called_once()
         call_args = mock_process.call_args
         assert call_args.kwargs["game_state"] == mock_state
-        assert call_args.kwargs["date"] == "2024-01-15"
+        assert call_args.kwargs["trading_date"] == "2024-01-15"
         assert call_args.kwargs["timeout"] == 300
 
     @patch("agent_trade.experiment.daily_runner.save_daily_outcome")

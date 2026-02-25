@@ -401,7 +401,7 @@ class TestCoordinatorInterest:
 
         outcome = process_daily_cycle(
             game_state=game_state,
-            date="2026-01-15",
+            trading_date="2026-01-15",
             decisions_base_dir=tmp_path,
         )
 
@@ -456,7 +456,7 @@ class TestCoordinatorInterest:
 
         outcome = process_daily_cycle(
             game_state=game_state,
-            date="2026-01-15",
+            trading_date="2026-01-15",
             decisions_base_dir=tmp_path,
         )
 
@@ -510,7 +510,7 @@ class TestCoordinatorInterest:
 
         outcome = process_daily_cycle(
             game_state=game_state,
-            date="2026-01-15",
+            trading_date="2026-01-15",
             decisions_base_dir=tmp_path,
         )
 
@@ -561,7 +561,7 @@ class TestCoordinatorInterest:
 
         outcome = process_daily_cycle(
             game_state=game_state,
-            date="2026-01-15",
+            trading_date="2026-01-15",
             decisions_base_dir=tmp_path,
         )
 
@@ -612,7 +612,7 @@ class TestCoordinatorInterest:
         # Should not crash with TypeError
         outcome = process_daily_cycle(
             game_state=game_state,
-            date="2026-01-15",
+            trading_date="2026-01-15",
             decisions_base_dir=tmp_path,
         )
 
@@ -660,7 +660,7 @@ class TestCoordinatorInterest:
 
         outcome = process_daily_cycle(
             game_state=game_state,
-            date="2026-01-15",
+            trading_date="2026-01-15",
             decisions_base_dir=tmp_path,
         )
 
