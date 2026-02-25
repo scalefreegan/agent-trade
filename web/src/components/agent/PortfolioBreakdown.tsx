@@ -38,7 +38,7 @@ export function PortfolioBreakdown({ portfolio, metrics }: PortfolioBreakdownPro
     return days;
   };
 
-  const positions = Object.values(portfolio.positions);
+  const positions = Object.values(portfolio.positions).filter(p => p.total_shares > 0);
 
   const gainColor = metrics.unrealized_gain >= 0 ? 'text-gain' : 'text-loss';
 
