@@ -367,16 +367,18 @@ class TestGetLogger:
         assert logger.log_file == Path("/tmp/custom.log")
 
     @patch.dict(os.environ, {"AGENT_TRADE_LOG_CONSOLE": "false"})
-    def test_reads_console_output_from_env_var(self, clear_global_logger):
+    def test_reads_console_output_from_env_var(self, clear_global_logger, tmp_path):
         """Should read console output setting from AGENT_TRADE_LOG_CONSOLE"""
-        logger = get_logger()
+        with patch("agent_trade.logging_config.Path.home", return_value=tmp_path):
+            logger = get_logger()
 
-        assert logger.console_output is False
+            assert logger.console_output is False
 
     @patch.dict(os.environ, {"AGENT_TRADE_LOG_CONSOLE": "true"})
-    def test_enables_console_output_when_env_var_true(self, clear_global_logger):
+    def test_enables_console_output_when_env_var_true(self, clear_global_logger, tmp_path):
         """Should enable console output when env var is 'true'"""
-        logger = get_logger()
+        with patch("agent_trade.logging_config.Path.home", return_value=tmp_path):
+            logger = get_logger()
 
         assert logger.console_output is True
 
