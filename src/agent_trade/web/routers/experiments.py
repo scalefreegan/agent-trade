@@ -109,6 +109,9 @@ async def get_experiment(
         num_agents=config.num_agents,
         status=config.status,
         current_day=current_day,
+        trading_mode=config.trading_mode,
+        options_enabled=config.options_enabled,
+        futures_enabled=config.futures_enabled,
     )
 
 
@@ -145,6 +148,9 @@ async def update_experiment(
         num_agents=config.num_agents,
         status=config.status,
         current_day=current_day,
+        trading_mode=config.trading_mode,
+        options_enabled=config.options_enabled,
+        futures_enabled=config.futures_enabled,
     )
 
 
@@ -211,6 +217,9 @@ async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
         num_agents=config.num_agents,
         status=config.status,
         current_day=game_state.trading_day,
+        trading_mode=config.trading_mode,
+        options_enabled=config.options_enabled,
+        futures_enabled=config.futures_enabled,
     )
 
 

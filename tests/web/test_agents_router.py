@@ -31,10 +31,14 @@ from agent_trade.experiment.models import (
     AgentState,
     AgentStrategy,
     DailyOutcome,
+    ExecutedFuturesTransaction,
+    ExecutedOptionTransaction,
     ExecutedTransaction,
     ExperimentConfig,
+    FuturesPosition,
     GameState,
     InvestmentThesis,
+    OptionPosition,
     Portfolio,
     StockPosition,
     StrategyLearning,
@@ -83,12 +87,26 @@ def _make_strategy(learnings=None) -> AgentStrategy:
     )
 
 
-def _make_agent(*, positions=None, cash=Decimal("8600"), guidance=None) -> AgentState:
+def _make_agent(
+    *,
+    positions=None,
+    cash=Decimal("8600"),
+    guidance=None,
+    option_positions=None,
+    futures_positions=None,
+    margin_used=Decimal("0"),
+) -> AgentState:
     return AgentState(
         agent_id=AGENT_ID,
         name="Test Agent",
         status="active",
-        portfolio=Portfolio(cash=cash, positions=positions or []),
+        portfolio=Portfolio(
+            cash=cash,
+            positions=positions or [],
+            option_positions=option_positions or [],
+            futures_positions=futures_positions or [],
+            margin_used=margin_used,
+        ),
         strategy=_make_strategy(),
         created_at=NOW,
         guidance=guidance,
@@ -890,3 +908,300 @@ class TestGetAgentPortfolio:
         with patch(f"{P}.load_game_state", return_value=gs):
             resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/portfolio")
         assert resp.status_code == 404
+
+
+# =============================================================================
+# Derivative positions in API responses
+# =============================================================================
+
+
+def _make_option_position() -> OptionPosition:
+    """AAPL call option: 2 contracts, $150 strike, $5 premium."""
+    return OptionPosition(
+        underlying="AAPL",
+        contract_type="call",
+        strike_price=Decimal("150"),
+        expiration_date=date(2026, 6, 20),
+        contracts=2,
+        premium_per_share=Decimal("5"),
+        opened_date=NOW,
+    )
+
+
+def _make_futures_position() -> FuturesPosition:
+    """ES futures: 1 contract long, $5000 entry, $50 multiplier."""
+    return FuturesPosition(
+        symbol="ES",
+        direction="long",
+        contracts=1,
+        entry_price=Decimal("5000"),
+        contract_multiplier=Decimal("50"),
+        expiration_date=date(2026, 6, 20),
+        opened_date=NOW,
+        margin_per_contract=Decimal("12500"),
+    )
+
+
+def _make_agent_with_derivatives(
+    *, cash=Decimal("5000"), positions=None, options=None, futures=None, margin=Decimal("0"),
+) -> AgentState:
+    return AgentState(
+        agent_id=AGENT_ID,
+        name="Derivatives Agent",
+        status="active",
+        portfolio=Portfolio(
+            cash=cash,
+            positions=positions or [],
+            option_positions=options or [],
+            futures_positions=futures or [],
+            margin_used=margin,
+        ),
+        strategy=_make_strategy(),
+        created_at=NOW,
+    )
+
+
+from datetime import date
+
+
+class TestDerivativePositionsInListAgents:
+    """Derivative positions (options/futures) appear in list_agents response."""
+
+    def test_option_positions_in_response(self):
+        opt = _make_option_position()
+        agent = _make_agent_with_derivatives(options=[opt])
+        gs = _make_game_state(agent)
+        with (
+            patch(f"{P}.load_game_state", return_value=gs),
+            patch(f"{P}.get_current_prices", return_value={"AAPL": Decimal("160")}),
+        ):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents")
+        assert resp.status_code == 200
+        data = resp.json()
+        portfolio = data[0]["portfolio"]
+        assert len(portfolio["option_positions"]) == 1
+        opt_resp = portfolio["option_positions"][0]
+        assert opt_resp["underlying"] == "AAPL"
+        assert opt_resp["contract_type"] == "call"
+        assert opt_resp["strike_price"] == 150.0
+        assert opt_resp["contracts"] == 2
+        assert opt_resp["premium_per_share"] == 5.0
+        assert opt_resp["total_premium"] == 1000.0  # 5 * 100 * 2
+        # Intrinsic value: (160-150) * 100 * 2 = 2000
+        assert opt_resp["intrinsic_value"] == 2000.0
+
+    def test_futures_positions_in_response(self):
+        fut = _make_futures_position()
+        agent = _make_agent_with_derivatives(futures=[fut], margin=Decimal("12500"))
+        gs = _make_game_state(agent)
+        with (
+            patch(f"{P}.load_game_state", return_value=gs),
+            patch(f"{P}.get_current_prices", return_value={"ES": Decimal("5050")}),
+        ):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents")
+        assert resp.status_code == 200
+        data = resp.json()
+        portfolio = data[0]["portfolio"]
+        assert portfolio["margin_used"] == 12500.0
+        assert len(portfolio["futures_positions"]) == 1
+        fut_resp = portfolio["futures_positions"][0]
+        assert fut_resp["symbol"] == "ES"
+        assert fut_resp["direction"] == "long"
+        assert fut_resp["contracts"] == 1
+        assert fut_resp["entry_price"] == 5000.0
+        assert fut_resp["contract_multiplier"] == 50.0
+        assert fut_resp["margin_per_contract"] == 12500.0
+        assert fut_resp["total_margin"] == 12500.0
+        # Unrealized P&L: (5050-5000)*50*1 = 2500
+        assert fut_resp["unrealized_pnl"] == 2500.0
+
+    def test_empty_derivatives_default(self):
+        """Agents without derivatives still include empty lists and zero margin."""
+        agent = _make_agent(positions=[_aapl_position()])
+        gs = _make_game_state(agent)
+        with (
+            patch(f"{P}.load_game_state", return_value=gs),
+            patch(f"{P}.get_current_prices", return_value={"AAPL": Decimal("150")}),
+        ):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents")
+        assert resp.status_code == 200
+        portfolio = resp.json()[0]["portfolio"]
+        assert portfolio["option_positions"] == []
+        assert portfolio["futures_positions"] == []
+        assert portfolio["margin_used"] == 0.0
+
+
+class TestDerivativePositionsInAgentDetail:
+    """Derivative positions appear in get_agent_detail response."""
+
+    def test_options_and_futures_in_detail(self):
+        opt = _make_option_position()
+        fut = _make_futures_position()
+        agent = _make_agent_with_derivatives(
+            positions=[_aapl_position()],
+            options=[opt],
+            futures=[fut],
+            margin=Decimal("12500"),
+        )
+        gs = _make_game_state(agent)
+        prices = {"AAPL": Decimal("160"), "ES": Decimal("5050")}
+        with (
+            patch(f"{P}.load_game_state", return_value=gs),
+            patch(f"{P}.get_current_prices", return_value=prices),
+            patch(f"{P}.calculate_portfolio_metrics", return_value={
+                "total_value": Decimal("20000"),
+                "cash": Decimal("5000"),
+                "stock_value": Decimal("1600"),
+                "total_cost": Decimal("1400"),
+                "unrealized_gain_loss": Decimal("200"),
+                "cash_pct": Decimal("25"),
+            }),
+        ):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}")
+        assert resp.status_code == 200
+        data = resp.json()
+        portfolio = data["portfolio"]
+        assert len(portfolio["option_positions"]) == 1
+        assert len(portfolio["futures_positions"]) == 1
+        assert portfolio["margin_used"] == 12500.0
+        assert portfolio["option_positions"][0]["intrinsic_value"] == 2000.0
+        assert portfolio["futures_positions"][0]["unrealized_pnl"] == 2500.0
+
+
+class TestDerivativeTransactions:
+    """Option and futures transactions appear in get_agent_transactions."""
+
+    def test_option_and_futures_transactions(self):
+        outcomes = [
+            DailyOutcome(
+                date="2026-02-01",
+                transactions=[],
+                option_transactions=[
+                    ExecutedOptionTransaction(
+                        timestamp=NOW,
+                        agent_id=AGENT_ID,
+                        action="buy_to_open",
+                        underlying="AAPL",
+                        contract_type="call",
+                        strike_price=Decimal("150"),
+                        expiration_date=date(2026, 6, 20),
+                        contracts=2,
+                        premium_per_share=Decimal("5"),
+                        total_premium=Decimal("1000"),
+                        net_amount=Decimal("-1000"),
+                    ),
+                    ExecutedOptionTransaction(
+                        timestamp=NOW,
+                        agent_id="other_agent",
+                        action="buy_to_open",
+                        underlying="GOOG",
+                        contract_type="put",
+                        strike_price=Decimal("100"),
+                        expiration_date=date(2026, 6, 20),
+                        contracts=1,
+                        premium_per_share=Decimal("3"),
+                        total_premium=Decimal("300"),
+                        net_amount=Decimal("-300"),
+                    ),
+                ],
+                futures_transactions=[
+                    ExecutedFuturesTransaction(
+                        timestamp=NOW,
+                        agent_id=AGENT_ID,
+                        action="open_long",
+                        symbol="ES",
+                        contracts=1,
+                        price=Decimal("5000"),
+                        contract_multiplier=Decimal("50"),
+                        margin_impact=Decimal("12500"),
+                        net_amount=Decimal("-12500"),
+                    ),
+                ],
+                portfolio_values={AGENT_ID: Decimal("10000")},
+            ),
+        ]
+        with patch(f"{P}.load_all_daily_outcomes", return_value=outcomes):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/transactions")
+        assert resp.status_code == 200
+        data = resp.json()
+        # 1 option txn + 1 futures txn for AGENT_ID (other_agent filtered out)
+        assert len(data["transactions"]) == 2
+        opt_txn = data["transactions"][0]
+        assert opt_txn["action"] == "BUY_TO_OPEN"
+        assert "AAPL" in opt_txn["symbol"]
+        assert "CALL" in opt_txn["symbol"]
+        assert opt_txn["shares"] == 2.0  # contracts
+        assert opt_txn["price"] == 5.0
+        assert opt_txn["total"] == 1000.0
+
+        fut_txn = data["transactions"][1]
+        assert fut_txn["action"] == "OPEN_LONG"
+        assert fut_txn["symbol"] == "ES"
+        assert fut_txn["shares"] == 1.0
+
+        # Buy volumes include option premium and futures margin
+        assert data["total_buy_volume"] == 13500.0  # 1000 + 12500
+        assert data["total_sell_volume"] == 0.0
+
+    def test_sell_to_close_option_adds_to_sell_volume(self):
+        """sell_to_close option and close futures contribute to sell volume."""
+        outcomes = [
+            DailyOutcome(
+                date="2026-02-10",
+                transactions=[],
+                option_transactions=[
+                    ExecutedOptionTransaction(
+                        timestamp=NOW,
+                        agent_id=AGENT_ID,
+                        action="sell_to_close",
+                        underlying="AAPL",
+                        contract_type="call",
+                        strike_price=Decimal("150"),
+                        expiration_date=date(2026, 6, 20),
+                        contracts=2,
+                        premium_per_share=Decimal("8"),
+                        total_premium=Decimal("1600"),
+                        net_amount=Decimal("1600"),
+                        realized_pnl=Decimal("600"),
+                    ),
+                ],
+                futures_transactions=[
+                    ExecutedFuturesTransaction(
+                        timestamp=NOW,
+                        agent_id=AGENT_ID,
+                        action="close",
+                        symbol="ES",
+                        contracts=1,
+                        price=Decimal("5100"),
+                        contract_multiplier=Decimal("50"),
+                        margin_impact=Decimal("-12500"),
+                        realized_pnl=Decimal("5000"),
+                        net_amount=Decimal("17500"),
+                    ),
+                ],
+                portfolio_values={AGENT_ID: Decimal("25000")},
+            ),
+        ]
+        with patch(f"{P}.load_all_daily_outcomes", return_value=outcomes):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/transactions")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["transactions"]) == 2
+        assert data["total_buy_volume"] == 0.0
+        assert data["total_sell_volume"] == 19100.0  # 1600 + 17500
+
+    def test_derivative_intrinsic_value_none_when_price_missing(self):
+        """Options/futures show None for computed values when price is missing."""
+        opt = _make_option_position()
+        fut = _make_futures_position()
+        agent = _make_agent_with_derivatives(options=[opt], futures=[fut])
+        gs = _make_game_state(agent)
+        with (
+            patch(f"{P}.load_game_state", return_value=gs),
+            patch(f"{P}.get_current_prices", return_value={}),  # No prices
+        ):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents")
+        assert resp.status_code == 200
+        portfolio = resp.json()[0]["portfolio"]
+        assert portfolio["option_positions"][0]["intrinsic_value"] is None
+        assert portfolio["futures_positions"][0]["unrealized_pnl"] is None
