@@ -23,6 +23,7 @@ from agent_trade.experiment.models import (
     ExecutedTransaction,
     ExperimentConfig,
     GameState,
+    InvestmentThesis,
     LotSale,
     Portfolio,
     StockPosition,
@@ -48,7 +49,15 @@ def sample_game_state():
             name="Agent One",
             status="active",
             created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
-            strategy=AgentStrategy(),
+            strategy=AgentStrategy(
+                thesis=InvestmentThesis(
+                    philosophy="Test strategy",
+                    risk_tolerance="moderate",
+                    time_horizon="medium-term",
+                ),
+                rationale="Testing",
+                last_updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            ),
             portfolio=Portfolio(
                 cash=Decimal("5000"),
                 positions=[
@@ -70,7 +79,15 @@ def sample_game_state():
             name="Agent Two",
             status="active",
             created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
-            strategy=AgentStrategy(),
+            strategy=AgentStrategy(
+                thesis=InvestmentThesis(
+                    philosophy="Test strategy",
+                    risk_tolerance="moderate",
+                    time_horizon="medium-term",
+                ),
+                rationale="Testing",
+                last_updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            ),
             portfolio=Portfolio(
                 cash=Decimal("8000"),
                 positions=[],
@@ -91,7 +108,6 @@ def sample_daily_outcome():
     """Create a sample daily outcome with transactions."""
     return DailyOutcome(
         date="2024-01-15",
-        trading_day=5,
         transactions=[
             ExecutedTransaction(
                 timestamp=datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
@@ -107,17 +123,19 @@ def sample_daily_outcome():
                     LotSale(
                         shares=Decimal("5"),
                         cost_basis=Decimal("100"),
-                        sale_price_per_share=Decimal("150"),
+                        purchase_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
                         capital_gain=Decimal("150"),  # (150-100)*5
                         holding_period_days=30,
                         is_long_term=False,
+                        tax_rate=Decimal("0.35"),
                         tax_amount=Decimal("52.50"),  # 35% * 150
                     )
                 ],
             )
         ],
+        portfolio_values={"agent1": Decimal("10000")},
         eliminations=[],
-        errors=[],
+        errors={},
     )
 
 
@@ -176,17 +194,17 @@ class TestLoadAllDailyOutcomes:
         # Create sample outcome files
         outcome1 = {
             "date": "2024-01-01",
-            "trading_day": 1,
             "transactions": [],
+            "portfolio_values": {},
             "eliminations": [],
-            "errors": [],
+            "errors": {},
         }
         outcome2 = {
             "date": "2024-01-02",
-            "trading_day": 2,
             "transactions": [],
+            "portfolio_values": {},
             "eliminations": [],
-            "errors": [],
+            "errors": {},
         }
 
         with open(outcomes_dir / "outcome_1.json", "w") as f:
@@ -210,10 +228,10 @@ class TestLoadAllDailyOutcomes:
         # Create one valid and one malformed file
         valid_outcome = {
             "date": "2024-01-01",
-            "trading_day": 1,
             "transactions": [],
+            "portfolio_values": {},
             "eliminations": [],
-            "errors": [],
+            "errors": {},
         }
 
         with open(outcomes_dir / "valid.json", "w") as f:
@@ -247,10 +265,10 @@ class TestLoadAllDailyOutcomes:
         for day, date in [(3, "2024-01-03"), (1, "2024-01-01"), (2, "2024-01-02")]:
             outcome = {
                 "date": date,
-                "trading_day": day,
                 "transactions": [],
+                "portfolio_values": {},
                 "eliminations": [],
-                "errors": [],
+                "errors": {},
             }
             with open(outcomes_dir / f"outcome_{day}.json", "w") as f:
                 json.dump(outcome, f)
@@ -272,9 +290,9 @@ class TestCalculateTaxMetrics:
         mock_load_outcomes.return_value = [
             DailyOutcome(
                 date="2024-01-15",
-                trading_day=5,
                 transactions=[
                     ExecutedTransaction(
+                        timestamp=datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
                         agent_id="agent1",
                         symbol="AAPL",
                         action="sell",
@@ -282,32 +300,36 @@ class TestCalculateTaxMetrics:
                         price_per_share=Decimal("150"),
                         gross_amount=Decimal("1500"),
                         tax_amount=Decimal("157.50"),  # Mix of short and long
+                        net_amount=Decimal("1342.50"),  # gross - tax
                         lot_sales=[
                             # Short-term: 30 days holding
                             LotSale(
                                 shares=Decimal("5"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
                                 capital_gain=Decimal("250"),
                                 holding_period_days=30,
                                 is_long_term=False,
+                                tax_rate=Decimal("0.35"),
                                 tax_amount=Decimal("87.50"),  # 35% * 250
                             ),
                             # Long-term: 400 days holding
                             LotSale(
                                 shares=Decimal("5"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
                                 capital_gain=Decimal("250"),
                                 holding_period_days=400,
                                 is_long_term=True,
+                                tax_rate=Decimal("0.15"),
                                 tax_amount=Decimal("37.50"),  # 15% * 250
                             ),
                         ],
                     )
                 ],
+                portfolio_values={"agent1": Decimal("10000")},
                 eliminations=[],
-                errors=[],
+                errors={},
             )
         ]
 
@@ -324,9 +346,9 @@ class TestCalculateTaxMetrics:
         mock_load_outcomes.return_value = [
             DailyOutcome(
                 date="2024-01-15",
-                trading_day=5,
                 transactions=[
                     ExecutedTransaction(
+                        timestamp=datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
                         agent_id="agent1",
                         symbol="AAPL",
                         action="sell",
@@ -334,21 +356,24 @@ class TestCalculateTaxMetrics:
                         price_per_share=Decimal("150"),
                         gross_amount=Decimal("1500"),
                         tax_amount=Decimal("150"),  # 10% tax drag
+                        net_amount=Decimal("1350"),  # gross - tax
                         lot_sales=[
                             LotSale(
                                 shares=Decimal("10"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
                                 capital_gain=Decimal("500"),
                                 holding_period_days=30,
                                 is_long_term=False,
+                                tax_rate=Decimal("0.35"),
                                 tax_amount=Decimal("150"),
                             )
                         ],
                     )
                 ],
+                portfolio_values={"agent1": Decimal("10000")},
                 eliminations=[],
-                errors=[],
+                errors={},
             )
         ]
 
@@ -363,9 +388,9 @@ class TestCalculateTaxMetrics:
         mock_load_outcomes.return_value = [
             DailyOutcome(
                 date="2024-01-15",
-                trading_day=5,
                 transactions=[
                     ExecutedTransaction(
+                        timestamp=datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
                         agent_id="agent1",
                         symbol="AAPL",
                         action="sell",
@@ -373,30 +398,34 @@ class TestCalculateTaxMetrics:
                         price_per_share=Decimal("150"),
                         gross_amount=Decimal("1500"),
                         tax_amount=Decimal("0"),
+                        net_amount=Decimal("1500"),  # gross - tax
                         lot_sales=[
                             LotSale(
                                 shares=Decimal("5"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2023, 10, 7, tzinfo=timezone.utc),
                                 capital_gain=Decimal("0"),
                                 holding_period_days=100,
                                 is_long_term=False,
+                                tax_rate=Decimal("0.35"),
                                 tax_amount=Decimal("0"),
                             ),
                             LotSale(
                                 shares=Decimal("5"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2023, 7, 29, tzinfo=timezone.utc),
                                 capital_gain=Decimal("0"),
                                 holding_period_days=200,
                                 is_long_term=False,
+                                tax_rate=Decimal("0.35"),
                                 tax_amount=Decimal("0"),
                             ),
                         ],
                     )
                 ],
+                portfolio_values={"agent1": Decimal("10000")},
                 eliminations=[],
-                errors=[],
+                errors={},
             )
         ]
 
@@ -411,10 +440,10 @@ class TestCalculateTaxMetrics:
         mock_load_outcomes.return_value = [
             DailyOutcome(
                 date="2024-01-15",
-                trading_day=5,
                 transactions=[],
+                portfolio_values={},
                 eliminations=[],
-                errors=[],
+                errors={},
             )
         ]
 
@@ -429,9 +458,9 @@ class TestCalculateTaxMetrics:
         mock_load_outcomes.return_value = [
             DailyOutcome(
                 date="2024-01-15",
-                trading_day=5,
                 transactions=[
                     ExecutedTransaction(
+                        timestamp=datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
                         agent_id="agent1",
                         symbol="AAPL",
                         action="sell",
@@ -439,27 +468,30 @@ class TestCalculateTaxMetrics:
                         price_per_share=Decimal("150"),
                         gross_amount=Decimal("750"),
                         tax_amount=Decimal("50"),
+                        net_amount=Decimal("700"),  # gross - tax
                         lot_sales=[
                             LotSale(
                                 shares=Decimal("5"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
                                 capital_gain=Decimal("100"),
                                 holding_period_days=30,
                                 is_long_term=False,
+                                tax_rate=Decimal("0.35"),
                                 tax_amount=Decimal("50"),
                             )
                         ],
                     )
                 ],
+                portfolio_values={"agent1": Decimal("10000")},
                 eliminations=[],
-                errors=[],
+                errors={},
             ),
             DailyOutcome(
                 date="2024-01-16",
-                trading_day=6,
                 transactions=[
                     ExecutedTransaction(
+                        timestamp=datetime(2024, 1, 16, 10, 0, 0, tzinfo=timezone.utc),
                         agent_id="agent1",
                         symbol="GOOGL",
                         action="sell",
@@ -467,21 +499,24 @@ class TestCalculateTaxMetrics:
                         price_per_share=Decimal("2800"),
                         gross_amount=Decimal("5600"),
                         tax_amount=Decimal("100"),
+                        net_amount=Decimal("5500"),  # gross - tax
                         lot_sales=[
                             LotSale(
                                 shares=Decimal("2"),
                                 cost_basis=Decimal("2500"),
-                                sale_price_per_share=Decimal("2800"),
+                                purchase_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
                                 capital_gain=Decimal("600"),
                                 holding_period_days=400,
                                 is_long_term=True,
+                                tax_rate=Decimal("0.15"),
                                 tax_amount=Decimal("100"),
                             )
                         ],
                     )
                 ],
+                portfolio_values={"agent1": Decimal("11000")},
                 eliminations=[],
-                errors=[],
+                errors={},
             ),
         ]
 
@@ -501,9 +536,9 @@ class TestCalculateHoldingPeriodDistribution:
         mock_load_outcomes.return_value = [
             DailyOutcome(
                 date="2024-01-15",
-                trading_day=5,
                 transactions=[
                     ExecutedTransaction(
+                        timestamp=datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
                         agent_id="agent1",
                         symbol="AAPL",
                         action="sell",
@@ -511,57 +546,64 @@ class TestCalculateHoldingPeriodDistribution:
                         price_per_share=Decimal("150"),
                         gross_amount=Decimal("1500"),
                         tax_amount=Decimal("0"),
+                        net_amount=Decimal("1500"),  # gross - tax
                         lot_sales=[
                             LotSale(
                                 shares=Decimal("2"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
                                 capital_gain=Decimal("0"),
                                 holding_period_days=15,  # 0-30
                                 is_long_term=False,
+                                tax_rate=Decimal("0.35"),
                                 tax_amount=Decimal("0"),
                             ),
                             LotSale(
                                 shares=Decimal("2"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2023, 11, 16, tzinfo=timezone.utc),
                                 capital_gain=Decimal("0"),
                                 holding_period_days=60,  # 31-90
                                 is_long_term=False,
+                                tax_rate=Decimal("0.35"),
                                 tax_amount=Decimal("0"),
                             ),
                             LotSale(
                                 shares=Decimal("2"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2023, 9, 17, tzinfo=timezone.utc),
                                 capital_gain=Decimal("0"),
                                 holding_period_days=120,  # 91-180
                                 is_long_term=False,
+                                tax_rate=Decimal("0.35"),
                                 tax_amount=Decimal("0"),
                             ),
                             LotSale(
                                 shares=Decimal("2"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2023, 3, 21, tzinfo=timezone.utc),
                                 capital_gain=Decimal("0"),
                                 holding_period_days=300,  # 181-365
                                 is_long_term=False,
+                                tax_rate=Decimal("0.35"),
                                 tax_amount=Decimal("0"),
                             ),
                             LotSale(
                                 shares=Decimal("2"),
                                 cost_basis=Decimal("100"),
-                                sale_price_per_share=Decimal("150"),
+                                purchase_date=datetime(2022, 12, 11, tzinfo=timezone.utc),
                                 capital_gain=Decimal("0"),
                                 holding_period_days=400,  # 365+
                                 is_long_term=True,
+                                tax_rate=Decimal("0.15"),
                                 tax_amount=Decimal("0"),
                             ),
                         ],
                     )
                 ],
+                portfolio_values={"agent1": Decimal("10000")},
                 eliminations=[],
-                errors=[],
+                errors={},
             )
         ]
 
@@ -579,10 +621,10 @@ class TestCalculateHoldingPeriodDistribution:
         mock_load_outcomes.return_value = [
             DailyOutcome(
                 date="2024-01-15",
-                trading_day=5,
                 transactions=[],
+                portfolio_values={},
                 eliminations=[],
-                errors=[],
+                errors={},
             )
         ]
 
