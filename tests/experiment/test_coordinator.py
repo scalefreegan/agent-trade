@@ -12,7 +12,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agent_trade.experiment.coordinator import load_latest_daily_outcome
+from agent_trade.experiment.coordinator import (
+    load_game_state,
+    load_latest_daily_outcome,
+    save_daily_outcome,
+    save_game_state,
+)
 from agent_trade.experiment.models import (
     AgentState,
     AgentStrategy,
@@ -630,3 +635,150 @@ class TestPositionLimitRemoval:
             position_pct = position_value / total_value
 
             assert position_pct > Decimal("0.5"), "Position should exceed 50% limit"
+
+
+# ---------------------------------------------------------------------------
+# save_game_state / load_game_state tests
+# ---------------------------------------------------------------------------
+
+
+class TestSaveGameState:
+    """Tests for save_game_state (lines 252-274)."""
+
+    def test_save_game_state_writes_json(self, tmp_path):
+        """save_game_state writes a valid JSON file that can be read back."""
+        config = make_config()
+        agent = make_agent()
+        game_state = GameState(
+            config=config,
+            agents={agent.agent_id: agent},
+            trading_day=3,
+            last_run=datetime(2026, 2, 20, tzinfo=timezone.utc),
+        )
+
+        exp_dir = tmp_path / config.experiment_id
+        exp_dir.mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir:
+            mock_get_dir.return_value = exp_dir
+            save_game_state(game_state)
+
+        state_path = exp_dir / "game_state.json"
+        assert state_path.exists()
+
+        data = json.loads(state_path.read_text())
+        assert data["trading_day"] == 3
+        assert data["config"]["experiment_id"] == config.experiment_id
+        assert agent.agent_id in data["agents"]
+
+    def test_save_game_state_oserror_propagates(self, tmp_path):
+        """save_game_state re-raises OSError when write fails."""
+        config = make_config()
+        game_state = GameState(
+            config=config,
+            agents={},
+            trading_day=1,
+            last_run=None,
+        )
+
+        # Point at a non-existent directory so open() fails
+        bad_dir = tmp_path / "nonexistent" / config.experiment_id
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir:
+            mock_get_dir.return_value = bad_dir
+            with pytest.raises(OSError):
+                save_game_state(game_state)
+
+
+class TestLoadGameState:
+    """Tests for load_game_state (lines 277-308)."""
+
+    def test_load_game_state_roundtrip(self, tmp_path):
+        """save then load returns an equivalent GameState."""
+        config = make_config()
+        agent = make_agent()
+        game_state = GameState(
+            config=config,
+            agents={agent.agent_id: agent},
+            trading_day=5,
+            last_run=datetime(2026, 2, 20, tzinfo=timezone.utc),
+        )
+
+        exp_dir = tmp_path / config.experiment_id
+        exp_dir.mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir:
+            mock_get_dir.return_value = exp_dir
+            save_game_state(game_state)
+            loaded = load_game_state(config.experiment_id)
+
+        assert loaded is not None
+        assert loaded.trading_day == 5
+        assert loaded.config.experiment_id == config.experiment_id
+        assert agent.agent_id in loaded.agents
+
+    def test_load_game_state_file_not_found_returns_none(self, tmp_path):
+        """load_game_state returns None when game_state.json doesn't exist."""
+        exp_dir = tmp_path / "exp_missing"
+        exp_dir.mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir:
+            mock_get_dir.return_value = exp_dir
+            result = load_game_state("exp_missing")
+
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# save_daily_outcome tests
+# ---------------------------------------------------------------------------
+
+
+class TestSaveDailyOutcome:
+    """Tests for save_daily_outcome (lines 352-378)."""
+
+    def test_save_daily_outcome_creates_dir_and_writes(self, tmp_path):
+        """save_daily_outcome creates the daily_outcomes dir and writes the file."""
+        exp_dir = tmp_path / "exp_test"
+        exp_dir.mkdir()
+
+        outcome = DailyOutcome(
+            date="2026-02-20",
+            transactions=[],
+            portfolio_values={"agent_001": Decimal("1500.00")},
+            eliminations=[],
+            errors={},
+        )
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir:
+            mock_get_dir.return_value = exp_dir
+            save_daily_outcome("exp_test", outcome)
+
+        outcome_path = exp_dir / "daily_outcomes" / "2026-02-20.json"
+        assert outcome_path.exists()
+
+        data = json.loads(outcome_path.read_text())
+        assert data["date"] == "2026-02-20"
+        assert "agent_001" in data["portfolio_values"]
+
+    def test_save_daily_outcome_oserror_propagates(self, tmp_path):
+        """save_daily_outcome re-raises OSError when write fails."""
+        outcome = DailyOutcome(
+            date="2026-02-20",
+            transactions=[],
+            portfolio_values={},
+            eliminations=[],
+            errors={},
+        )
+
+        # Use a path where mkdir will succeed but open() will fail
+        # by making the outcome file path point to a directory
+        exp_dir = tmp_path / "exp_test"
+        outcomes_dir = exp_dir / "daily_outcomes"
+        outcomes_dir.mkdir(parents=True)
+        # Create a directory where the file should be, causing open() to fail
+        (outcomes_dir / "2026-02-20.json").mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir:
+            mock_get_dir.return_value = exp_dir
+            with pytest.raises(OSError):
+                save_daily_outcome("exp_test", outcome)
