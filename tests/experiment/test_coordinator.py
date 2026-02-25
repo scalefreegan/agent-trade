@@ -29,6 +29,7 @@ from agent_trade.experiment.models import (
     Order,
     Portfolio,
     StockPosition,
+    StrategyLearning,
     TaxLot,
 )
 
@@ -782,3 +783,369 @@ class TestSaveDailyOutcome:
             mock_get_dir.return_value = exp_dir
             with pytest.raises(OSError):
                 save_daily_outcome("exp_test", outcome)
+
+
+# ---------------------------------------------------------------------------
+# Orchestration tests for process_daily_cycle
+# ---------------------------------------------------------------------------
+
+
+class TestProcessDailyCycleOrchestration:
+    """Tests for uncovered orchestration branches in process_daily_cycle."""
+
+    def _make_game_state(self, agents=None, trading_day=1, last_run=None):
+        """Helper to build a GameState with sensible defaults."""
+        config = make_config()
+        config.experiment_id = "exp_test"
+        if agents is None:
+            agent = make_agent()
+            agent.agent_id = "agent_001"
+            agents = {agent.agent_id: agent}
+        return GameState(
+            config=config,
+            agents=agents,
+            trading_day=trading_day,
+            last_run=last_run,
+        )
+
+    def _empty_decision(self, date="2026-02-20"):
+        """Helper to create a DailyDecision with no orders."""
+        return DailyDecision(
+            date=date,
+            research_notes="No trades",
+            orders=[],
+            strategy_updates=None,
+            alerts=[],
+            execution_time_ms=50.0,
+        )
+
+    # -- Test 1: No active agents → early return (lines 67-75) --
+
+    def test_no_active_agents_returns_early(self, tmp_path):
+        """When all agents are eliminated, return outcome with error message."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        agent = make_agent()
+        agent.agent_id = "agent_001"
+        agent.status = "eliminated"
+        game_state = self._make_game_state(agents={"agent_001": agent})
+
+        outcome = process_daily_cycle(
+            game_state=game_state,
+            date="2026-02-20",
+            decisions_base_dir=tmp_path / "decisions",
+            timeout=300,
+        )
+
+        assert outcome.date == "2026-02-20"
+        assert outcome.transactions == []
+        assert "game" in outcome.errors
+        assert "No active agents" in outcome.errors["game"]
+
+    # -- Test 2: Unexpected Exception loading previous errors (lines 87-90) --
+
+    def test_unexpected_error_loading_previous_errors_continues(self, tmp_path):
+        """Generic Exception when loading previous errors doesn't crash the cycle."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        game_state = self._make_game_state()
+        exp_dir = tmp_path / "exp_test"
+        exp_dir.mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir, \
+             patch("agent_trade.experiment.coordinator.spawn_all_agents") as mock_spawn, \
+             patch("agent_trade.experiment.coordinator.get_current_prices") as mock_prices, \
+             patch("agent_trade.experiment.coordinator.load_latest_daily_outcome") as mock_load:
+
+            mock_get_dir.return_value = exp_dir
+            mock_prices.return_value = {}
+            # Raise a generic exception (e.g. ValidationError scenario)
+            mock_load.side_effect = RuntimeError("Unexpected validation failure")
+            mock_spawn.return_value = {
+                "agent_001": self._empty_decision(),
+            }
+
+            outcome = process_daily_cycle(
+                game_state=game_state,
+                date="2026-02-20",
+                decisions_base_dir=tmp_path / "decisions",
+                timeout=300,
+            )
+
+            # Should succeed despite the error
+            assert outcome.date == "2026-02-20"
+            # spawn_all_agents gets empty previous_errors
+            assert mock_spawn.call_args.kwargs["previous_errors"] == {}
+
+    # -- Test 3: Market price unavailable for symbol (lines 132-135, 164-173) --
+
+    def test_market_price_unavailable_captured_as_error(self, tmp_path):
+        """Order for unknown symbol records error, doesn't crash."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        game_state = self._make_game_state()
+        exp_dir = tmp_path / "exp_test"
+        exp_dir.mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir, \
+             patch("agent_trade.experiment.coordinator.spawn_all_agents") as mock_spawn, \
+             patch("agent_trade.experiment.coordinator.get_current_prices") as mock_prices:
+
+            mock_get_dir.return_value = exp_dir
+            mock_prices.return_value = {}  # No prices available
+            mock_spawn.return_value = {
+                "agent_001": DailyDecision(
+                    date="2026-02-20",
+                    research_notes="Buy unknown stock",
+                    orders=[
+                        Order(action="buy", symbol="ZZZZ", amount=Decimal("100"), reasoning="test"),
+                    ],
+                    strategy_updates=None,
+                    alerts=[],
+                    execution_time_ms=50.0,
+                ),
+            }
+
+            outcome = process_daily_cycle(
+                game_state=game_state,
+                date="2026-02-20",
+                decisions_base_dir=tmp_path / "decisions",
+                timeout=300,
+            )
+
+            assert "agent_001" in outcome.errors
+            assert "Market price unavailable" in outcome.errors["agent_001"]
+            assert len(outcome.transactions) == 0
+
+    # -- Test 4: Sell below minimum trade amount (lines 140-147) --
+
+    def test_sell_below_minimum_trade_amount(self, tmp_path):
+        """Sell whose value is below min_trade_amount records error."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        agent = make_agent()
+        agent.agent_id = "agent_001"
+        agent.portfolio.positions = [
+            StockPosition(
+                symbol="PENNY",
+                lots=[
+                    TaxLot(
+                        shares=Decimal("100"),
+                        cost_basis=Decimal("0.01"),
+                        purchase_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                    )
+                ],
+            )
+        ]
+        game_state = self._make_game_state(agents={"agent_001": agent})
+        # Set a high minimum trade amount so the sell value fails
+        game_state.config.min_trade_amount = Decimal("50.00")
+
+        exp_dir = tmp_path / "exp_test"
+        exp_dir.mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir, \
+             patch("agent_trade.experiment.coordinator.spawn_all_agents") as mock_spawn, \
+             patch("agent_trade.experiment.coordinator.get_current_prices") as mock_prices:
+
+            mock_get_dir.return_value = exp_dir
+            # PENNY stock at $0.01/share → selling 1 share = $0.01 < $50 minimum
+            mock_prices.return_value = {"PENNY": Decimal("0.01")}
+            mock_spawn.return_value = {
+                "agent_001": DailyDecision(
+                    date="2026-02-20",
+                    research_notes="Sell penny stock",
+                    orders=[
+                        Order(action="sell", symbol="PENNY", amount=Decimal("1"), reasoning="exit"),
+                    ],
+                    strategy_updates=None,
+                    alerts=[],
+                    execution_time_ms=50.0,
+                ),
+            }
+
+            outcome = process_daily_cycle(
+                game_state=game_state,
+                date="2026-02-20",
+                decisions_base_dir=tmp_path / "decisions",
+                timeout=300,
+            )
+
+            assert "agent_001" in outcome.errors
+            assert "below minimum" in outcome.errors["agent_001"]
+            assert len(outcome.transactions) == 0
+
+    # -- Test 5: Multiple errors concatenated with "; " (lines 170-171) --
+
+    def test_multiple_errors_for_same_agent_concatenated(self, tmp_path):
+        """When an agent has multiple failing orders, errors are joined with '; '."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        game_state = self._make_game_state()
+        exp_dir = tmp_path / "exp_test"
+        exp_dir.mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir, \
+             patch("agent_trade.experiment.coordinator.spawn_all_agents") as mock_spawn, \
+             patch("agent_trade.experiment.coordinator.get_current_prices") as mock_prices:
+
+            mock_get_dir.return_value = exp_dir
+            mock_prices.return_value = {}  # No prices → both orders fail
+            mock_spawn.return_value = {
+                "agent_001": DailyDecision(
+                    date="2026-02-20",
+                    research_notes="Buy two unknowns",
+                    orders=[
+                        Order(action="buy", symbol="AAA", amount=Decimal("100"), reasoning="t1"),
+                        Order(action="buy", symbol="BBB", amount=Decimal("100"), reasoning="t2"),
+                    ],
+                    strategy_updates=None,
+                    alerts=[],
+                    execution_time_ms=50.0,
+                ),
+            }
+
+            outcome = process_daily_cycle(
+                game_state=game_state,
+                date="2026-02-20",
+                decisions_base_dir=tmp_path / "decisions",
+                timeout=300,
+            )
+
+            assert "agent_001" in outcome.errors
+            # Both errors should be present, joined by "; "
+            assert "; " in outcome.errors["agent_001"]
+            assert "AAA" in outcome.errors["agent_001"]
+            assert "BBB" in outcome.errors["agent_001"]
+
+    # -- Test 6: Strategy updates applied and saved (lines 188-196) --
+
+    def test_strategy_updates_applied_and_saved(self, tmp_path):
+        """Decision with strategy_updates updates agent.strategy and calls save_strategy."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        game_state = self._make_game_state()
+        exp_dir = tmp_path / "exp_test"
+        exp_dir.mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir, \
+             patch("agent_trade.experiment.coordinator.spawn_all_agents") as mock_spawn, \
+             patch("agent_trade.experiment.coordinator.get_current_prices") as mock_prices, \
+             patch("agent_trade.experiment.strategy_manager.save_strategy") as mock_save_strat:
+
+            mock_get_dir.return_value = exp_dir
+            mock_prices.return_value = {}
+            mock_spawn.return_value = {
+                "agent_001": DailyDecision(
+                    date="2026-02-20",
+                    research_notes="Learned something",
+                    orders=[],
+                    strategy_updates=StrategyLearning(
+                        date="2026-02-20",
+                        observation="Tech selloff happened",
+                        outcome="negative",
+                        lesson="Shift to value investing after tech selloff",
+                    ),
+                    alerts=[],
+                    execution_time_ms=50.0,
+                ),
+            }
+
+            outcome = process_daily_cycle(
+                game_state=game_state,
+                date="2026-02-20",
+                decisions_base_dir=tmp_path / "decisions",
+                timeout=300,
+            )
+
+            # Strategy learnings updated
+            agent = game_state.agents["agent_001"]
+            assert len(agent.strategy.learnings) == 1
+            assert agent.strategy.learnings[0].lesson == "Shift to value investing after tech selloff"
+
+            # save_strategy called
+            mock_save_strat.assert_called_once_with(
+                "exp_test", "agent_001", agent.strategy
+            )
+
+    # -- Test 7: save_strategy OSError logged but not raised (lines 195-196) --
+
+    def test_strategy_save_oserror_logged_not_raised(self, tmp_path):
+        """OSError from save_strategy is logged but doesn't crash the cycle."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        game_state = self._make_game_state()
+        exp_dir = tmp_path / "exp_test"
+        exp_dir.mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir, \
+             patch("agent_trade.experiment.coordinator.spawn_all_agents") as mock_spawn, \
+             patch("agent_trade.experiment.coordinator.get_current_prices") as mock_prices, \
+             patch("agent_trade.experiment.strategy_manager.save_strategy") as mock_save_strat:
+
+            mock_get_dir.return_value = exp_dir
+            mock_prices.return_value = {}
+            mock_save_strat.side_effect = OSError("Disk full")
+            mock_spawn.return_value = {
+                "agent_001": DailyDecision(
+                    date="2026-02-20",
+                    research_notes="Update strategy",
+                    orders=[],
+                    strategy_updates=StrategyLearning(
+                        date="2026-02-20",
+                        observation="Market shift",
+                        outcome="neutral",
+                        lesson="Adapt to conditions",
+                    ),
+                    alerts=[],
+                    execution_time_ms=50.0,
+                ),
+            }
+
+            # Should NOT raise despite save_strategy failure
+            outcome = process_daily_cycle(
+                game_state=game_state,
+                date="2026-02-20",
+                decisions_base_dir=tmp_path / "decisions",
+                timeout=300,
+            )
+
+            assert outcome.date == "2026-02-20"
+            mock_save_strat.assert_called_once()
+
+    # -- Test 8: Agent elimination when portfolio value ≤ 0 (lines 217-223) --
+
+    def test_agent_elimination_on_zero_portfolio(self, tmp_path):
+        """Agent with portfolio value ≤ 0 is marked eliminated."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        agent = make_agent()
+        agent.agent_id = "agent_001"
+        agent.portfolio.cash = Decimal("0")
+        agent.portfolio.positions = []  # No positions, no cash → $0 value
+        game_state = self._make_game_state(agents={"agent_001": agent})
+
+        exp_dir = tmp_path / "exp_test"
+        exp_dir.mkdir()
+
+        with patch("agent_trade.experiment.config.get_experiment_dir") as mock_get_dir, \
+             patch("agent_trade.experiment.coordinator.spawn_all_agents") as mock_spawn, \
+             patch("agent_trade.experiment.coordinator.get_current_prices") as mock_prices:
+
+            mock_get_dir.return_value = exp_dir
+            mock_prices.return_value = {}
+            mock_spawn.return_value = {
+                "agent_001": self._empty_decision(),
+            }
+
+            outcome = process_daily_cycle(
+                game_state=game_state,
+                date="2026-02-20",
+                decisions_base_dir=tmp_path / "decisions",
+                timeout=300,
+            )
+
+            assert "agent_001" in outcome.eliminations
+            assert agent.status == "eliminated"
+            assert agent.eliminated_at is not None
+            assert outcome.portfolio_values["agent_001"] == Decimal("0")

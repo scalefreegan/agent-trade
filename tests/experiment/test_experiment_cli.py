@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
@@ -13,6 +13,7 @@ from agent_trade.experiment.models import (
     AgentState,
     AgentStrategy,
     ExperimentConfig,
+    ExperimentInitSpec,
     GameState,
     InvestmentThesis,
     Portfolio,
@@ -477,6 +478,177 @@ class TestStrategyCommands:
 
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# TestInitCommand
+# ---------------------------------------------------------------------------
+
+
+class TestInitCommand:
+    """Tests for the `init` command."""
+
+    _CLI = "agent_trade.experiment.experiment_cli"
+
+    # Lazy imports inside init() must be patched at their source modules
+    _PATCHES = {
+        "get_dir": f"{_CLI}.get_experiment_dir",
+        "create_cfg": f"{_CLI}.create_experiment_config",
+        "save_cfg": f"{_CLI}.save_config",
+        "save_gs": f"{_CLI}.save_game_state",
+        "templates": "agent_trade.experiment.templates.create_initial_game_state",
+        "gen_names": "agent_trade.experiment.agent_runner.generate_agent_names_via_claude",
+        "save_strat": "agent_trade.experiment.strategy_manager.save_strategy",
+    }
+
+    @pytest.fixture
+    def _init_mocks(self, tmp_path):
+        """Set up all mocks needed for a successful init call."""
+        exp_dir = tmp_path / "exp_20260224_120000"
+
+        with (
+            patch(self._PATCHES["get_dir"], return_value=exp_dir) as m_dir,
+            patch(self._PATCHES["create_cfg"], return_value=_make_config()) as m_cfg,
+            patch(self._PATCHES["save_cfg"]) as m_save_cfg,
+            patch(self._PATCHES["save_gs"]) as m_save_gs,
+            patch(
+                self._PATCHES["templates"], return_value=_make_game_state()
+            ) as m_gs,
+            patch(
+                self._PATCHES["gen_names"], new_callable=AsyncMock
+            ) as m_names,
+            patch(self._PATCHES["save_strat"]) as m_strat,
+        ):
+            yield {
+                "exp_dir": exp_dir,
+                "get_dir": m_dir,
+                "create_cfg": m_cfg,
+                "save_cfg": m_save_cfg,
+                "save_gs": m_save_gs,
+                "create_gs": m_gs,
+                "gen_names": m_names,
+                "save_strat": m_strat,
+            }
+
+    def test_init_success(self, runner, _init_mocks):
+        """Should initialise a new experiment with defaults."""
+        result = runner.invoke(app, ["init", "--name", "Test Experiment"])
+
+        assert result.exit_code == 0, result.output
+        assert "Experiment Created" in result.output
+        assert "Test Experiment" in result.output
+        _init_mocks["create_cfg"].assert_called_once()
+        _init_mocks["create_gs"].assert_called_once()
+        _init_mocks["gen_names"].assert_awaited_once()
+
+    def test_init_custom_values(self, runner, _init_mocks):
+        """Should pass custom agents and capital to config creation."""
+        result = runner.invoke(
+            app,
+            ["init", "--name", "Custom", "--agents", "5", "--capital", "5000"],
+        )
+
+        assert result.exit_code == 0, result.output
+        call_kwargs = _init_mocks["create_cfg"].call_args
+        assert call_kwargs.kwargs["num_agents"] == 5
+        assert call_kwargs.kwargs["starting_capital"] == Decimal("5000.0")
+
+    def test_init_creates_agent_directories(self, runner, _init_mocks):
+        """Should create per-agent directories with decisions subdir and portfolio."""
+        result = runner.invoke(app, ["init", "--name", "DirTest"])
+
+        assert result.exit_code == 0, result.output
+
+        exp_dir = _init_mocks["exp_dir"]
+        game_state = _init_mocks["create_gs"].return_value
+        for agent_id in game_state.agents:
+            agent_dir = exp_dir / "agents" / agent_id
+            assert agent_dir.exists(), f"Missing agent dir: {agent_dir}"
+            assert (agent_dir / "decisions").exists()
+            assert (agent_dir / "portfolio.json").exists()
+
+        assert _init_mocks["save_strat"].call_count == len(game_state.agents)
+
+    def test_init_with_guidance(self, runner, _init_mocks):
+        """Should pass guidance text to config creation and display it."""
+        result = runner.invoke(
+            app,
+            ["init", "--name", "Guided", "--guidance", "Focus on dividends"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Guidance" in result.output
+        call_kwargs = _init_mocks["create_cfg"].call_args
+        assert call_kwargs.kwargs["guidance"] == "Focus on dividends"
+
+    def test_init_file_not_found(self, runner, tmp_path):
+        """Should error when --init-file does not exist."""
+        missing = tmp_path / "nope.json"
+
+        result = runner.invoke(
+            app,
+            ["init", "--name", "Bad", "--init-file", str(missing)],
+        )
+
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower()
+
+    def test_init_file_invalid_json(self, runner, tmp_path):
+        """Should error when --init-file contains invalid JSON."""
+        bad_file = tmp_path / "bad.json"
+        bad_file.write_text("not json at all")
+
+        result = runner.invoke(
+            app,
+            ["init", "--name", "Bad", "--init-file", str(bad_file)],
+        )
+
+        assert result.exit_code == 1
+        assert "failed to parse" in result.output.lower()
+
+    def test_init_with_init_file(self, runner, tmp_path, _init_mocks):
+        """Should load init spec from file and pass to create_initial_game_state."""
+        spec = ExperimentInitSpec(guidance="File-level guidance")
+        spec_file = tmp_path / "spec.json"
+        spec_file.write_text(spec.model_dump_json())
+
+        result = runner.invoke(
+            app,
+            ["init", "--name", "Specced", "--init-file", str(spec_file)],
+        )
+
+        assert result.exit_code == 0, result.output
+        gs_call = _init_mocks["create_gs"].call_args
+        assert gs_call.kwargs.get("init_spec") is not None
+
+    def test_init_prints_success_details(self, runner, _init_mocks):
+        """Should display experiment details in the success panel."""
+        result = runner.invoke(
+            app,
+            [
+                "init",
+                "--name",
+                "Detail",
+                "--agents",
+                "3",
+                "--capital",
+                "2500",
+                "--short-term-tax",
+                "0.30",
+                "--long-term-tax",
+                "0.10",
+                "--long-term-days",
+                "180",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        output = result.output
+        assert "Agents: 3" in output
+        assert "$2,500.00" in output
+        assert "30%" in output
+        assert "10%" in output
+        assert "180 days" in output
 
 
 # ---------------------------------------------------------------------------
