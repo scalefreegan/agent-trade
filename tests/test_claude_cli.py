@@ -1,4 +1,5 @@
 """Tests for claude_cli.py"""
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -28,8 +29,7 @@ class TestQueryCommand:
 class TestRunQuery:
     """Tests for _run_query() async function"""
 
-    @pytest.mark.asyncio
-    async def test_dict_result_with_result_key_prints_markdown(self):
+    def test_dict_result_with_result_key_prints_markdown(self):
         """Should print markdown when result dict has 'result' key"""
         with patch("agent_trade.claude_cli.console") as mock_console, patch(
             "agent_trade.claude_wrapper.run_agent", new_callable=AsyncMock
@@ -38,13 +38,12 @@ class TestRunQuery:
                 "result": "# Test Result\n\nThis is markdown content"
             }
 
-            await _run_query("test question", 10, 120)
+            asyncio.run(_run_query("test question", 10, 120))
 
             # Verify print was called
             assert mock_console.print.called
 
-    @pytest.mark.asyncio
-    async def test_dict_result_without_text_keys_prints_json(self):
+    def test_dict_result_without_text_keys_prints_json(self):
         """Should print JSON when result dict has no text-like keys"""
         with patch("agent_trade.claude_cli.console") as mock_console, patch(
             "agent_trade.claude_wrapper.run_agent", new_callable=AsyncMock
@@ -54,26 +53,24 @@ class TestRunQuery:
                 "data": {"price": 150.25},
             }
 
-            await _run_query("test question", 10, 120)
+            asyncio.run(_run_query("test question", 10, 120))
 
             # Should call print_json
             assert mock_console.print_json.called
 
-    @pytest.mark.asyncio
-    async def test_string_result_prints_as_string(self):
+    def test_string_result_prints_as_string(self):
         """Should print string results directly"""
         with patch("agent_trade.claude_cli.console") as mock_console, patch(
             "agent_trade.claude_wrapper.run_agent", new_callable=AsyncMock
         ) as mock_run_agent:
             mock_run_agent.return_value = "Simple string result"
 
-            await _run_query("test question", 10, 120)
+            asyncio.run(_run_query("test question", 10, 120))
 
             # Should call print with the string
             assert mock_console.print.called
 
-    @pytest.mark.asyncio
-    async def test_timeout_error_raises_exit(self):
+    def test_timeout_error_raises_exit(self):
         """Should handle TimeoutError and raise Exit"""
         with patch("agent_trade.claude_cli.console") as mock_console, patch(
             "agent_trade.claude_wrapper.run_agent", new_callable=AsyncMock
@@ -81,12 +78,11 @@ class TestRunQuery:
             mock_run_agent.side_effect = TimeoutError("Query exceeded timeout")
 
             with pytest.raises(Exit) as exc_info:
-                await _run_query("test question", 10, 120)
+                asyncio.run(_run_query("test question", 10, 120))
 
             assert exc_info.value.exit_code == 1
 
-    @pytest.mark.asyncio
-    async def test_runtime_error_raises_exit(self):
+    def test_runtime_error_raises_exit(self):
         """Should handle RuntimeError and raise Exit"""
         with patch("agent_trade.claude_cli.console") as mock_console, patch(
             "agent_trade.claude_wrapper.run_agent", new_callable=AsyncMock
@@ -94,19 +90,18 @@ class TestRunQuery:
             mock_run_agent.side_effect = RuntimeError("Agent execution failed")
 
             with pytest.raises(Exit) as exc_info:
-                await _run_query("test question", 10, 120)
+                asyncio.run(_run_query("test question", 10, 120))
 
             assert exc_info.value.exit_code == 1
 
-    @pytest.mark.asyncio
-    async def test_calls_run_agent_with_correct_parameters(self):
+    def test_calls_run_agent_with_correct_parameters(self):
         """Should call claude_wrapper.run_agent with correct parameters"""
         with patch("agent_trade.claude_cli.console") as mock_console, patch(
             "agent_trade.claude_wrapper.run_agent", new_callable=AsyncMock
         ) as mock_run_agent:
             mock_run_agent.return_value = "Success"
 
-            await _run_query("test question", 15, 300)
+            asyncio.run(_run_query("test question", 15, 300))
 
             mock_run_agent.assert_called_once_with(
                 prompt="test question",

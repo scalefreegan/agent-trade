@@ -9,10 +9,18 @@ Covers:
 - get_agent_transactions: success with buy+sell, empty transactions
 - update_agent_strategy: update philosophy, no fields unchanged
 - update_agent_guidance: set text, clear
+- list_agent_decisions: empty, multiple files, corrupted JSON, trading_day numbering
+- get_agent_decision: 404, orders+research, error, no orders
+- get_agent_holdings: positions+buy_reasons, empty, not found, stock info failure
+- get_agent_alerts: empty, multiple, non-dict entries, not found, corrupted file
+- get_agent_benchmarks: SPY only, yfinance failure, not found
+- get_agent_portfolio: delegation, not found
 """
 
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -458,3 +466,427 @@ class TestUpdateGuidance:
         data = resp.json()
         assert data["guidance"] is None
         assert "cleared" in data["message"].lower()
+
+
+# =============================================================================
+# list_agent_decisions
+# =============================================================================
+
+
+def _decisions_dir(tmp_path) -> Path:
+    """Return (and create) the decisions dir for the default agent."""
+    d = tmp_path / ".agent-trade" / "experiments" / EXP_ID / "agents" / AGENT_ID / "decisions"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+class TestListAgentDecisions:
+    """GET /experiments/{eid}/agents/{aid}/decisions — decision listing."""
+
+    def test_missing_decisions_dir_returns_empty(self):
+        """No decisions directory at all → empty list."""
+        resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/decisions")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_multiple_files_sorted_reverse(self, tmp_path):
+        """Multiple decision files returned sorted newest-first."""
+        d = _decisions_dir(tmp_path)
+        (d / "2026-01-10.json").write_text(json.dumps({"orders": [{"action": "buy", "symbol": "AAPL", "amount": 100}]}))
+        (d / "2026-01-11.json").write_text(json.dumps({"orders": []}))
+        (d / "2026-01-12.json").write_text(json.dumps({"orders": [{"action": "sell", "symbol": "GOOG", "amount": 50}, {"action": "buy", "symbol": "MSFT", "amount": 200}]}))
+
+        resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/decisions")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 3
+        # Newest first
+        assert data[0]["date"] == "2026-01-12"
+        assert data[0]["has_orders"] is True
+        assert data[0]["order_count"] == 2
+        # Middle (no orders)
+        assert data[1]["date"] == "2026-01-11"
+        assert data[1]["has_orders"] is False
+        assert data[1]["order_count"] == 0
+        # Oldest
+        assert data[2]["date"] == "2026-01-10"
+        assert data[2]["has_orders"] is True
+        assert data[2]["order_count"] == 1
+
+    def test_corrupted_json_still_returns_entry(self, tmp_path):
+        """Corrupted JSON file → entry present with has_orders=False."""
+        d = _decisions_dir(tmp_path)
+        (d / "2026-01-15.json").write_text("NOT VALID JSON {{{")
+
+        resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/decisions")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["date"] == "2026-01-15"
+        assert data[0]["has_orders"] is False
+        assert data[0]["order_count"] == 0
+
+    def test_trading_day_numbering(self, tmp_path):
+        """trading_day numbers files sequentially by date."""
+        d = _decisions_dir(tmp_path)
+        (d / "2026-01-01.json").write_text(json.dumps({"orders": []}))
+        (d / "2026-01-05.json").write_text(json.dumps({"orders": []}))
+
+        resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/decisions")
+        assert resp.status_code == 200
+        data = resp.json()
+        # Reverse sorted, so day 2 first, day 1 second
+        assert data[0]["trading_day"] == 2
+        assert data[1]["trading_day"] == 1
+
+
+# =============================================================================
+# get_agent_decision
+# =============================================================================
+
+
+class TestGetAgentDecision:
+    """GET /experiments/{eid}/agents/{aid}/decisions/{date} — single decision."""
+
+    def test_not_found_returns_404(self):
+        """Missing decision file → 404."""
+        resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/decisions/2026-01-01")
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
+
+    def test_decision_with_orders_and_research(self, tmp_path):
+        """Full decision with orders and research notes renders as markdown."""
+        d = _decisions_dir(tmp_path)
+        decision = {
+            "research_notes": "AAPL shows strong momentum after earnings beat.",
+            "orders": [
+                {"action": "buy", "symbol": "AAPL", "amount": 500, "reasoning": "Strong earnings"},
+                {"action": "sell", "symbol": "GOOG", "amount": 200, "reasoning": "Taking profits"},
+            ],
+            "strategy_updates": {
+                "observation": "Tech sector outperforming",
+                "outcome": "positive",
+                "lesson": "Follow momentum in earnings season",
+            },
+        }
+        (d / "2026-01-20.json").write_text(json.dumps(decision))
+
+        resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/decisions/2026-01-20")
+        assert resp.status_code == 200
+        md = resp.json()["markdown"]
+        assert "# Trading Decision: 2026-01-20" in md
+        assert "## Research Notes" in md
+        assert "AAPL shows strong momentum" in md
+        assert "**BUY AAPL**" in md
+        assert "**SELL GOOG**" in md
+        assert "> Strong earnings" in md
+        assert "## Strategy Update" in md
+        assert "**Observation**: Tech sector outperforming" in md
+        assert "**Lesson**: Follow momentum" in md
+
+    def test_decision_with_error(self, tmp_path):
+        """Decision with error field renders error status."""
+        d = _decisions_dir(tmp_path)
+        (d / "2026-01-21.json").write_text(json.dumps({"error": "Agent timed out"}))
+
+        resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/decisions/2026-01-21")
+        assert resp.status_code == 200
+        md = resp.json()["markdown"]
+        assert "## Status" in md
+        assert "**Agent timed out**" in md
+
+    def test_decision_no_orders(self, tmp_path):
+        """Decision with empty orders → 'No orders placed.'"""
+        d = _decisions_dir(tmp_path)
+        (d / "2026-01-22.json").write_text(json.dumps({"orders": []}))
+
+        resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/decisions/2026-01-22")
+        assert resp.status_code == 200
+        md = resp.json()["markdown"]
+        assert "*No orders placed.*" in md
+
+
+# =============================================================================
+# get_agent_holdings
+# =============================================================================
+
+
+class TestGetAgentHoldings:
+    """GET /experiments/{eid}/agents/{aid}/holdings — holdings breakdown."""
+
+    def test_with_positions_and_buy_reasons(self, tmp_path):
+        """Agent with positions, stock info, and buy reasons in decision files."""
+        agent = _make_agent(positions=[_aapl_position()])
+        gs = _make_game_state(agent)
+
+        # Create a decision file with a buy order for AAPL
+        d = _decisions_dir(tmp_path)
+        (d / "2026-01-10.json").write_text(json.dumps({
+            "orders": [{"action": "buy", "symbol": "AAPL", "amount": 1400, "reasoning": "Strong fundamentals"}],
+        }))
+
+        mock_info = type("MockInfo", (), {
+            "name": "Apple Inc.",
+            "sector": "Technology",
+            "industry": "Consumer Electronics",
+            "business_summary": "Apple designs iPhones.",
+            "market_cap": 3000000000000,
+            "pe_ratio": Decimal("28.5"),
+            "fifty_two_week_high": Decimal("200"),
+            "fifty_two_week_low": Decimal("120"),
+        })()
+
+        from agent_trade.models import HistoricalPrice, HistoricalPriceData
+
+        mock_hist = HistoricalPriceData(
+            symbol="AAPL",
+            period="3mo",
+            count=1,
+            data=[HistoricalPrice(date="2026-01-10", open=Decimal("140"), high=Decimal("145"), low=Decimal("138"), close=Decimal("142"), volume=1000000)],
+        )
+
+        with (
+            patch(f"{P}.load_game_state", return_value=gs),
+            patch(f"{P}.get_current_prices", return_value={"AAPL": Decimal("150")}),
+            patch(f"{P}.get_stock_info", return_value=mock_info),
+            patch(f"{P}.get_historical_prices", return_value=mock_hist),
+        ):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/holdings")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["holdings"]) == 1
+        h = data["holdings"][0]
+        assert h["symbol"] == "AAPL"
+        assert h["total_shares"] == 10.0
+        assert h["current_price"] == 150.0
+        assert h["current_value"] == 1500.0
+        assert h["unrealized_gain"] == 100.0
+        assert h["company_name"] == "Apple Inc."
+        assert h["sector"] == "Technology"
+        assert len(h["buy_reasons"]) == 1
+        assert h["buy_reasons"][0]["reasoning"] == "Strong fundamentals"
+        assert len(h["price_history"]) == 1
+
+    def test_no_positions_returns_empty_holdings(self):
+        """Agent with no positions → empty holdings list."""
+        agent = _make_agent(positions=[])
+        gs = _make_game_state(agent)
+        with patch(f"{P}.load_game_state", return_value=gs):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/holdings")
+        assert resp.status_code == 200
+        assert resp.json()["holdings"] == []
+
+    def test_agent_not_found_returns_404(self):
+        """Unknown agent_id → 404."""
+        gs = _make_game_state(agent=None)
+        with patch(f"{P}.load_game_state", return_value=gs):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/holdings")
+        assert resp.status_code == 404
+
+    def test_stock_info_failure_returns_none_fields(self):
+        """If get_stock_info raises, company info fields are None."""
+        agent = _make_agent(positions=[_aapl_position()])
+        gs = _make_game_state(agent)
+        with (
+            patch(f"{P}.load_game_state", return_value=gs),
+            patch(f"{P}.get_current_prices", return_value={"AAPL": Decimal("150")}),
+            patch(f"{P}.get_stock_info", side_effect=RuntimeError("API down")),
+            patch(f"{P}.get_historical_prices", side_effect=RuntimeError("API down")),
+        ):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/holdings")
+        assert resp.status_code == 200
+        h = resp.json()["holdings"][0]
+        assert h["company_name"] is None
+        assert h["sector"] is None
+        assert h["price_history"] == []
+        # But price/value should still work from get_current_prices
+        assert h["current_price"] == 150.0
+
+
+# =============================================================================
+# get_agent_alerts
+# =============================================================================
+
+
+class TestGetAgentAlerts:
+    """GET /experiments/{eid}/agents/{aid}/alerts — alert collection."""
+
+    def test_no_decisions_dir_returns_empty(self):
+        """No decisions directory → empty alerts."""
+        agent = _make_agent()
+        gs = _make_game_state(agent)
+        with patch(f"{P}.load_game_state", return_value=gs):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/alerts")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["alerts"] == []
+        assert data["total_count"] == 0
+
+    def test_multiple_alerts_across_files(self, tmp_path):
+        """Alerts collected from multiple decision files."""
+        agent = _make_agent()
+        gs = _make_game_state(agent)
+        d = _decisions_dir(tmp_path)
+
+        (d / "2026-01-10.json").write_text(json.dumps({
+            "orders": [],
+            "alerts": [
+                {"symbol": "NVDA", "thesis": "AI demand surge", "confidence": "high", "catalyst": "Earnings", "time_horizon": "3 months"},
+            ],
+        }))
+        (d / "2026-01-11.json").write_text(json.dumps({
+            "orders": [],
+            "alerts": [
+                {"symbol": "TSLA", "thesis": "EV rebounce", "confidence": "medium", "catalyst": "Policy", "time_horizon": "6 months"},
+                {"symbol": "AMZN", "thesis": "Cloud growth", "confidence": "high", "catalyst": "AWS revenue", "time_horizon": "1 year"},
+            ],
+        }))
+
+        with patch(f"{P}.load_game_state", return_value=gs):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/alerts")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_count"] == 3
+        symbols = [a["symbol"] for a in data["alerts"]]
+        assert "NVDA" in symbols
+        assert "TSLA" in symbols
+        assert "AMZN" in symbols
+
+    def test_non_dict_entries_skipped(self, tmp_path):
+        """Non-dict entries in alerts array are skipped."""
+        agent = _make_agent()
+        gs = _make_game_state(agent)
+        d = _decisions_dir(tmp_path)
+
+        (d / "2026-01-10.json").write_text(json.dumps({
+            "orders": [],
+            "alerts": [
+                "not a dict",
+                42,
+                {"symbol": "AAPL", "thesis": "Value play", "confidence": "low", "catalyst": "Buybacks", "time_horizon": "1 year"},
+                None,
+            ],
+        }))
+
+        with patch(f"{P}.load_game_state", return_value=gs):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/alerts")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_count"] == 1
+        assert data["alerts"][0]["symbol"] == "AAPL"
+
+    def test_agent_not_found_returns_404(self):
+        """Unknown agent_id → 404."""
+        gs = _make_game_state(agent=None)
+        with patch(f"{P}.load_game_state", return_value=gs):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/alerts")
+        assert resp.status_code == 404
+
+    def test_corrupted_decision_file_skipped(self, tmp_path):
+        """Corrupted JSON in decision file is skipped, valid files still work."""
+        agent = _make_agent()
+        gs = _make_game_state(agent)
+        d = _decisions_dir(tmp_path)
+
+        (d / "2026-01-10.json").write_text("INVALID JSON")
+        (d / "2026-01-11.json").write_text(json.dumps({
+            "orders": [],
+            "alerts": [{"symbol": "GOOG", "thesis": "Search dominance", "confidence": "high", "catalyst": "AI", "time_horizon": "2 years"}],
+        }))
+
+        with patch(f"{P}.load_game_state", return_value=gs):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/alerts")
+        assert resp.status_code == 200
+        assert resp.json()["total_count"] == 1
+        assert resp.json()["alerts"][0]["symbol"] == "GOOG"
+
+
+# =============================================================================
+# get_agent_benchmarks
+# =============================================================================
+
+
+class TestGetAgentBenchmarks:
+    """GET /experiments/{eid}/agents/{aid}/benchmarks — benchmark comparison."""
+
+    def test_empty_portfolio_fetches_spy_only(self):
+        """Agent with no positions → only SPY benchmark."""
+        agent = _make_agent(positions=[])
+        gs = _make_game_state(agent)
+
+        import pandas as pd
+
+        mock_hist = pd.DataFrame(
+            {"Close": [500.0, 505.0, 510.0]},
+            index=pd.to_datetime(["2026-01-01", "2026-01-02", "2026-01-03"]),
+        )
+        mock_ticker = type("MockTicker", (), {"history": lambda self, **kw: mock_hist})()
+
+        with (
+            patch(f"{P}.load_game_state", return_value=gs),
+            patch(f"{P}.yf.Ticker", return_value=mock_ticker),
+        ):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/benchmarks")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["benchmarks"]) == 1
+        assert data["benchmarks"][0]["symbol"] == "SPY"
+        assert data["benchmarks"][0]["label"] == "S&P 500 (SPY)"
+        # First value should equal starting capital (normalized)
+        assert data["benchmarks"][0]["data"][0]["value"] == 10000.0
+
+    def test_yfinance_failure_returns_empty_benchmarks(self):
+        """If yfinance raises for all ETFs → empty benchmarks list."""
+        agent = _make_agent(positions=[])
+        gs = _make_game_state(agent)
+
+        mock_ticker = type("MockTicker", (), {"history": lambda self, **kw: (_ for _ in ()).throw(RuntimeError("API error"))})()
+
+        with (
+            patch(f"{P}.load_game_state", return_value=gs),
+            patch(f"{P}.yf.Ticker", return_value=mock_ticker),
+        ):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/benchmarks")
+        assert resp.status_code == 200
+        assert resp.json()["benchmarks"] == []
+
+    def test_agent_not_found_returns_404(self):
+        """Unknown agent → 404."""
+        gs = _make_game_state(agent=None)
+        with patch(f"{P}.load_game_state", return_value=gs):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/benchmarks")
+        assert resp.status_code == 404
+
+
+# =============================================================================
+# get_agent_portfolio
+# =============================================================================
+
+
+class TestGetAgentPortfolio:
+    """GET /experiments/{eid}/agents/{aid}/portfolio — portfolio delegation."""
+
+    def test_returns_portfolio_and_metrics(self):
+        """Delegates to get_agent_detail and returns portfolio + metrics."""
+        agent = _make_agent(positions=[_aapl_position()])
+        gs = _make_game_state(agent)
+        with (
+            patch(f"{P}.load_game_state", return_value=gs),
+            patch(f"{P}.get_current_prices", return_value={"AAPL": Decimal("150")}),
+            patch(f"{P}.calculate_portfolio_metrics", return_value=_portfolio_metrics_dict()),
+        ):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/portfolio")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "portfolio" in data
+        assert "metrics" in data
+        assert data["portfolio"]["cash"] == 8600.0
+        assert data["metrics"]["total_value"] == 10100.0
+
+    def test_agent_not_found_returns_404(self):
+        """Unknown agent → 404 (delegated from get_agent_detail)."""
+        gs = _make_game_state(agent=None)
+        with patch(f"{P}.load_game_state", return_value=gs):
+            resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents/{AGENT_ID}/portfolio")
+        assert resp.status_code == 404

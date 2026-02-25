@@ -652,6 +652,269 @@ class TestInitCommand:
 
 
 # ---------------------------------------------------------------------------
+# TestReportCommand
+# ---------------------------------------------------------------------------
+
+
+class TestReportCommand:
+    """Tests for the `report` command."""
+
+    @patch("agent_trade.experiment.experiment_cli.analysis_reporter")
+    def test_markdown_format_default(self, mock_reporter, runner):
+        """Should render markdown report to console by default."""
+        mock_reporter.generate_experiment_report.return_value = {"summary": "ok"}
+        mock_reporter.format_report_text.return_value = "# Report\nAll good"
+
+        result = runner.invoke(app, ["report", "test_exp"])
+
+        assert result.exit_code == 0
+        mock_reporter.generate_experiment_report.assert_called_once_with("test_exp")
+        mock_reporter.format_report_text.assert_called_once_with({"summary": "ok"})
+
+    @patch("agent_trade.experiment.experiment_cli.analysis_reporter")
+    def test_json_format(self, mock_reporter, runner):
+        """Should output JSON when --format json is specified."""
+        mock_reporter.generate_experiment_report.return_value = {"agents": 10}
+
+        result = runner.invoke(app, ["report", "test_exp", "--format", "json"])
+
+        assert result.exit_code == 0
+        assert '"agents"' in result.output
+        assert "10" in result.output
+
+    @patch("agent_trade.experiment.experiment_cli.analysis_reporter")
+    def test_output_file(self, mock_reporter, runner, tmp_path):
+        """Should save report to file when --output is specified."""
+        mock_reporter.generate_experiment_report.return_value = {"summary": "ok"}
+        mock_reporter.format_report_text.return_value = "# Report\nSaved"
+        out = tmp_path / "report.md"
+
+        result = runner.invoke(app, ["report", "test_exp", "--output", str(out)])
+
+        assert result.exit_code == 0
+        assert "saved to" in result.output.lower()
+        assert out.read_text() == "# Report\nSaved"
+
+    @patch("agent_trade.experiment.experiment_cli.analysis_reporter")
+    def test_json_output_file(self, mock_reporter, runner, tmp_path):
+        """Should save JSON report to file."""
+        mock_reporter.generate_experiment_report.return_value = {"count": 5}
+        out = tmp_path / "report.json"
+
+        result = runner.invoke(
+            app, ["report", "test_exp", "--format", "json", "--output", str(out)]
+        )
+
+        assert result.exit_code == 0
+        assert out.exists()
+        content = out.read_text()
+        assert '"count"' in content
+
+    @patch("agent_trade.experiment.experiment_cli.analysis_reporter")
+    def test_unknown_format(self, mock_reporter, runner):
+        """Should error on unknown format."""
+        mock_reporter.generate_experiment_report.return_value = {"summary": "ok"}
+
+        result = runner.invoke(app, ["report", "test_exp", "--format", "csv"])
+
+        assert result.exit_code == 1
+        assert "Unknown format" in result.output
+
+    @patch("agent_trade.experiment.experiment_cli.analysis_reporter")
+    def test_empty_report_data(self, mock_reporter, runner):
+        """Should error when generate_experiment_report returns None."""
+        mock_reporter.generate_experiment_report.return_value = None
+
+        result = runner.invoke(app, ["report", "test_exp"])
+
+        assert result.exit_code == 1
+        assert "Could not generate report" in result.output
+
+
+# ---------------------------------------------------------------------------
+# TestAnalyzeCommand
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyzeCommand:
+    """Tests for the `analyze` command."""
+
+    @patch("agent_trade.experiment.experiment_cli.analysis_reporter")
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_tax_keyword(self, mock_load, mock_reporter, runner):
+        """Should route queries with 'tax' to tax metrics analysis."""
+        mock_load.return_value = _make_game_state()
+        mock_reporter.calculate_tax_metrics.return_value = {
+            "agent_001": {"total_tax": 42.50},
+            "agent_002": {"total_tax": 18.00},
+        }
+
+        result = runner.invoke(app, ["analyze", "test_exp", "tax efficiency"])
+
+        assert result.exit_code == 0
+        mock_reporter.calculate_tax_metrics.assert_called_once_with("test_exp")
+
+    @patch("agent_trade.experiment.experiment_cli.analysis_reporter")
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_holding_keyword(self, mock_load, mock_reporter, runner):
+        """Should route queries with 'holding' to holding period distribution."""
+        mock_load.return_value = _make_game_state()
+        mock_reporter.calculate_holding_period_distribution.return_value = {
+            "agent_001": {"0-30": 3, "31-90": 1, "91-180": 0, "181-365": 0, "365+": 0}
+        }
+
+        result = runner.invoke(app, ["analyze", "test_exp", "holding periods"])
+
+        assert result.exit_code == 0
+        mock_reporter.calculate_holding_period_distribution.assert_called_once_with("test_exp")
+
+    @patch("agent_trade.experiment.experiment_cli.analysis_reporter")
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_default_query_falls_through(self, mock_load, mock_reporter, runner):
+        """Should fall through to full report for unrecognized queries."""
+        mock_load.return_value = _make_game_state()
+        mock_reporter.generate_experiment_report.return_value = {"summary": "full"}
+        mock_reporter.format_report_text.return_value = "# Full Report"
+
+        result = runner.invoke(app, ["analyze", "test_exp", "leaderboard"])
+
+        assert result.exit_code == 0
+        mock_reporter.generate_experiment_report.assert_called_once_with("test_exp")
+        mock_reporter.format_report_text.assert_called_once()
+
+    @patch("agent_trade.experiment.experiment_cli.analysis_reporter")
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_exception_handling(self, mock_load, mock_reporter, runner):
+        """Should handle exceptions gracefully."""
+        mock_load.return_value = _make_game_state()
+        mock_reporter.calculate_tax_metrics.side_effect = RuntimeError("DB error")
+
+        result = runner.invoke(app, ["analyze", "test_exp", "tax stuff"])
+
+        assert result.exit_code == 1
+        assert "Error" in result.output
+
+
+# ---------------------------------------------------------------------------
+# TestStrategyEditCommand
+# ---------------------------------------------------------------------------
+
+
+class TestStrategyEditCommand:
+    """Tests for `strategy edit` command."""
+
+    @patch("agent_trade.experiment.strategy_manager.save_strategy")
+    @patch("agent_trade.experiment.experiment_cli.save_game_state")
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_edit_philosophy(self, mock_load, mock_save, mock_strat, runner):
+        """Should update philosophy field."""
+        state = _make_game_state()
+        mock_load.return_value = state
+
+        result = runner.invoke(
+            app,
+            ["strategy", "edit", "test_exp", "agent_001", "--philosophy", "Value investing"],
+        )
+
+        assert result.exit_code == 0
+        assert "philosophy" in result.output
+        assert state.agents["agent_001"].strategy.thesis.philosophy == "Value investing"
+
+    @patch("agent_trade.experiment.strategy_manager.save_strategy")
+    @patch("agent_trade.experiment.experiment_cli.save_game_state")
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_edit_valid_risk(self, mock_load, mock_save, mock_strat, runner):
+        """Should update risk tolerance with valid value."""
+        state = _make_game_state()
+        mock_load.return_value = state
+
+        result = runner.invoke(
+            app,
+            ["strategy", "edit", "test_exp", "agent_001", "--risk", "aggressive"],
+        )
+
+        assert result.exit_code == 0
+        assert "risk_tolerance" in result.output
+        assert state.agents["agent_001"].strategy.thesis.risk_tolerance == "aggressive"
+
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_edit_invalid_risk(self, mock_load, runner):
+        """Should reject invalid risk tolerance values."""
+        state = _make_game_state()
+        mock_load.return_value = state
+
+        result = runner.invoke(
+            app,
+            ["strategy", "edit", "test_exp", "agent_001", "--risk", "yolo"],
+        )
+
+        assert result.exit_code == 1
+        assert "Invalid risk tolerance" in result.output
+
+    @patch("agent_trade.experiment.strategy_manager.save_strategy")
+    @patch("agent_trade.experiment.experiment_cli.save_game_state")
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_edit_sectors(self, mock_load, mock_save, mock_strat, runner):
+        """Should update preferred sectors from comma-separated input."""
+        state = _make_game_state()
+        mock_load.return_value = state
+
+        result = runner.invoke(
+            app,
+            ["strategy", "edit", "test_exp", "agent_001", "--sectors", "Energy, Financials"],
+        )
+
+        assert result.exit_code == 0
+        assert "preferred_sectors" in result.output
+        assert state.agents["agent_001"].strategy.thesis.preferred_sectors == ["Energy", "Financials"]
+
+    @patch("agent_trade.experiment.strategy_manager.save_strategy")
+    @patch("agent_trade.experiment.experiment_cli.save_game_state")
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_edit_metrics(self, mock_load, mock_save, mock_strat, runner):
+        """Should update key metrics from comma-separated input."""
+        state = _make_game_state()
+        mock_load.return_value = state
+
+        result = runner.invoke(
+            app,
+            ["strategy", "edit", "test_exp", "agent_001", "--metrics", "EV/EBITDA,FCF Yield"],
+        )
+
+        assert result.exit_code == 0
+        assert "key_metrics" in result.output
+        assert state.agents["agent_001"].strategy.thesis.key_metrics == ["EV/EBITDA", "FCF Yield"]
+
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_edit_no_fields(self, mock_load, runner):
+        """Should warn when no fields are specified to update."""
+        state = _make_game_state()
+        mock_load.return_value = state
+
+        result = runner.invoke(
+            app,
+            ["strategy", "edit", "test_exp", "agent_001"],
+        )
+
+        assert result.exit_code == 0
+        assert "No fields specified" in result.output
+
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_edit_agent_not_found(self, mock_load, runner):
+        """Should error when agent doesn't exist."""
+        state = _make_game_state()
+        mock_load.return_value = state
+
+        result = runner.invoke(
+            app,
+            ["strategy", "edit", "test_exp", "agent_999", "--risk", "moderate"],
+        )
+
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
 # TestMain
 # ---------------------------------------------------------------------------
 
