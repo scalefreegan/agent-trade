@@ -572,6 +572,102 @@ class TestCoordinatorInterest:
         # Eliminated agent's cash should be unchanged
         assert eliminated_agent.portfolio.cash == Decimal("8000")
 
+    @patch("agent_trade.experiment.coordinator.get_current_prices")
+    @patch("agent_trade.experiment.coordinator.spawn_all_agents")
+    @patch("agent_trade.experiment.coordinator.load_latest_daily_outcome")
+    def test_interest_decimal_roundtrip_from_json(
+        self,
+        mock_load_outcome,
+        mock_spawn,
+        mock_prices,
+        tmp_path,
+    ):
+        """Test that total_interest_earned handles JSON reload (string/float to Decimal)."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        mock_load_outcome.return_value = None
+        mock_spawn.return_value = {
+            "agent_001": DailyDecision(
+                date="2026-01-15",
+                research_notes="Holding",
+                orders=[],
+                execution_time_ms=50,
+            )
+        }
+        mock_prices.return_value = {}
+
+        config = _make_config(cash_interest_rate=Decimal("0.05"))
+        agent = _make_agent(cash=Decimal("10000"))
+
+        # Simulate JSON round-trip: total_interest_earned becomes string
+        agent.stats["total_interest_earned"] = "1.23"
+
+        game_state = GameState(
+            config=config,
+            agents={"agent_001": agent},
+            trading_day=1,
+            last_run=None,
+        )
+
+        # Should not crash with TypeError
+        outcome = process_daily_cycle(
+            game_state=game_state,
+            date="2026-01-15",
+            decisions_base_dir=tmp_path,
+        )
+
+        # Verify interest was correctly accumulated as Decimal
+        assert len(outcome.interest_payments) == 1
+        new_interest = outcome.interest_payments[0].amount
+        expected_total = Decimal("1.23") + new_interest
+        assert agent.stats["total_interest_earned"] == expected_total
+        assert isinstance(agent.stats["total_interest_earned"], Decimal)
+
+    @patch("agent_trade.experiment.coordinator.get_current_prices")
+    @patch("agent_trade.experiment.coordinator.spawn_all_agents")
+    @patch("agent_trade.experiment.coordinator.load_latest_daily_outcome")
+    def test_same_day_rerun_no_duplicate_interest(
+        self,
+        mock_load_outcome,
+        mock_spawn,
+        mock_prices,
+        tmp_path,
+    ):
+        """Test that same-day reruns don't double-credit interest (idempotency)."""
+        from agent_trade.experiment.coordinator import process_daily_cycle
+
+        mock_load_outcome.return_value = None
+        mock_spawn.return_value = {
+            "agent_001": DailyDecision(
+                date="2026-01-15",
+                research_notes="Holding",
+                orders=[],
+                execution_time_ms=50,
+            )
+        }
+        mock_prices.return_value = {}
+
+        config = _make_config(cash_interest_rate=Decimal("0.05"))
+        agent = _make_agent(cash=Decimal("10000"))
+
+        # Set last_run to match the date we're processing (simulating rerun)
+        game_state = GameState(
+            config=config,
+            agents={"agent_001": agent},
+            trading_day=1,
+            last_run=datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc),
+        )
+
+        outcome = process_daily_cycle(
+            game_state=game_state,
+            date="2026-01-15",
+            decisions_base_dir=tmp_path,
+        )
+
+        # Interest should be skipped on same-day rerun
+        assert len(outcome.interest_payments) == 0
+        assert agent.portfolio.cash == Decimal("10000")  # unchanged
+
 
 # ==============================================================================
 # DailyOutcome with interest_payments

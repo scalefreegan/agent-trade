@@ -46,10 +46,13 @@ def process_daily_cycle(
     Process a complete daily trading cycle.
 
     1. Load previous day's errors for feedback
-    2. Spawn all active agents to get decisions
-    3. Validate and execute all orders
-    4. Update portfolios and eliminate bankrupt agents
-    5. Generate daily outcome report
+    2. Apply daily cash interest to active agents
+    3. Spawn all active agents to get decisions
+    4. Fetch market prices
+    5. Validate and execute all orders (sells before buys)
+    6. Apply strategy updates from agent decisions
+    7. Calculate portfolio values and eliminate bankrupt agents
+    8. Update game state and generate daily outcome report
 
     Args:
         game_state: Current game state (modified in-place)
@@ -91,9 +94,12 @@ def process_daily_cycle(
         logger.error(f"Unexpected error loading previous errors: {e}", exc_info=True)
         # Continue with empty errors rather than failing the cycle
 
+    # Compute last run date for idempotency checks
+    last_run_date = game_state.last_run.strftime("%Y-%m-%d") if game_state.last_run else None
+
     # Step 2: Apply daily cash interest to all active agents
     interest_payments: list[InterestPayment] = []
-    if game_state.config.cash_interest_rate > 0:
+    if game_state.config.cash_interest_rate > 0 and date != last_run_date:
         now = datetime.now(timezone.utc)
         for agent in active_agents:
             payment = apply_cash_interest(
@@ -104,9 +110,9 @@ def process_daily_cycle(
             )
             if payment:
                 interest_payments.append(payment)
-                # Track cumulative interest in agent stats
-                agent.stats.setdefault("total_interest_earned", Decimal("0"))
-                agent.stats["total_interest_earned"] += payment.amount
+                # Track cumulative interest in agent stats (normalize from JSON reload)
+                existing = agent.stats.get("total_interest_earned", 0)
+                agent.stats["total_interest_earned"] = Decimal(str(existing)) + payment.amount
         if interest_payments:
             logger.info(
                 f"Applied daily interest to {len(interest_payments)} agents "
@@ -253,7 +259,6 @@ def process_daily_cycle(
     # Step 8: Update game state
     # Only increment trading_day when this is a new calendar date — reruns on the
     # same day (e.g. re-clicking "Run Day") should not advance the counter.
-    last_run_date = game_state.last_run.strftime("%Y-%m-%d") if game_state.last_run else None
     if date != last_run_date:
         game_state.trading_day += 1
     game_state.last_run = datetime.now(timezone.utc)
