@@ -54,7 +54,8 @@ class TestStatsCommand:
         assert result.exit_code == 0
         assert "Tool Usage Overview" in result.output
         assert "Total Calls" in result.output
-        assert "2" in result.output
+        # Verify the count appears in context (log_file fixture has 2 entries)
+        assert "2" in result.output.split("Total Calls")[1].split("\n")[0]
         assert "Errors" in result.output
 
     def test_no_log_file_shows_message(self, runner, tmp_path):
@@ -212,7 +213,9 @@ class TestClearCommand:
 
         result = runner.invoke(app, ["clear", "--log-file", str(log_file)], input="n\n")
 
-        assert result.exit_code != 0 or "Cancelled" in result.output or "Aborted" in result.output
+        # Command exits with 0 and shows cancellation message (current behavior)
+        assert result.exit_code == 0
+        assert "Cancelled" in result.output
         # File should be unchanged
         assert log_file.read_text() == original_content
 

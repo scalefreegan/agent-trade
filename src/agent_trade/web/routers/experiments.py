@@ -127,6 +127,7 @@ async def update_experiment(
         try:
             save_config(config)
         except Exception as e:
+            logger.error("Failed to save config for %s: %s", experiment_id, e)
             raise HTTPException(status_code=500, detail=str(e))
 
     current_day = None
