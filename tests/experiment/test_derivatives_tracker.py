@@ -589,6 +589,8 @@ class TestPortfolioValueWithDerivatives:
 
         prices = {"ES": Decimal("5100.00")}
         # Cash: 38000
+        # Margin used: 12000
         # Futures P&L: (5100-5000)*50*1 = 5000
+        # Total: 38000 + 12000 + 5000 = 55000
         total = portfolio.total_value(prices, strict=False)
-        assert total == Decimal("43000.00")
+        assert total == Decimal("55000.00")

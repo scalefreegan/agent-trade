@@ -248,7 +248,7 @@ class Portfolio(BaseModel):
                     f"Cannot accurately value portfolio."
                 )
 
-        return self.cash + stock_value + options_value + futures_pnl
+        return self.cash + self.margin_used + stock_value + options_value + futures_pnl
 
 
 class Order(BaseModel):

@@ -187,7 +187,7 @@ def process_option_expirations(
         if not position.is_expired(as_of):
             continue
 
-        underlying_price = current_prices.get(position.underlying, Decimal("0"))
+        underlying_price = current_prices[position.underlying]
         intrinsic = position.total_intrinsic_value(underlying_price)
 
         if intrinsic > Decimal("0"):
@@ -384,7 +384,7 @@ def process_futures_expirations(
         if not position.is_expired(as_of):
             continue
 
-        current_price = current_prices.get(position.symbol, position.entry_price)
+        current_price = current_prices[position.symbol]
         realized_pnl = position.unrealized_pnl(current_price)
 
         # Release margin and settle P&L

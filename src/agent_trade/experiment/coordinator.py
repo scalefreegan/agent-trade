@@ -111,7 +111,7 @@ def process_daily_cycle(
 
     # Step 2: Apply daily cash interest to all active agents
     interest_payments: list[InterestPayment] = []
-    if game_state.config.cash_interest_rate > 0 and date != last_run_date:
+    if game_state.config.cash_interest_rate > 0 and trading_date != last_run_date:
         now = datetime.now(timezone.utc)
         for agent in active_agents:
             payment = apply_cash_interest(
@@ -165,6 +165,14 @@ def process_daily_cycle(
             # Collect underlying symbols for options pricing
             for opt_order in decision.option_orders:
                 symbols_needed.add(opt_order.underlying)
+
+    # Include held derivative positions for expiration settlement pricing
+    if is_multi_instrument:
+        for agent in active_agents:
+            for opt in agent.portfolio.option_positions:
+                symbols_needed.add(opt.underlying)
+            for fut in agent.portfolio.futures_positions:
+                symbols_needed.add(fut.symbol)
 
     # Get current market prices for stocks and option underlyings
     current_prices = get_current_prices(list(symbols_needed))

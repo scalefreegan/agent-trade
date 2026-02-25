@@ -534,7 +534,13 @@ def _build_derivatives_prompt_section(
     options_text = ""
     if agent.portfolio.option_positions:
         for opt in agent.portfolio.option_positions:
-            underlying_price = current_prices.get(opt.underlying, Decimal("0"))
+            underlying_price = current_prices.get(opt.underlying)
+            if underlying_price is None:
+                options_text += (
+                    f"- {opt.contracts} {opt.contract_type.upper()} {opt.underlying} "
+                    f"${opt.strike_price} exp {opt.expiration_date} | price unavailable\n"
+                )
+                continue
             intrinsic = opt.intrinsic_value(underlying_price)
             total_intrinsic = opt.total_intrinsic_value(underlying_price)
             status = "ITM" if intrinsic > 0 else "OTM"
@@ -552,7 +558,13 @@ def _build_derivatives_prompt_section(
     futures_text = ""
     if agent.portfolio.futures_positions:
         for fut in agent.portfolio.futures_positions:
-            current_fut_price = current_prices.get(fut.symbol, fut.entry_price)
+            current_fut_price = current_prices.get(fut.symbol)
+            if current_fut_price is None:
+                futures_text += (
+                    f"- {fut.direction.upper()} {fut.contracts} {fut.symbol} "
+                    f"at ${fut.entry_price} | price unavailable\n"
+                )
+                continue
             unrealized = fut.unrealized_pnl(current_fut_price)
             futures_text += (
                 f"- {fut.direction.upper()} {fut.contracts} {fut.symbol} "
