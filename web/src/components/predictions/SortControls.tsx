@@ -6,11 +6,15 @@ export type SortOption =
   | 'close_time'
   | 'created_time';
 
+export type MaxDateRange = '1m' | '3m' | '6m' | '1y' | 'none';
+
 interface SortControlsProps {
   sortBy: SortOption;
   onSortChange: (sort: SortOption) => void;
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
+  maxDateRange: MaxDateRange;
+  onMaxDateRangeChange: (range: MaxDateRange) => void;
 }
 
 const sortOptions: { value: SortOption; label: string }[] = [
@@ -27,11 +31,21 @@ const statusOptions = [
   { value: '', label: 'All' },
 ];
 
+const maxDateRangeOptions: { value: MaxDateRange; label: string }[] = [
+  { value: '1m', label: '1 Month' },
+  { value: '3m', label: '3 Months' },
+  { value: '6m', label: '6 Months' },
+  { value: '1y', label: '1 Year' },
+  { value: 'none', label: 'No Limit' },
+];
+
 export function SortControls({
   sortBy,
   onSortChange,
   statusFilter,
   onStatusFilterChange,
+  maxDateRange,
+  onMaxDateRangeChange,
 }: SortControlsProps) {
   return (
     <div className="flex items-center gap-3 flex-wrap">
@@ -66,6 +80,25 @@ export function SortControls({
           className="px-3 py-1.5 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
         >
           {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Max close date filter */}
+      <div className="flex items-center gap-2">
+        <label htmlFor="maxDate" className="text-sm font-medium text-foreground">
+          Closes within:
+        </label>
+        <select
+          id="maxDate"
+          value={maxDateRange}
+          onChange={(e) => onMaxDateRangeChange(e.target.value as MaxDateRange)}
+          className="px-3 py-1.5 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          {maxDateRangeOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
