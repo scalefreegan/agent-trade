@@ -133,8 +133,8 @@ async def update_experiment(
     try:
         game_state = load_game_state(experiment_id)
         current_day = game_state.trading_day if game_state else None
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Could not load game state for %s: %s", experiment_id, e)
 
     return ExperimentDetail(
         id=experiment_id,

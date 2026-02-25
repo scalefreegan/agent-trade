@@ -231,22 +231,30 @@ class TestPrintLogEntry:
     def test_success_entry_formatting(self, capsys):
         """Should format successful entries with green checkmark."""
         from agent_trade.logs_cli import console as logs_console
+        from io import StringIO
 
-        entry = {
-            "timestamp": "2026-02-20T10:00:00.000000",
-            "tool_name": "get_stock_info",
-            "mode": "mcp",
-            "error": None,
-            "execution_time_ms": 150.5,
-        }
+        # Temporarily redirect console output to capture it
+        buffer = StringIO()
+        original_file = logs_console.file
+        logs_console.file = buffer
 
-        _print_log_entry(entry)
+        try:
+            entry = {
+                "timestamp": "2026-02-20T10:00:00.000000",
+                "tool_name": "get_stock_info",
+                "mode": "mcp",
+                "error": None,
+                "execution_time_ms": 150.5,
+            }
 
-        # The rich console outputs to its own stream; check it printed without error
-        # We verify by checking the console's file output
-        output = logs_console.file.getvalue() if hasattr(logs_console.file, "getvalue") else ""
-        # At minimum, the function should not raise
-        assert True
+            _print_log_entry(entry)
+
+            output = buffer.getvalue()
+            assert "get_stock_info" in output
+            assert "10:00:00" in output
+            assert "150.50 ms" in output
+        finally:
+            logs_console.file = original_file
 
     def test_error_entry_formatting(self, capsys):
         """Should format error entries with red X and error message."""

@@ -319,40 +319,45 @@ class TestToolLoggerGetStats:
 class TestGetLogger:
     """Tests for get_logger() singleton"""
 
-    def test_returns_singleton_instance(self, clear_global_logger):
+    def test_returns_singleton_instance(self, clear_global_logger, tmp_path):
         """Should return same instance on multiple calls"""
-        logger1 = get_logger()
-        logger2 = get_logger()
+        with patch("agent_trade.logging_config.Path.home", return_value=tmp_path):
+            logger1 = get_logger()
+            logger2 = get_logger()
 
-        assert logger1 is logger2
+            assert logger1 is logger2
 
     @patch.dict(os.environ, {"AGENT_TRADE_LOG_LEVEL": "debug"})
-    def test_reads_log_level_from_env_var(self, clear_global_logger):
+    def test_reads_log_level_from_env_var(self, clear_global_logger, tmp_path):
         """Should read log level from AGENT_TRADE_LOG_LEVEL env var"""
-        logger = get_logger()
+        with patch("agent_trade.logging_config.Path.home", return_value=tmp_path):
+            logger = get_logger()
 
-        assert logger.log_level == LogLevel.DEBUG
+            assert logger.log_level == LogLevel.DEBUG
 
     @patch.dict(os.environ, {"AGENT_TRADE_LOG_LEVEL": "error"})
-    def test_handles_different_log_levels(self, clear_global_logger):
+    def test_handles_different_log_levels(self, clear_global_logger, tmp_path):
         """Should handle different log level values"""
-        logger = get_logger()
+        with patch("agent_trade.logging_config.Path.home", return_value=tmp_path):
+            logger = get_logger()
 
-        assert logger.log_level == LogLevel.ERROR
+            assert logger.log_level == LogLevel.ERROR
 
     @patch.dict(os.environ, {"AGENT_TRADE_LOG_LEVEL": "INVALID"})
-    def test_falls_back_to_info_on_invalid_level(self, clear_global_logger):
+    def test_falls_back_to_info_on_invalid_level(self, clear_global_logger, tmp_path):
         """Should fallback to INFO for invalid log level"""
-        logger = get_logger()
+        with patch("agent_trade.logging_config.Path.home", return_value=tmp_path):
+            logger = get_logger()
 
-        assert logger.log_level == LogLevel.INFO
+            assert logger.log_level == LogLevel.INFO
 
     @patch.dict(os.environ, {}, clear=True)
-    def test_defaults_to_info_when_env_var_not_set(self, clear_global_logger):
+    def test_defaults_to_info_when_env_var_not_set(self, clear_global_logger, tmp_path):
         """Should default to INFO when env var not set"""
-        logger = get_logger()
+        with patch("agent_trade.logging_config.Path.home", return_value=tmp_path):
+            logger = get_logger()
 
-        assert logger.log_level == LogLevel.INFO
+            assert logger.log_level == LogLevel.INFO
 
     @patch.dict(os.environ, {"AGENT_TRADE_LOG_FILE": "/tmp/custom.log"})
     def test_reads_log_file_from_env_var(self, clear_global_logger):

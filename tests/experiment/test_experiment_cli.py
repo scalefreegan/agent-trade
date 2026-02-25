@@ -477,7 +477,25 @@ class TestStrategyCommands:
         )
 
         assert result.exit_code == 1
-        assert "not found" in result.output.lower()
+
+    @patch("agent_trade.experiment.experiment_cli.load_game_state")
+    def test_strategy_guide_no_args(self, mock_load, runner):
+        """Should warn when neither guidance text nor --clear provided."""
+        state = _make_game_state()
+        mock_load.return_value = state
+
+        result = runner.invoke(
+            app,
+            [
+                "strategy",
+                "guide",
+                "test_exp_20260220_100000",
+                "agent_001",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Provide guidance text or --clear" in result.output
 
 
 # ---------------------------------------------------------------------------
