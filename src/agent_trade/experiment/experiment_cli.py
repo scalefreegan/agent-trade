@@ -420,6 +420,8 @@ def pause(
 
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
+        if "--debug" in sys.argv:
+            raise
         raise typer.Exit(1)
 
 
@@ -448,11 +450,13 @@ def resume(
 
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
+        if "--debug" in sys.argv:
+            raise
         raise typer.Exit(1)
 
 
-@app.command()
-def list():
+@app.command(name="list")
+def list_experiments():
     """List all experiments.
 
     Examples:

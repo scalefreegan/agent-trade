@@ -2,6 +2,11 @@
 Tests for agent_runner.py focusing on:
 - spawn_agent timeout classification (builtin TimeoutError AND asyncio.TimeoutError)
 - _parse_structured_response skipping orders with decimal.InvalidOperation
+- _parse_structured_response strategy_updates parsing
+- _build_system_prompt with positions, missing prices, learnings
+- _build_task_prompt with and without positions
+- spawn_agent success path
+- spawn_all_agents parallel execution, timeout, and error handling
 """
 
 import asyncio
@@ -9,14 +14,16 @@ import json
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from agent_trade.experiment.agent_runner import (
     _build_system_prompt,
+    _build_task_prompt,
     _parse_structured_response,
     spawn_agent,
+    spawn_all_agents,
 )
 from agent_trade.experiment.models import (
     AgentState,
@@ -24,6 +31,9 @@ from agent_trade.experiment.models import (
     ExperimentConfig,
     InvestmentThesis,
     Portfolio,
+    StockPosition,
+    StrategyLearning,
+    TaxLot,
 )
 
 
@@ -429,3 +439,444 @@ class TestBuildSystemPromptMaxPositionRemoval:
         assert "No short selling" in prompt
         assert "Fractional shares" in prompt
         assert "FIFO accounting" in prompt
+
+
+# ---------------------------------------------------------------------------
+# _parse_structured_response — strategy_updates
+# ---------------------------------------------------------------------------
+
+
+class TestParseStructuredResponseStrategyUpdates:
+    """Verify strategy_updates parsing: valid, partial, non-dict."""
+
+    def test_valid_strategy_updates_parsed(self):
+        """Complete strategy_updates dict produces a StrategyLearning."""
+        data = {
+            "research_notes": "notes",
+            "orders": [],
+            "strategy_updates": {
+                "observation": "Market pulled back on earnings miss",
+                "outcome": "negative",
+                "lesson": "Set tighter stop-losses before earnings",
+            },
+        }
+        decision = _parse_structured_response(data, agent_id="a1", date="2026-02-20")
+        assert decision.strategy_updates is not None
+        assert decision.strategy_updates.observation == "Market pulled back on earnings miss"
+        assert decision.strategy_updates.outcome == "negative"
+        assert decision.strategy_updates.lesson == "Set tighter stop-losses before earnings"
+        assert decision.strategy_updates.date == "2026-02-20"
+
+    def test_partial_strategy_updates_ignored(self):
+        """strategy_updates with missing required fields → None."""
+        data = {
+            "research_notes": "",
+            "orders": [],
+            "strategy_updates": {
+                "observation": "Something happened",
+                "outcome": "",
+                "lesson": "Learned something",
+            },
+        }
+        decision = _parse_structured_response(data, agent_id="a1", date="2026-02-20")
+        assert decision.strategy_updates is None
+
+    def test_non_dict_strategy_updates_ignored(self):
+        """strategy_updates that is a string instead of dict → None."""
+        data = {
+            "research_notes": "",
+            "orders": [],
+            "strategy_updates": "not a dict",
+        }
+        decision = _parse_structured_response(data, agent_id="a1", date="2026-02-20")
+        assert decision.strategy_updates is None
+
+    def test_null_strategy_updates(self):
+        """strategy_updates = null → None."""
+        data = {
+            "research_notes": "",
+            "orders": [],
+            "strategy_updates": None,
+        }
+        decision = _parse_structured_response(data, agent_id="a1", date="2026-02-20")
+        assert decision.strategy_updates is None
+
+
+# ---------------------------------------------------------------------------
+# _build_system_prompt — positions & prices
+# ---------------------------------------------------------------------------
+
+
+class TestBuildSystemPromptPositions:
+    """Verify portfolio positions and price rendering in system prompt."""
+
+    def _agent_with_positions(self) -> AgentState:
+        agent = make_agent()
+        agent.portfolio = Portfolio(
+            cash=Decimal("500.00"),
+            positions=[
+                StockPosition(
+                    symbol="AAPL",
+                    lots=[
+                        TaxLot(
+                            shares=Decimal("10"),
+                            cost_basis=Decimal("150.00"),
+                            purchase_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                        )
+                    ],
+                ),
+                StockPosition(
+                    symbol="TSLA",
+                    lots=[
+                        TaxLot(
+                            shares=Decimal("5"),
+                            cost_basis=Decimal("200.00"),
+                            purchase_date=datetime(2026, 1, 15, tzinfo=timezone.utc),
+                        )
+                    ],
+                ),
+            ],
+        )
+        return agent
+
+    def test_positions_rendered_with_prices(self):
+        """Positions appear with current prices and values."""
+        agent = self._agent_with_positions()
+        config = make_config()
+        prices = {"AAPL": Decimal("175.00"), "TSLA": Decimal("220.00")}
+        prompt = _build_system_prompt(agent, config, "2026-02-20", prices)
+
+        assert "AAPL" in prompt
+        assert "10 shares" in prompt
+        assert "$150.00" in prompt  # cost basis
+        assert "$175.00" in prompt  # current price
+        assert "TSLA" in prompt
+        assert "No positions held" not in prompt
+
+    def test_missing_price_warning(self):
+        """Missing prices show warning and price unavailable marker."""
+        agent = self._agent_with_positions()
+        config = make_config()
+        # Only provide price for AAPL, not TSLA
+        prices = {"AAPL": Decimal("175.00")}
+        prompt = _build_system_prompt(agent, config, "2026-02-20", prices)
+
+        assert "price unavailable" in prompt
+        assert "WARNING" in prompt
+        assert "TSLA" in prompt
+
+    def test_empty_portfolio_shows_no_positions(self):
+        """Portfolio with no positions shows 'No positions held'."""
+        agent = make_agent()  # default: no positions
+        config = make_config()
+        prompt = _build_system_prompt(agent, config, "2026-02-20", {})
+
+        assert "No positions held" in prompt
+
+
+# ---------------------------------------------------------------------------
+# _build_system_prompt — learnings
+# ---------------------------------------------------------------------------
+
+
+class TestBuildSystemPromptLearnings:
+    """Verify learnings rendering in system prompt."""
+
+    def test_learnings_rendered(self):
+        """Recent learnings appear in the system prompt."""
+        agent = make_agent()
+        agent.strategy.learnings = [
+            StrategyLearning(
+                date="2026-02-18",
+                observation="Tech stocks rallied after CPI",
+                outcome="positive",
+                lesson="Buy dips before CPI release",
+            ),
+        ]
+        config = make_config()
+        prompt = _build_system_prompt(agent, config, "2026-02-20", {})
+
+        assert "Tech stocks rallied after CPI" in prompt
+        assert "Buy dips before CPI release" in prompt
+        assert "No learnings recorded yet" not in prompt
+
+    def test_no_learnings_shows_placeholder(self):
+        """Empty learnings list shows placeholder text."""
+        agent = make_agent()
+        agent.strategy.learnings = []
+        config = make_config()
+        prompt = _build_system_prompt(agent, config, "2026-02-20", {})
+
+        assert "No learnings recorded yet" in prompt
+
+
+# ---------------------------------------------------------------------------
+# _build_task_prompt
+# ---------------------------------------------------------------------------
+
+
+class TestBuildTaskPrompt:
+    """Verify task prompt construction."""
+
+    def test_task_prompt_with_positions(self):
+        """Task prompt lists held tickers."""
+        agent = make_agent()
+        agent.portfolio = Portfolio(
+            cash=Decimal("500.00"),
+            positions=[
+                StockPosition(
+                    symbol="AAPL",
+                    lots=[
+                        TaxLot(
+                            shares=Decimal("10"),
+                            cost_basis=Decimal("150.00"),
+                            purchase_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                        )
+                    ],
+                ),
+            ],
+        )
+        prompt = _build_task_prompt(agent, "2026-02-20")
+
+        assert "2026-02-20" in prompt
+        assert "AAPL" in prompt
+
+    def test_task_prompt_empty_portfolio(self):
+        """Task prompt shows 'none' when no positions held."""
+        agent = make_agent()
+        prompt = _build_task_prompt(agent, "2026-02-20")
+
+        assert "Currently holding: none" in prompt
+
+
+# ---------------------------------------------------------------------------
+# spawn_agent — success path
+# ---------------------------------------------------------------------------
+
+
+class TestSpawnAgentSuccess:
+    """Verify spawn_agent success flow: parse response, write file, return decision."""
+
+    def test_successful_agent_spawn(self, tmp_path):
+        """Successful run_agent call → parsed DailyDecision with orders."""
+        agent = make_agent()
+        config = make_config()
+        response_data = {
+            "research_notes": "AAPL showing momentum",
+            "orders": [
+                {"action": "buy", "symbol": "AAPL", "amount": 200, "reasoning": "momentum"},
+            ],
+            "strategy_updates": None,
+            "alerts": [],
+        }
+
+        mock_run = AsyncMock(return_value=response_data)
+        with patch("agent_trade.experiment.agent_runner.run_agent", mock_run):
+            decision = asyncio.run(
+                spawn_agent(
+                    agent=agent,
+                    config=config,
+                    date="2026-02-20",
+                    current_prices={},
+                    decisions_dir=tmp_path,
+                )
+            )
+
+        assert decision.research_notes == "AAPL showing momentum"
+        assert len(decision.orders) == 1
+        assert decision.orders[0].symbol == "AAPL"
+        assert decision.execution_time_ms > 0
+
+        # Verify decision file written
+        decision_file = tmp_path / "2026-02-20.json"
+        assert decision_file.exists()
+        saved = json.loads(decision_file.read_text())
+        assert saved["research_notes"] == "AAPL showing momentum"
+
+
+# ---------------------------------------------------------------------------
+# spawn_all_agents — parallel execution
+# ---------------------------------------------------------------------------
+
+
+class TestSpawnAllAgents:
+    """Verify spawn_all_agents handles success, timeout, and errors in parallel."""
+
+    def _make_agents(self, count: int = 2) -> list[AgentState]:
+        agents = []
+        for i in range(count):
+            a = make_agent()
+            a.agent_id = f"agent_{i:03d}"
+            a.name = f"Agent {i}"
+            agents.append(a)
+        return agents
+
+    def test_all_agents_succeed(self, tmp_path):
+        """All agents succeed → all results returned."""
+        agents = self._make_agents(2)
+        config = make_config()
+        response_data = {
+            "research_notes": "looks good",
+            "orders": [],
+            "strategy_updates": None,
+            "alerts": [],
+        }
+
+        mock_run = AsyncMock(return_value=response_data)
+        with (
+            patch("agent_trade.experiment.agent_runner.run_agent", mock_run),
+            patch("agent_trade.experiment.agent_runner.get_current_prices", return_value={}),
+        ):
+            results = asyncio.run(
+                spawn_all_agents(
+                    agents=agents,
+                    config=config,
+                    date="2026-02-20",
+                    decisions_base_dir=tmp_path,
+                )
+            )
+
+        assert len(results) == 2
+        assert "agent_000" in results
+        assert "agent_001" in results
+        assert results["agent_000"].research_notes == "looks good"
+
+    def test_timeout_agent_produces_timeout_decision(self, tmp_path):
+        """An agent that times out gets a TIMEOUT decision without blocking others."""
+        agents = self._make_agents(2)
+        config = make_config()
+
+        async def side_effect(*args, **kwargs):
+            await asyncio.sleep(999)
+
+        mock_run = AsyncMock(side_effect=side_effect)
+        with (
+            patch("agent_trade.experiment.agent_runner.run_agent", mock_run),
+            patch("agent_trade.experiment.agent_runner.get_current_prices", return_value={}),
+        ):
+            results = asyncio.run(
+                spawn_all_agents(
+                    agents=agents,
+                    config=config,
+                    date="2026-02-20",
+                    decisions_base_dir=tmp_path,
+                    timeout=1,
+                )
+            )
+
+        for agent_id, decision in results.items():
+            assert "TIMEOUT" in decision.research_notes
+            assert decision.orders == []
+
+    def test_error_agent_produces_error_decision(self, tmp_path):
+        """An agent that raises an exception gets an ERROR decision."""
+        agents = self._make_agents(1)
+        config = make_config()
+
+        mock_run = AsyncMock(side_effect=RuntimeError("API failure"))
+        with (
+            patch("agent_trade.experiment.agent_runner.run_agent", mock_run),
+            patch("agent_trade.experiment.agent_runner.get_current_prices", return_value={}),
+        ):
+            results = asyncio.run(
+                spawn_all_agents(
+                    agents=agents,
+                    config=config,
+                    date="2026-02-20",
+                    decisions_base_dir=tmp_path,
+                )
+            )
+
+        assert len(results) == 1
+        decision = results["agent_000"]
+        assert decision.research_notes.startswith("ERROR:")
+
+    def test_progress_callback_called(self, tmp_path):
+        """Progress callback receives start and complete events."""
+        agents = self._make_agents(1)
+        config = make_config()
+        response_data = {
+            "research_notes": "done",
+            "orders": [],
+            "strategy_updates": None,
+            "alerts": [],
+        }
+        callback = MagicMock()
+
+        mock_run = AsyncMock(return_value=response_data)
+        with (
+            patch("agent_trade.experiment.agent_runner.run_agent", mock_run),
+            patch("agent_trade.experiment.agent_runner.get_current_prices", return_value={}),
+        ):
+            asyncio.run(
+                spawn_all_agents(
+                    agents=agents,
+                    config=config,
+                    date="2026-02-20",
+                    decisions_base_dir=tmp_path,
+                    progress_callback=callback,
+                )
+            )
+
+        event_types = [call.args[0] for call in callback.call_args_list]
+        assert "agent_start" in event_types
+        assert "agent_complete" in event_types
+
+    def test_previous_errors_passed_to_agent(self, tmp_path):
+        """previous_errors dict is forwarded to spawn_agent and appears in system prompt."""
+        agents = self._make_agents(1)
+        config = make_config()
+        response_data = {
+            "research_notes": "adjusted strategy",
+            "orders": [],
+            "strategy_updates": None,
+            "alerts": [],
+        }
+
+        mock_run = AsyncMock(return_value=response_data)
+        with (
+            patch("agent_trade.experiment.agent_runner.run_agent", mock_run),
+            patch("agent_trade.experiment.agent_runner.get_current_prices", return_value={}),
+        ):
+            asyncio.run(
+                spawn_all_agents(
+                    agents=agents,
+                    config=config,
+                    date="2026-02-20",
+                    decisions_base_dir=tmp_path,
+                    previous_errors={"agent_000": "Order failed: insufficient cash"},
+                )
+            )
+
+        # run_agent was called with system_prompt containing the error
+        assert mock_run.called
+        call_kwargs = mock_run.call_args.kwargs
+        assert "insufficient cash" in call_kwargs["system_prompt"]
+
+    def test_decisions_dirs_created(self, tmp_path):
+        """spawn_all_agents creates per-agent decisions directories."""
+        agents = self._make_agents(2)
+        config = make_config()
+        response_data = {
+            "research_notes": "done",
+            "orders": [],
+            "strategy_updates": None,
+            "alerts": [],
+        }
+
+        mock_run = AsyncMock(return_value=response_data)
+        with (
+            patch("agent_trade.experiment.agent_runner.run_agent", mock_run),
+            patch("agent_trade.experiment.agent_runner.get_current_prices", return_value={}),
+        ):
+            asyncio.run(
+                spawn_all_agents(
+                    agents=agents,
+                    config=config,
+                    date="2026-02-20",
+                    decisions_base_dir=tmp_path,
+                )
+            )
+
+        assert (tmp_path / "agent_000" / "decisions").is_dir()
+        assert (tmp_path / "agent_001" / "decisions").is_dir()
