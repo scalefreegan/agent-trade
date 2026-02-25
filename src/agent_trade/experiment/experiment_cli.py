@@ -451,8 +451,8 @@ def resume(
         raise typer.Exit(1)
 
 
-@app.command()
-def list():
+@app.command(name="list")
+def list_experiments():
     """List all experiments.
 
     Examples:

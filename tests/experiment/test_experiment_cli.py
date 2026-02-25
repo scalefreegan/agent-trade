@@ -1,6 +1,5 @@
 """Tests for experiment_cli.py"""
 
-import builtins
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -9,7 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-import agent_trade.experiment.experiment_cli as experiment_cli_mod
 from agent_trade.experiment.experiment_cli import app, main
 from agent_trade.experiment.models import (
     AgentState,
@@ -232,13 +230,7 @@ class TestStatusCommand:
             "MSFT": Decimal("350"),
         }
 
-        # The module-level `list` command shadows the builtin; restore it
-        orig = experiment_cli_mod.list
-        experiment_cli_mod.list = builtins.list
-        try:
-            result = runner.invoke(app, ["status", "test_exp_20260220_100000"])
-        finally:
-            experiment_cli_mod.list = orig
+        result = runner.invoke(app, ["status", "test_exp_20260220_100000"])
 
         assert result.exit_code == 0
         assert "Experiment Status" in result.output
@@ -257,15 +249,9 @@ class TestStatusCommand:
             "MSFT": Decimal("350"),
         }
 
-        # The module-level `list` command shadows the builtin; restore it
-        orig = experiment_cli_mod.list
-        experiment_cli_mod.list = builtins.list
-        try:
-            result = runner.invoke(
-                app, ["status", "test_exp_20260220_100000", "--top", "1"]
-            )
-        finally:
-            experiment_cli_mod.list = orig
+        result = runner.invoke(
+            app, ["status", "test_exp_20260220_100000", "--top", "1"]
+        )
 
         assert result.exit_code == 0
         assert "Top 1" in result.output
