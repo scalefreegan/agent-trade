@@ -6,11 +6,11 @@ and calculate portfolio metrics.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
-from .models import Portfolio, StockPosition, TaxLot
+from .models import InterestPayment, Portfolio, StockPosition, TaxLot
 
 logger = logging.getLogger(__name__)
 
@@ -223,3 +223,52 @@ def calculate_portfolio_metrics(
         "unrealized_gain_loss": unrealized_gain_loss,
         "cash_pct": cash_pct,
     }
+
+
+def apply_cash_interest(
+    portfolio: Portfolio,
+    agent_id: str,
+    annual_rate: Decimal,
+    timestamp: Optional[datetime] = None,
+) -> Optional[InterestPayment]:
+    """
+    Apply daily interest to cash balance.
+
+    Uses simple daily accrual: daily_rate = annual_rate / 365.
+    Interest is only applied when cash balance is positive.
+
+    Args:
+        portfolio: Portfolio to modify (modified in-place)
+        agent_id: Agent receiving the interest
+        annual_rate: Annual interest rate (e.g. Decimal("0.05") for 5%)
+        timestamp: Timestamp for the payment (defaults to now)
+
+    Returns:
+        InterestPayment record, or None if no interest was applied
+        (zero rate or non-positive cash)
+    """
+    if annual_rate <= 0 or portfolio.cash <= 0:
+        return None
+
+    if timestamp is None:
+        timestamp = datetime.now(timezone.utc)
+
+    daily_rate = annual_rate / Decimal("365")
+    interest_amount = portfolio.cash * daily_rate
+
+    # Credit interest to cash
+    cash_before = portfolio.cash
+    portfolio.cash += interest_amount
+
+    logger.debug(
+        f"Applied interest for {agent_id}: ${interest_amount:.4f} "
+        f"on ${cash_before:.2f} cash (daily rate {daily_rate:.6f})"
+    )
+
+    return InterestPayment(
+        timestamp=timestamp,
+        agent_id=agent_id,
+        cash_balance=cash_before,
+        daily_rate=daily_rate,
+        amount=interest_amount,
+    )

@@ -13,6 +13,7 @@ from .models import (
     Order,
     LotSale,
     ExecutedTransaction,
+    InterestPayment,
     # Strategy Models
     InvestmentThesis,
     StrategyLearning,
@@ -29,6 +30,7 @@ from .models import (
 # Import functions from Phase 3 modules
 from .portfolio_tracker import (
     add_shares,
+    apply_cash_interest,
     calculate_portfolio_metrics,
     remove_shares_fifo,
     validate_position_limit,
@@ -44,6 +46,7 @@ __all__ = [
     "Order",
     "LotSale",
     "ExecutedTransaction",
+    "InterestPayment",
     # Strategy Models
     "InvestmentThesis",
     "StrategyLearning",
@@ -57,6 +60,7 @@ __all__ = [
     "DailyOutcome",
     # Portfolio Management (Phase 3)
     "add_shares",
+    "apply_cash_interest",
     "remove_shares_fifo",
     "validate_position_limit",
     "calculate_portfolio_metrics",

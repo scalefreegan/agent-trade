@@ -209,6 +209,7 @@ Portfolio value may be materially understated. These positions are valued at $0.
   - FIFO accounting: oldest shares sold first
 - **Max Position**: {int((config.max_position_pct if config else Decimal("0.50")) * 100)}% of portfolio in one stock
 - **Min Trade**: ${config.min_trade_amount if config else Decimal("1.00")}
+- **Cash Interest**: {int((config.cash_interest_rate if config else Decimal("0.05")) * 100)}% annual rate on uninvested cash (accrued daily)
 - **No Short Selling**: Can only sell stocks you own
 """
 

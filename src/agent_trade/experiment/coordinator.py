@@ -23,8 +23,10 @@ from .models import (
     ExperimentConfig,
     ExecutedTransaction,
     GameState,
+    InterestPayment,
     Order,
 )
+from .portfolio_tracker import apply_cash_interest
 from .transaction_processor import execute_order
 
 # Note: get_experiment_dir and save_strategy are imported inline within functions
@@ -89,7 +91,29 @@ def process_daily_cycle(
         logger.error(f"Unexpected error loading previous errors: {e}", exc_info=True)
         # Continue with empty errors rather than failing the cycle
 
-    # Step 2: Spawn all agents to get decisions
+    # Step 2: Apply daily cash interest to all active agents
+    interest_payments: list[InterestPayment] = []
+    if game_state.config.cash_interest_rate > 0:
+        now = datetime.now(timezone.utc)
+        for agent in active_agents:
+            payment = apply_cash_interest(
+                portfolio=agent.portfolio,
+                agent_id=agent.agent_id,
+                annual_rate=game_state.config.cash_interest_rate,
+                timestamp=now,
+            )
+            if payment:
+                interest_payments.append(payment)
+                # Track cumulative interest in agent stats
+                agent.stats.setdefault("total_interest_earned", Decimal("0"))
+                agent.stats["total_interest_earned"] += payment.amount
+        if interest_payments:
+            logger.info(
+                f"Applied daily interest to {len(interest_payments)} agents "
+                f"(annual rate: {game_state.config.cash_interest_rate})"
+            )
+
+    # Step 3: Spawn all agents to get decisions
     logger.info(f"Spawning {len(active_agents)} agents for decisions")
 
     decisions = asyncio.run(
@@ -104,7 +128,7 @@ def process_daily_cycle(
         )
     )
 
-    # Step 3: Collect all orders and get market prices
+    # Step 4: Collect all orders and get market prices
     all_orders: dict[str, list[Order]] = {}
     symbols_needed = set()
 
@@ -116,7 +140,7 @@ def process_daily_cycle(
     # Get current market prices
     current_prices = get_current_prices(list(symbols_needed))
 
-    # Step 4: Validate and execute orders
+    # Step 5: Validate and execute orders
     transactions: list[ExecutedTransaction] = []
     errors: dict[str, str] = {}
 
@@ -181,7 +205,7 @@ def process_daily_cycle(
                 )
                 raise
 
-    # Step 5: Apply strategy updates and sync strategy.md
+    # Step 6: Apply strategy updates and sync strategy.md
     from .strategy_manager import save_strategy
 
     for agent_id, decision in decisions.items():
@@ -195,7 +219,7 @@ def process_daily_cycle(
             except OSError as e:
                 logger.warning(f"Failed to sync strategy.md for {agent_id}: {e}")
 
-    # Step 6: Calculate portfolio values and check for eliminations
+    # Step 7: Calculate portfolio values and check for eliminations
     # Get all symbols across all agents
     all_symbols = set()
     for agent in game_state.agents.values():
@@ -226,7 +250,7 @@ def process_daily_cycle(
             logger.error(f"Failed to calculate portfolio value for {agent_id}: {e}")
             portfolio_values[agent_id] = Decimal("0")
 
-    # Step 7: Update game state
+    # Step 8: Update game state
     # Only increment trading_day when this is a new calendar date — reruns on the
     # same day (e.g. re-clicking "Run Day") should not advance the counter.
     last_run_date = game_state.last_run.strftime("%Y-%m-%d") if game_state.last_run else None
@@ -246,6 +270,7 @@ def process_daily_cycle(
         portfolio_values=portfolio_values,
         eliminations=eliminations,
         errors=errors,
+        interest_payments=interest_payments,
     )
 
 
