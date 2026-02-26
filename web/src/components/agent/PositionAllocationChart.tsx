@@ -23,16 +23,18 @@ export function PositionAllocationChart({ portfolio }: PositionAllocationChartPr
   const chartData = [];
   let totalValue = portfolio.cash;
 
-  // Add stock positions
-  Object.values(portfolio.positions).forEach((position) => {
-    const value = position.current_value || 0;
-    totalValue += value;
-    chartData.push({
-      symbol: position.symbol,
-      value: value,
-      isCash: false,
+  // Add stock positions (only those with shares > 0)
+  Object.values(portfolio.positions)
+    .filter((position) => position.total_shares > 0)
+    .forEach((position) => {
+      const value = position.current_value || 0;
+      totalValue += value;
+      chartData.push({
+        symbol: position.symbol,
+        value: value,
+        isCash: false,
+      });
     });
-  });
 
   // Add cash
   chartData.push({

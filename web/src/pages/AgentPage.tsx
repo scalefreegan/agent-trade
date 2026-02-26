@@ -19,22 +19,22 @@ import { PositionAllocationChart } from '../components/agent/PositionAllocationC
 import { AgentPerformanceChart } from '../components/agent/AgentPerformanceChart';
 import { StrategyPanel } from '../components/agent/StrategyPanel';
 import { StrategyEditModal } from '../components/agent/StrategyEditModal';
-import { TransactionHistory } from '../components/agent/TransactionHistory';
 import { DecisionLog } from '../components/agent/DecisionLog';
 import { HoldingsInfo } from '../components/agent/HoldingsInfo';
 import { AlertsPanel } from '../components/agent/AlertsPanel';
+import { TransactionList } from '../components/agent/TransactionList';
 import { Badge, statusVariant } from '../components/ui/Badge';
 import { InlineEdit } from '../components/ui/InlineEdit';
 import { Tabs } from '../components/ui/Tabs';
 
-type Tab = 'portfolio' | 'info' | 'performance' | 'strategy' | 'transactions' | 'decisions' | 'alerts';
+type Tab = 'portfolio' | 'history' | 'info' | 'performance' | 'strategy' | 'decisions' | 'alerts';
 
 const TABS = [
   { id: 'portfolio' as Tab, label: 'Portfolio' },
+  { id: 'history' as Tab, label: 'History' },
   { id: 'info' as Tab, label: 'Info' },
   { id: 'performance' as Tab, label: 'Performance' },
   { id: 'strategy' as Tab, label: 'Strategy' },
-  { id: 'transactions' as Tab, label: 'Transactions' },
   { id: 'decisions' as Tab, label: 'Decisions' },
   { id: 'alerts' as Tab, label: 'Alerts' },
 ];
@@ -141,6 +141,18 @@ export function AgentPage() {
           </div>
         )}
 
+        {activeTab === 'history' && (
+          <>
+            {transactionsLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading history...</div>
+            ) : transactions ? (
+              <TransactionList transactions={transactions} />
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">No transaction history available</div>
+            )}
+          </>
+        )}
+
         {activeTab === 'info' && (
           <>
             {holdingsLoading ? (
@@ -200,18 +212,6 @@ export function AgentPage() {
               </>
             ) : (
               <div className="text-center py-12 text-muted-foreground">No strategy data available</div>
-            )}
-          </>
-        )}
-
-        {activeTab === 'transactions' && (
-          <>
-            {transactionsLoading ? (
-              <div className="text-center py-12 text-muted-foreground">Loading transactions...</div>
-            ) : transactions ? (
-              <TransactionHistory history={transactions} />
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">No transaction data available</div>
             )}
           </>
         )}

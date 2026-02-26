@@ -113,10 +113,18 @@ def remove_shares_fifo(
             # Partial sale from this lot
             lot_sales.append((lot, remaining_to_sell))
             lot.shares -= remaining_to_sell
-            logger.debug(
-                f"Sold {remaining_to_sell} shares of {symbol} from lot "
-                f"(lot now has {lot.shares} shares remaining)"
-            )
+
+            # If the remaining shares are negligibly small (<= 0.0001), remove the lot entirely
+            if lot.shares <= Decimal("0.0001"):
+                logger.debug(
+                    f"Lot has negligible remaining shares ({lot.shares}), removing it"
+                )
+                lots_to_remove.append(i)
+            else:
+                logger.debug(
+                    f"Sold {remaining_to_sell} shares of {symbol} from lot "
+                    f"(lot now has {lot.shares} shares remaining)"
+                )
             remaining_to_sell = Decimal("0")
 
     # Remove fully-sold lots (in reverse order to preserve indices)
