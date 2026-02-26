@@ -145,8 +145,10 @@ export function AgentPage() {
           <>
             {transactionsLoading ? (
               <div className="text-center py-12 text-muted-foreground">Loading history...</div>
-            ) : (
+            ) : transactions ? (
               <TransactionList transactions={transactions} />
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">No transaction history available</div>
             )}
           </>
         )}

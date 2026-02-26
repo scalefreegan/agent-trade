@@ -104,9 +104,8 @@ export function PortfolioBreakdown({ portfolio, metrics }: PortfolioBreakdownPro
             {positions.map((position) => {
               const isExpanded = expandedPosition === position.symbol;
               const gainLoss = position.unrealized_gain || 0;
-              const gainLossPct = position.current_value
-                ? ((gainLoss / (position.current_value - gainLoss)) * 100)
-                : 0;
+              const costBasis = position.current_value ? position.current_value - gainLoss : 0;
+              const gainLossPct = costBasis !== 0 ? (gainLoss / costBasis) * 100 : 0;
               const glColor = gainLoss >= 0 ? 'text-gain' : 'text-loss';
 
               return (

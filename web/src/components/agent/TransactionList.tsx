@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { TransactionHistory } from '../../api/types';
 import { Card } from '../ui/Card';
 import { MetricCard } from '../ui/MetricCard';
@@ -17,6 +17,11 @@ export function TransactionList({ transactions }: TransactionListProps) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const pageSize = 20;
+
+  // Reset pagination when transactions change
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [transactions]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -302,7 +307,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                       {formatCurrency(txn.total)}
                     </td>
                     <td className="px-4 py-3.5 text-right font-mono text-sm text-foreground tabular-nums">
-                      {txn.tax_paid !== null ? formatCurrency(txn.tax_paid) : '—'}
+                      {txn.tax_paid != null ? formatCurrency(txn.tax_paid) : '—'}
                     </td>
                   </tr>
                 ))}

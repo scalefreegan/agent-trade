@@ -132,6 +132,10 @@ def main():
             print(f"Skipping {exp_id} (no state files found)")
             continue
 
+        if game_state is None:
+            print(f"Skipping {exp_id} (failed to load game state)")
+            continue
+
         total_stats["experiments_processed"] += 1
         exp_had_cleanup = False
 
