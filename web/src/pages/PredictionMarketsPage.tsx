@@ -1,11 +1,35 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useKalshiEvents, type KalshiMarket } from '../api/kalshi';
 import { MarketCard } from '../components/predictions/MarketCard';
-import { SortControls, type SortOption } from '../components/predictions/SortControls';
+import { SortControls, type SortOption, type MaxDateRange } from '../components/predictions/SortControls';
+
+function getMaxCloseDate(range: MaxDateRange): Date | null {
+  if (range === 'none') return null;
+  const now = new Date();
+  switch (range) {
+    case '1m':
+      now.setMonth(now.getMonth() + 1);
+      return now;
+    case '3m':
+      now.setMonth(now.getMonth() + 3);
+      return now;
+    case '6m':
+      now.setMonth(now.getMonth() + 6);
+      return now;
+    case '1y':
+      now.setFullYear(now.getFullYear() + 1);
+      return now;
+    default: {
+      const _exhaustive: never = range;
+      return null;
+    }
+  }
+}
 
 export function PredictionMarketsPage() {
   const [sortBy, setSortBy] = useState<SortOption>('volume_24h');
   const [statusFilter, setStatusFilter] = useState('open');
+  const [maxDateRange, setMaxDateRange] = useState<MaxDateRange>('6m');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allMarkets, setAllMarkets] = useState<KalshiMarket[]>([]);
 
@@ -36,33 +60,49 @@ export function PredictionMarketsPage() {
     }
   }, [data, cursor, error]);
 
-  // Client-side sorting
-  const sortedMarkets = useMemo(() => {
-    const markets = [...allMarkets];
+  // Client-side filtering and sorting — reacts to all filter/sort state changes
+  const displayedMarkets = useMemo(() => {
+    // Filter by max close date
+    const maxDate = getMaxCloseDate(maxDateRange);
+    let markets = allMarkets;
+    if (maxDate) {
+      const maxTime = maxDate.getTime();
+      markets = markets.filter((m) => {
+        const closeTime = new Date(m.close_time).getTime();
+        return !isNaN(closeTime) && closeTime <= maxTime;
+      });
+    }
 
+    // Sort
+    const sorted = [...markets];
     switch (sortBy) {
       case 'volume_24h':
-        return markets.sort((a, b) => (b.volume_24h || 0) - (a.volume_24h || 0));
+        return sorted.sort((a, b) => (b.volume_24h || 0) - (a.volume_24h || 0));
       case 'volume':
-        return markets.sort((a, b) => (b.volume || 0) - (a.volume || 0));
+        return sorted.sort((a, b) => (b.volume || 0) - (a.volume || 0));
       case 'open_interest':
-        return markets.sort((a, b) => (b.open_interest || 0) - (a.open_interest || 0));
+        return sorted.sort((a, b) => (b.open_interest || 0) - (a.open_interest || 0));
       case 'yes_bid':
-        return markets.sort((a, b) => (b.yes_bid || 0) - (a.yes_bid || 0));
+        return sorted.sort((a, b) => (b.yes_bid || 0) - (a.yes_bid || 0));
       case 'close_time':
-        return markets.sort(
+        return sorted.sort(
           (a, b) => new Date(a.close_time).getTime() - new Date(b.close_time).getTime()
         );
       case 'created_time':
-        return markets.sort(
+        return sorted.sort(
           (a, b) => new Date(b.created_time).getTime() - new Date(a.created_time).getTime()
         );
       default: {
         const _exhaustive: never = sortBy;
-        return markets;
+        return sorted;
       }
     }
-  }, [allMarkets, sortBy]);
+  }, [allMarkets, sortBy, maxDateRange]);
+
+  const resetPagination = () => {
+    setCursor(undefined);
+    setAllMarkets([]);
+  };
 
   const handleSortChange = (newSort: SortOption) => {
     setSortBy(newSort);
@@ -70,8 +110,11 @@ export function PredictionMarketsPage() {
 
   const handleStatusFilterChange = (newStatus: string) => {
     setStatusFilter(newStatus);
-    setCursor(undefined); // Reset pagination
-    setAllMarkets([]); // Clear accumulated markets
+    resetPagination();
+  };
+
+  const handleMaxDateRangeChange = (newRange: MaxDateRange) => {
+    setMaxDateRange(newRange);
   };
 
   const handleLoadMore = () => {
@@ -95,6 +138,8 @@ export function PredictionMarketsPage() {
         onSortChange={handleSortChange}
         statusFilter={statusFilter}
         onStatusFilterChange={handleStatusFilterChange}
+        maxDateRange={maxDateRange}
+        onMaxDateRangeChange={handleMaxDateRangeChange}
       />
 
       {/* Loading skeleton */}
@@ -128,22 +173,22 @@ export function PredictionMarketsPage() {
       )}
 
       {/* Markets grid */}
-      {!isLoading && !error && sortedMarkets.length === 0 && (
+      {!isLoading && !error && displayedMarkets.length === 0 && (
         <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
           No markets found
         </div>
       )}
 
-      {sortedMarkets.length > 0 && (
+      {displayedMarkets.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedMarkets.map((market) => (
+          {displayedMarkets.map((market) => (
             <MarketCard key={market.ticker} market={market} />
           ))}
         </div>
       )}
 
       {/* Load more button */}
-      {hasMore && sortedMarkets.length > 0 && (
+      {hasMore && displayedMarkets.length > 0 && (
         <div className="flex justify-center pt-4">
           <button
             onClick={handleLoadMore}
