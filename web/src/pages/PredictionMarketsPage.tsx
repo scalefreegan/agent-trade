@@ -21,6 +21,7 @@ function getMaxCloseDate(range: MaxDateRange): Date | null {
       return now;
     default: {
       const _exhaustive: never = range;
+      void _exhaustive;
       return null;
     }
   }
@@ -94,6 +95,7 @@ export function PredictionMarketsPage() {
         );
       default: {
         const _exhaustive: never = sortBy;
+        void _exhaustive;
         return sorted;
       }
     }
