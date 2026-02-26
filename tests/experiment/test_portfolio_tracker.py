@@ -242,6 +242,32 @@ class TestRemoveSharesFifo:
                 as_of=now + timedelta(days=10),
             )
 
+    def test_remove_shares_negligible_remainder_removes_lot(self):
+        """Test that selling shares leaving negligible remainder (<0.0001) removes the lot."""
+        now = datetime.now(timezone.utc)
+        position = StockPosition(
+            symbol="AAPL",
+            lots=[
+                TaxLot(shares=Decimal("10.0000"), cost_basis=Decimal("100"), purchase_date=now)
+            ],
+        )
+        portfolio = Portfolio(cash=Decimal("500"), positions=[position])
+
+        # Sell 9.9999 shares, leaving 0.0001 shares (should remove the lot and position)
+        lot_sales = remove_shares_fifo(
+            portfolio=portfolio,
+            symbol="AAPL",
+            shares_to_sell=Decimal("9.9999"),
+            as_of=now + timedelta(days=100),
+        )
+
+        assert len(lot_sales) == 1
+        assert lot_sales[0][1] == Decimal("9.9999")
+
+        # Position should be removed because remaining shares are < 0.0001
+        assert portfolio.get_position("AAPL") is None
+        assert len(portfolio.positions) == 0
+
 
 class TestValidatePositionLimit:
     """Tests for validate_position_limit function."""
