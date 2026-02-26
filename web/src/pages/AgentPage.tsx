@@ -23,14 +23,16 @@ import { TransactionHistory } from '../components/agent/TransactionHistory';
 import { DecisionLog } from '../components/agent/DecisionLog';
 import { HoldingsInfo } from '../components/agent/HoldingsInfo';
 import { AlertsPanel } from '../components/agent/AlertsPanel';
+import { ClosedPositions } from '../components/agent/ClosedPositions';
 import { Badge, statusVariant } from '../components/ui/Badge';
 import { InlineEdit } from '../components/ui/InlineEdit';
 import { Tabs } from '../components/ui/Tabs';
 
-type Tab = 'portfolio' | 'info' | 'performance' | 'strategy' | 'transactions' | 'decisions' | 'alerts';
+type Tab = 'portfolio' | 'history' | 'info' | 'performance' | 'strategy' | 'transactions' | 'decisions' | 'alerts';
 
 const TABS = [
   { id: 'portfolio' as Tab, label: 'Portfolio' },
+  { id: 'history' as Tab, label: 'History' },
   { id: 'info' as Tab, label: 'Info' },
   { id: 'performance' as Tab, label: 'Performance' },
   { id: 'strategy' as Tab, label: 'Strategy' },
@@ -139,6 +141,16 @@ export function AgentPage() {
             </div>
             <PortfolioBreakdown portfolio={agent.portfolio} metrics={agent.metrics} />
           </div>
+        )}
+
+        {activeTab === 'history' && (
+          <>
+            {transactionsLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading history...</div>
+            ) : (
+              <ClosedPositions portfolio={agent.portfolio} transactions={transactions} />
+            )}
+          </>
         )}
 
         {activeTab === 'info' && (
