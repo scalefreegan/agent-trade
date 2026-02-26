@@ -19,6 +19,10 @@ function getMaxCloseDate(range: MaxDateRange): Date | null {
     case '1y':
       now.setFullYear(now.getFullYear() + 1);
       return now;
+    default: {
+      const _exhaustive: never = range;
+      return null;
+    }
   }
 }
 
@@ -102,7 +106,6 @@ export function PredictionMarketsPage() {
 
   const handleSortChange = (newSort: SortOption) => {
     setSortBy(newSort);
-    resetPagination();
   };
 
   const handleStatusFilterChange = (newStatus: string) => {
@@ -112,7 +115,6 @@ export function PredictionMarketsPage() {
 
   const handleMaxDateRangeChange = (newRange: MaxDateRange) => {
     setMaxDateRange(newRange);
-    resetPagination();
   };
 
   const handleLoadMore = () => {
