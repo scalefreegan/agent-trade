@@ -31,6 +31,36 @@ export function TransactionList({ transactions }: TransactionListProps) {
     }).format(value);
   };
 
+  // Helper: safe date parsing that returns 0 for malformed dates
+  const safeDate = (dateStr: string): number => {
+    const t = new Date(dateStr).getTime();
+    return Number.isNaN(t) ? 0 : t;
+  };
+
+  // Helper: extract sort value with exhaustive type checking
+  const getSortValue = (txn: TransactionHistory['transactions'][0], field: SortField): number | string => {
+    switch (field) {
+      case 'date':
+        return safeDate(txn.date);
+      case 'action':
+        return txn.action;
+      case 'symbol':
+        return txn.symbol;
+      case 'shares':
+        return txn.shares;
+      case 'price':
+        return txn.price;
+      case 'total':
+        return txn.total;
+      case 'tax':
+        return txn.tax_paid ?? 0;
+      default: {
+        const _exhaustive: never = field;
+        return _exhaustive;
+      }
+    }
+  };
+
   // Filter and sort transactions
   const filteredAndSorted = useMemo(() => {
     if (!transactions) return [];
@@ -47,40 +77,8 @@ export function TransactionList({ transactions }: TransactionListProps) {
 
     // Apply sorting
     const sorted = [...filtered].sort((a, b) => {
-      let aVal: any;
-      let bVal: any;
-
-      switch (sortField) {
-        case 'date':
-          aVal = new Date(a.date).getTime();
-          bVal = new Date(b.date).getTime();
-          break;
-        case 'action':
-          aVal = a.action;
-          bVal = b.action;
-          break;
-        case 'symbol':
-          aVal = a.symbol;
-          bVal = b.symbol;
-          break;
-        case 'shares':
-          aVal = a.shares;
-          bVal = b.shares;
-          break;
-        case 'price':
-          aVal = a.price;
-          bVal = b.price;
-          break;
-        case 'total':
-          aVal = a.total;
-          bVal = b.total;
-          break;
-        case 'tax':
-          aVal = a.tax_paid ?? 0;
-          bVal = b.tax_paid ?? 0;
-          break;
-      }
-
+      const aVal = getSortValue(a, sortField);
+      const bVal = getSortValue(b, sortField);
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
