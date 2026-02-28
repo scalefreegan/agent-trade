@@ -416,3 +416,36 @@ export interface ExperimentAgentInfo {
   name: string;
   philosophy: string;
 }
+
+// ==============================================================================
+// Conversation Types
+// ==============================================================================
+
+export interface ConversationMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  status: 'idle' | 'responding';
+}
+
+export interface ConversationDetail {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: ConversationMessage[];
+  status: 'idle' | 'responding';
+}
+
+export interface ConversationListResponse {
+  conversations: ConversationSummary[];
+}

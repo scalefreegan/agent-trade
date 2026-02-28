@@ -12,6 +12,7 @@ from agent_trade.web.routers import (
     advisor,
     agents,
     analysis,
+    conversation,
     experiments,
     performance,
     runs,
@@ -67,6 +68,7 @@ app.include_router(runs.router, prefix="/api/v1")
 app.include_router(analysis.router, prefix="/api/v1")
 app.include_router(search.router, prefix="/api/v1")
 app.include_router(advisor.router, prefix="/api/v1")
+app.include_router(conversation.router, prefix="/api/v1")
 
 
 @app.get("/api/health")
