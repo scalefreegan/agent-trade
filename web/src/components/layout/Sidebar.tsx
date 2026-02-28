@@ -4,6 +4,7 @@ import { DashboardIcon } from '../../assets/icons/DashboardIcon';
 import { SearchIcon } from '../../assets/icons/SearchIcon';
 import { PredictionIcon } from '../../assets/icons/PredictionIcon';
 import { AdvisorIcon } from '../../assets/icons/AdvisorIcon';
+import { ChatIcon } from '../../assets/icons/ChatIcon';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -105,6 +106,15 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose, closeB
             <AdvisorIcon className="w-5 h-5 shrink-0" />
             <span className="ml-3 text-sm font-medium whitespace-nowrap">Advisor</span>
           </Link>
+          <Link
+            to="/chat"
+            onClick={onMobileClose}
+            aria-current={location.pathname.startsWith('/chat') ? 'page' : undefined}
+            className={`flex items-center rounded-lg px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isActive('/chat')}`}
+          >
+            <ChatIcon className="w-5 h-5 shrink-0" />
+            <span className="ml-3 text-sm font-medium whitespace-nowrap">Chat</span>
+          </Link>
         </nav>
       </div>
     </>
@@ -179,6 +189,17 @@ function SidebarContent({ collapsed, onToggle, isActive }: SidebarContentProps) 
         >
           <AdvisorIcon className="w-5 h-5 shrink-0" />
           {!collapsed && <span className="ml-3 text-sm font-medium whitespace-nowrap">Advisor</span>}
+        </Link>
+        <Link
+          to="/chat"
+          title={collapsed ? 'Chat' : undefined}
+          aria-current={location.pathname.startsWith('/chat') ? 'page' : undefined}
+          className={`flex items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isActive('/chat')} ${
+            collapsed ? 'justify-center px-0 py-3' : 'px-4 py-3'
+          }`}
+        >
+          <ChatIcon className="w-5 h-5 shrink-0" />
+          {!collapsed && <span className="ml-3 text-sm font-medium whitespace-nowrap">Chat</span>}
         </Link>
       </nav>
 
