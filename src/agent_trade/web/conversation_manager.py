@@ -27,6 +27,7 @@ _PROJECT_ROOT = str(Path(__file__).parent.parent.parent.parent)
 MAX_HISTORY_MESSAGES = 40  # keep last N messages (20 turns)
 MAX_PROMPT_CHARS = 150_000
 
+
 class MessageRole(str, Enum):
     USER = "user"
     ASSISTANT = "assistant"
