@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useConversation, useSendMessage } from '../../api/conversation';
 import type { ConversationMessage } from '../../api/types';
 
@@ -181,13 +182,32 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
 
       {/* Message content */}
       <div
-        className={`rounded-2xl px-4 py-3 max-w-[80%] text-sm leading-relaxed whitespace-pre-wrap ${
+        className={`rounded-2xl px-4 py-3 max-w-[80%] text-sm leading-relaxed ${
           isUser
-            ? 'bg-primary text-primary-foreground rounded-tr-sm'
+            ? 'bg-primary text-primary-foreground rounded-tr-sm whitespace-pre-wrap'
             : 'bg-muted text-foreground rounded-tl-sm'
         }`}
       >
-        {message.content}
+        {isUser ? message.content : (
+          <div className="
+            prose prose-sm max-w-none dark:prose-invert
+            prose-headings:text-foreground prose-headings:font-semibold
+            prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2
+            prose-h3:text-sm
+            prose-p:text-foreground prose-p:my-1.5
+            prose-strong:text-foreground
+            prose-li:text-foreground prose-li:my-0.5
+            prose-code:bg-white/10 prose-code:text-foreground prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
+            prose-pre:bg-white/10 prose-pre:border prose-pre:border-border prose-pre:rounded-md
+            prose-table:border-collapse
+            prose-th:border prose-th:border-border prose-th:bg-white/5 prose-th:px-2 prose-th:py-1.5 prose-th:text-xs
+            prose-td:border prose-td:border-border prose-td:px-2 prose-td:py-1.5 prose-td:text-xs
+            prose-a:text-primary hover:prose-a:text-primary/80
+            prose-blockquote:border-l-4 prose-blockquote:border-primary/50 prose-blockquote:text-muted-foreground prose-blockquote:not-italic
+          ">
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );
