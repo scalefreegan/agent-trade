@@ -43,11 +43,15 @@ export function useCreateConversation() {
 export function useSendMessage(conversationId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (content: string) =>
-      postApi<ConversationMessage>(
+    mutationFn: (content: string) => {
+      if (!conversationId) {
+        return Promise.reject(new Error('No conversation selected'));
+      }
+      return postApi<ConversationMessage>(
         `/conversations/${conversationId}/messages`,
         { content }
-      ),
+      );
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ['conversation', conversationId],
@@ -60,10 +64,14 @@ export function useSendMessage(conversationId: string | null) {
 export function useUpdateConversationTitle(conversationId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (title: string) =>
-      patchApi<ConversationDetail>(`/conversations/${conversationId}`, {
+    mutationFn: (title: string) => {
+      if (!conversationId) {
+        return Promise.reject(new Error('No conversation selected'));
+      }
+      return patchApi<ConversationDetail>(`/conversations/${conversationId}`, {
         title,
-      }),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ['conversation', conversationId],
