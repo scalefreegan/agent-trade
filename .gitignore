@@ -213,3 +213,9 @@ memorybank
 web/node_modules/
 web/dist/
 web/.vite/
+
+# Gas Town (added by gt)
+.runtime/
+.claude/
+.beads/
+.logs/
