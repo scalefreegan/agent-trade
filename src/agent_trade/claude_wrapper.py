@@ -93,8 +93,8 @@ async def run_agent(
         max_turns: Maximum agentic turns (safety bound).
         timeout: Wall-clock timeout in seconds before killing the process.
             If None or <= 0, no timeout is applied (caller controls the deadline).
-        allowed_tools: Reserved for future use (currently unused; all tools
-            are allowed via --dangerously-skip-permissions).
+        allowed_tools: List of tool names the agent may use without
+            prompting. Defaults to the agent-trade MCP tools only.
         cwd: Working directory for the subprocess. Defaults to project root.
         mcp_config_path: Path to an MCP config JSON. If None, a temporary
             config is generated pointing at the agent-trade server.
@@ -107,6 +107,17 @@ async def run_agent(
         TimeoutError: If the process exceeds the timeout.
     """
     work_dir = cwd or _PROJECT_ROOT
+
+    # Default to only agent-trade MCP tools when no explicit list is given.
+    _DEFAULT_ALLOWED_TOOLS = [
+        "mcp__agent-trade__get_stock_info",
+        "mcp__agent-trade__get_historical_prices",
+        "mcp__agent-trade__get_dividend_history",
+        "mcp__agent-trade__get_stock_splits",
+        "mcp__agent-trade__get_stock_news",
+        "mcp__agent-trade__search_news",
+    ]
+    effective_tools = allowed_tools if allowed_tools is not None else _DEFAULT_ALLOWED_TOOLS
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         # Write system prompt to temp file if provided
@@ -125,10 +136,12 @@ async def run_agent(
             "-p",
             prompt,
             "--output-format", "json",
-            "--dangerously-skip-permissions",
             "--max-turns", str(max_turns),
             "--mcp-config", effective_mcp_path,
         ]
+
+        for tool in effective_tools:
+            cmd.extend(["--allowedTools", tool])
 
         if sys_prompt_path:
             with open(sys_prompt_path) as f:
