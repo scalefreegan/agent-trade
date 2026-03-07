@@ -114,6 +114,38 @@ class TestRunAgent:
             asyncio.run(run_agent("test prompt"))
 
     @patch("agent_trade.claude_wrapper.asyncio.create_subprocess_exec")
+    def test_run_agent_uses_allowed_tools_not_skip_permissions(self, mock_exec):
+        """Command uses --allowedTools instead of --dangerously-skip-permissions."""
+        agent_text = '{"ok": true}'
+        wrapper = json.dumps({"type": "result", "result": agent_text})
+        mock_exec.return_value = _mock_process(wrapper.encode())
+
+        asyncio.run(run_agent("test prompt"))
+
+        cmd_args = mock_exec.call_args[0]
+        assert "--dangerously-skip-permissions" not in cmd_args
+        assert "--allowedTools" in cmd_args
+        # Default MCP tools should be present
+        tool_indices = [i for i, a in enumerate(cmd_args) if a == "--allowedTools"]
+        tool_values = [cmd_args[i + 1] for i in tool_indices]
+        assert "mcp__agent-trade__get_stock_info" in tool_values
+
+    @patch("agent_trade.claude_wrapper.asyncio.create_subprocess_exec")
+    def test_run_agent_custom_allowed_tools(self, mock_exec):
+        """Caller can override allowed_tools to restrict the tool set."""
+        agent_text = '{"ok": true}'
+        wrapper = json.dumps({"type": "result", "result": agent_text})
+        mock_exec.return_value = _mock_process(wrapper.encode())
+
+        asyncio.run(run_agent("test prompt", allowed_tools=["mcp__agent-trade__get_stock_info"]))
+
+        cmd_args = mock_exec.call_args[0]
+        assert "--dangerously-skip-permissions" not in cmd_args
+        tool_indices = [i for i, a in enumerate(cmd_args) if a == "--allowedTools"]
+        tool_values = [cmd_args[i + 1] for i in tool_indices]
+        assert tool_values == ["mcp__agent-trade__get_stock_info"]
+
+    @patch("agent_trade.claude_wrapper.asyncio.create_subprocess_exec")
     def test_run_agent_timeout(self, mock_exec):
         """Process exceeding timeout raises TimeoutError (lines 152-158)."""
         proc = AsyncMock()
