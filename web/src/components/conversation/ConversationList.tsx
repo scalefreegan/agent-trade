@@ -5,9 +5,10 @@ interface ConversationListProps {
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
+  onDelete?: (id: string) => void;
 }
 
-export function ConversationList({ activeId, onSelect, onNew }: ConversationListProps) {
+export function ConversationList({ activeId, onSelect, onNew, onDelete }: ConversationListProps) {
   const { data, isLoading } = useConversations();
   const deleteMutation = useDeleteConversation();
 
@@ -50,7 +51,11 @@ export function ConversationList({ activeId, onSelect, onNew }: ConversationList
             conversation={conv}
             isActive={conv.id === activeId}
             onSelect={() => onSelect(conv.id)}
-            onDelete={() => deleteMutation.mutate(conv.id)}
+            onDelete={() => {
+              deleteMutation.mutate(conv.id, {
+                onSuccess: () => onDelete?.(conv.id),
+              });
+            }}
           />
         ))}
       </div>

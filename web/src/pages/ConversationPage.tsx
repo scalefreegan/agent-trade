@@ -22,6 +22,13 @@ export function ConversationPage() {
     setShowList(false);
   };
 
+  const handleDelete = (id: string) => {
+    if (id === activeConversationId) {
+      setActiveConversationId(null);
+      setShowList(true);
+    }
+  };
+
   return (
     <div className="h-[calc(100vh-theme(spacing.20))]">
       <div className="flex h-full rounded-xl border border-border overflow-hidden bg-card shadow-card">
@@ -36,6 +43,7 @@ export function ConversationPage() {
             activeId={activeConversationId}
             onSelect={handleSelect}
             onNew={handleNew}
+            onDelete={handleDelete}
           />
         </div>
 
