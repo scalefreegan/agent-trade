@@ -252,8 +252,9 @@ class ConversationManager:
         conv = self.get_conversation(conv_id)
         if not conv:
             return None
-        conv.title = title
-        conv.updated_at = datetime.now()
+        with conv._lock:
+            conv.title = title
+            conv.updated_at = datetime.now()
         return conv
 
     def send_message(self, conv_id: str, content: str) -> tuple[Message | None, str | None]:
