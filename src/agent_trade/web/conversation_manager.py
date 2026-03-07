@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = str(Path(__file__).parent.parent.parent.parent)
 
+# Prompt size guards — prevent unbounded growth when history gets long.
+# ~4 chars per token; 150k chars ≈ 37k tokens, well within Claude's window
+# while leaving room for system prompt, tool results, and response.
+MAX_HISTORY_MESSAGES = 40  # keep last N messages (20 turns)
+MAX_PROMPT_CHARS = 150_000
+
 
 class MessageRole(str, Enum):
     USER = "user"
@@ -102,18 +108,33 @@ async def _run_conversation_turn(
         RuntimeError: If the process exits with non-zero status.
         TimeoutError: If the process exceeds the timeout.
     """
-    # Build the prompt with full conversation context
-    history_parts = []
-    for msg in messages[:-1]:  # All but the latest user message
+    # Build the prompt with conversation context, guarding against unbounded growth.
+    latest_msg = messages[-1].content
+    prior = messages[:-1]  # All but the latest user message
+
+    # Truncate to last MAX_HISTORY_MESSAGES to bound prompt size.
+    if len(prior) > MAX_HISTORY_MESSAGES:
+        dropped = len(prior) - MAX_HISTORY_MESSAGES
+        prior = prior[-MAX_HISTORY_MESSAGES:]
+        logger.info("Truncated conversation history: dropped %d oldest messages", dropped)
+
+    # Serialize history, then enforce a character budget.
+    history_parts: list[str] = []
+    for msg in prior:
         prefix = "User" if msg.role == MessageRole.USER else "Assistant"
         history_parts.append(f"{prefix}: {msg.content}")
 
-    latest_msg = messages[-1].content
+    # Trim oldest messages until we fit within MAX_PROMPT_CHARS.
+    history_text = "\n\n".join(history_parts)
+    while history_parts and len(history_text) + len(latest_msg) > MAX_PROMPT_CHARS:
+        history_parts.pop(0)
+        history_text = "\n\n".join(history_parts)
+        logger.info("Trimmed oldest history entry to stay within prompt char budget")
 
     if history_parts:
         prompt = (
             "Here is the conversation so far:\n\n"
-            + "\n\n".join(history_parts)
+            + history_text
             + f"\n\nUser: {latest_msg}"
             + "\n\nPlease respond to the latest user message, taking into account the full conversation context above."
         )
