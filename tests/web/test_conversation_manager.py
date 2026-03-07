@@ -1,9 +1,10 @@
-"""Tests for conversation_manager prompt truncation guards.
+"""Tests for conversation_manager prompt truncation guards and deletion guards.
 
 Covers:
 - Message count truncation (MAX_HISTORY_MESSAGES)
 - Character budget enforcement (MAX_PROMPT_CHARS)
 - Small conversations pass through unchanged
+- Rejection of deletion while RESPONDING
 """
 
 import uuid
@@ -11,14 +12,20 @@ from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from agent_trade.web.conversation_manager import (
     MAX_HISTORY_MESSAGES,
     MAX_PROMPT_CHARS,
+    ConversationManager,
+    ConversationStatus,
     Message,
     MessageRole,
     _run_conversation_turn,
+    conversation_manager,
 )
+from agent_trade.web.routers.conversation import router
 
 
 def _make_messages(n: int, content: str = "hello") -> list[Message]:
@@ -45,6 +52,11 @@ def _make_messages(n: int, content: str = "hello") -> list[Message]:
             )
         )
     return msgs
+
+
+# ---------------------------------------------------------------------------
+# Prompt truncation tests
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
@@ -155,3 +167,74 @@ async def test_single_message_no_history():
 
         assert prompt == "just one question"
         assert "conversation so far" not in prompt
+
+
+# ---------------------------------------------------------------------------
+# Deletion-while-RESPONDING tests (ConversationManager unit tests)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clear_conversations():
+    """Clear all conversations between tests (keep singleton intact)."""
+    conversation_manager._conversations.clear()
+    yield
+    conversation_manager._conversations.clear()
+
+
+def test_delete_idle_conversation():
+    conv = conversation_manager.create_conversation("test")
+    deleted, error = conversation_manager.delete_conversation(conv.id)
+    assert deleted is True
+    assert error is None
+    assert conversation_manager.get_conversation(conv.id) is None
+
+
+def test_delete_nonexistent_conversation():
+    deleted, error = conversation_manager.delete_conversation("does-not-exist")
+    assert deleted is False
+    assert error is None
+
+
+def test_delete_responding_conversation_returns_error():
+    conv = conversation_manager.create_conversation("test")
+    conv.status = ConversationStatus.RESPONDING
+
+    deleted, error = conversation_manager.delete_conversation(conv.id)
+    assert deleted is False
+    assert error is not None
+    assert "responding" in error.lower()
+    # Conversation should still exist
+    assert conversation_manager.get_conversation(conv.id) is not None
+
+
+# ---------------------------------------------------------------------------
+# Router integration tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def client():
+    app = FastAPI()
+    app.include_router(router)
+    return TestClient(app)
+
+
+def test_delete_endpoint_idle_returns_204(client):
+    conv = conversation_manager.create_conversation("test")
+    resp = client.delete(f"/conversations/{conv.id}")
+    assert resp.status_code == 204
+
+
+def test_delete_endpoint_not_found_returns_404(client):
+    resp = client.delete("/conversations/nonexistent")
+    assert resp.status_code == 404
+
+
+def test_delete_endpoint_responding_returns_409(client):
+    conv = conversation_manager.create_conversation("test")
+    conv.status = ConversationStatus.RESPONDING
+
+    resp = client.delete(f"/conversations/{conv.id}")
+    assert resp.status_code == 409
+    assert "responding" in resp.json()["detail"].lower()

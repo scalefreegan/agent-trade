@@ -107,8 +107,11 @@ async def get_conversation(conversation_id: str) -> ConversationDetail:
 
 @router.delete("/conversations/{conversation_id}", status_code=204)
 async def delete_conversation(conversation_id: str):
-    """Delete a conversation session."""
-    if not conversation_manager.delete_conversation(conversation_id):
+    """Delete a conversation session. Returns 409 if the conversation is responding."""
+    deleted, error = conversation_manager.delete_conversation(conversation_id)
+    if error:
+        raise HTTPException(status_code=409, detail=error)
+    if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
 
