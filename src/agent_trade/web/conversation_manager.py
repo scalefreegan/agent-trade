@@ -234,9 +234,20 @@ class ConversationManager:
         convs.sort(key=lambda c: c.updated_at, reverse=True)
         return convs
 
-    def delete_conversation(self, conv_id: str) -> bool:
+    def delete_conversation(self, conv_id: str) -> tuple[bool, str | None]:
+        """Delete a conversation. Returns (success, error_message).
+
+        Rejects deletion while the conversation is RESPONDING to avoid
+        orphaning the background subprocess.
+        """
         with self._lock:
-            return self._conversations.pop(conv_id, None) is not None
+            conv = self._conversations.get(conv_id)
+            if conv is None:
+                return False, None
+            if conv.status == ConversationStatus.RESPONDING:
+                return False, "Cannot delete conversation while it is responding"
+            del self._conversations[conv_id]
+            return True, None
 
     def update_title(self, conv_id: str, title: str) -> Conversation | None:
         conv = self.get_conversation(conv_id)
