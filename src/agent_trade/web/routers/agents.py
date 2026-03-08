@@ -1,8 +1,10 @@
 """Agent detail endpoints."""
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
+from functools import partial
 from pathlib import Path
 from typing import Any, Optional
 
@@ -187,8 +189,11 @@ def _collect_portfolio_symbols(portfolio: Portfolio) -> set[str]:
 @router.get("/experiments/{experiment_id}/agents")
 async def list_agents(experiment_id: str) -> list[AgentStateResponse]:
     """List all agents in an experiment."""
+    loop = asyncio.get_running_loop()
     try:
-        game_state = load_game_state(experiment_id)
+        game_state = await loop.run_in_executor(
+            None, partial(load_game_state, experiment_id)
+        )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -201,7 +206,13 @@ async def list_agents(experiment_id: str) -> list[AgentStateResponse]:
     for agent in game_state.agents.values():
         all_symbols.update(_collect_portfolio_symbols(agent.portfolio))
 
-    current_prices = get_current_prices(list(all_symbols)) if all_symbols else {}
+    current_prices = (
+        await loop.run_in_executor(
+            None, partial(get_current_prices, list(all_symbols))
+        )
+        if all_symbols
+        else {}
+    )
 
     # Convert to response format
     agents = []
@@ -223,8 +234,11 @@ async def get_agent_detail(
     experiment_id: str, agent_id: str
 ) -> AgentDetailResponse:
     """Get complete agent details."""
+    loop = asyncio.get_running_loop()
     try:
-        game_state = load_game_state(experiment_id)
+        game_state = await loop.run_in_executor(
+            None, partial(load_game_state, experiment_id)
+        )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -238,7 +252,13 @@ async def get_agent_detail(
 
     # Get current prices for portfolio valuation (stocks + derivatives)
     symbols = _collect_portfolio_symbols(agent.portfolio)
-    current_prices = get_current_prices(list(symbols)) if symbols else {}
+    current_prices = (
+        await loop.run_in_executor(
+            None, partial(get_current_prices, list(symbols))
+        )
+        if symbols
+        else {}
+    )
 
     # Build portfolio response
     portfolio_resp = _build_portfolio_response(agent.portfolio, current_prices)
@@ -280,8 +300,11 @@ async def update_agent(
     experiment_id: str, agent_id: str, body: UpdateAgentRequest
 ) -> UpdateAgentResponse:
     """Update an agent's name and/or description."""
+    loop = asyncio.get_running_loop()
     try:
-        game_state = load_game_state(experiment_id)
+        game_state = await loop.run_in_executor(
+            None, partial(load_game_state, experiment_id)
+        )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -303,7 +326,7 @@ async def update_agent(
         agent.description = body.description.strip() or None
 
     try:
-        save_game_state(game_state)
+        await loop.run_in_executor(None, partial(save_game_state, game_state))
     except Exception as e:
         logger.exception(f"Failed to save game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -332,8 +355,11 @@ async def get_agent_strategy(
     experiment_id: str, agent_id: str
 ) -> StrategyResponse:
     """Get agent strategy."""
+    loop = asyncio.get_running_loop()
     try:
-        strategy = load_strategy(experiment_id, agent_id)
+        strategy = await loop.run_in_executor(
+            None, partial(load_strategy, experiment_id, agent_id)
+        )
     except Exception as e:
         logger.exception(f"Failed to load strategy for {agent_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -368,8 +394,11 @@ async def get_agent_transactions(
     experiment_id: str, agent_id: str
 ) -> TransactionHistoryResponse:
     """Get agent transaction history."""
+    loop = asyncio.get_running_loop()
     try:
-        outcomes = load_all_daily_outcomes(experiment_id)
+        outcomes = await loop.run_in_executor(
+            None, partial(load_all_daily_outcomes, experiment_id)
+        )
     except Exception as e:
         logger.exception(f"Failed to load outcomes for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -555,8 +584,11 @@ async def get_agent_holdings(
     experiment_id: str, agent_id: str
 ) -> HoldingsInfoResponse:
     """Get per-holding breakdown with buy rationale from decision history."""
+    loop = asyncio.get_running_loop()
     try:
-        game_state = load_game_state(experiment_id)
+        game_state = await loop.run_in_executor(
+            None, partial(load_game_state, experiment_id)
+        )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -570,7 +602,13 @@ async def get_agent_holdings(
 
     # Get current prices
     symbols = [pos.symbol for pos in agent.portfolio.positions]
-    current_prices = get_current_prices(symbols) if symbols else {}
+    current_prices = (
+        await loop.run_in_executor(
+            None, partial(get_current_prices, symbols)
+        )
+        if symbols
+        else {}
+    )
 
     # Scan decision files for buy reasoning per symbol
     agent_dir = get_experiment_dir(experiment_id) / "agents" / agent_id / "decisions"
@@ -591,6 +629,38 @@ async def get_agent_holdings(
             except (IOError, OSError, json.JSONDecodeError) as e:
                 logger.warning(f"Failed to read decision file {decision_file}: {e}")
 
+    # Fetch stock info and price history for ALL symbols in parallel
+    async def _fetch_stock_info(symbol: str) -> tuple[str, Any]:
+        try:
+            info = await loop.run_in_executor(
+                None, partial(get_stock_info, symbol)
+            )
+            return (symbol, info)
+        except Exception as e:
+            logger.warning(f"Failed to fetch stock info for {symbol}: {e}")
+            return (symbol, None)
+
+    async def _fetch_price_history(symbol: str) -> tuple[str, list[PricePoint]]:
+        try:
+            hist = await loop.run_in_executor(
+                None, partial(get_historical_prices, symbol, "3mo")
+            )
+            return (symbol, [
+                PricePoint(date=p.date, close=float(p.close))
+                for p in hist.data
+            ])
+        except Exception as e:
+            logger.warning(f"Failed to fetch price history for {symbol}: {e}")
+            return (symbol, [])
+
+    # Run all info + history fetches concurrently
+    info_results, history_results = await asyncio.gather(
+        asyncio.gather(*[_fetch_stock_info(sym) for sym in symbols]),
+        asyncio.gather(*[_fetch_price_history(sym) for sym in symbols]),
+    )
+    stock_info_map: dict[str, Any] = dict(info_results)
+    price_history_map: dict[str, list[PricePoint]] = dict(history_results)
+
     holdings = []
     for pos in agent.portfolio.positions:
         current_price = current_prices.get(pos.symbol)
@@ -607,14 +677,13 @@ async def get_agent_holdings(
             else "unknown"
         )
 
-        # Fetch business info and 90-day price history
+        # Use pre-fetched stock info
         company_name = sector = industry = business_summary = None
         market_cap = None
         pe_ratio = fifty_two_week_high = fifty_two_week_low = None
-        price_history: list[PricePoint] = []
 
-        try:
-            info = get_stock_info(pos.symbol)
+        info = stock_info_map.get(pos.symbol)
+        if info is not None:
             company_name = info.name
             sector = info.sector
             industry = info.industry
@@ -623,17 +692,6 @@ async def get_agent_holdings(
             pe_ratio = float(info.pe_ratio) if info.pe_ratio is not None else None
             fifty_two_week_high = float(info.fifty_two_week_high) if info.fifty_two_week_high is not None else None
             fifty_two_week_low = float(info.fifty_two_week_low) if info.fifty_two_week_low is not None else None
-        except Exception as e:
-            logger.warning(f"Failed to fetch stock info for {pos.symbol}: {e}")
-
-        try:
-            hist = get_historical_prices(pos.symbol, period="3mo")
-            price_history = [
-                PricePoint(date=p.date, close=float(p.close))
-                for p in hist.data
-            ]
-        except Exception as e:
-            logger.warning(f"Failed to fetch price history for {pos.symbol}: {e}")
 
         holdings.append(
             HoldingRationaleResponse(
@@ -653,7 +711,7 @@ async def get_agent_holdings(
                 fifty_two_week_high=fifty_two_week_high,
                 fifty_two_week_low=fifty_two_week_low,
                 business_summary=business_summary,
-                price_history=price_history,
+                price_history=price_history_map.get(pos.symbol, []),
             )
         )
 
@@ -665,8 +723,11 @@ async def get_agent_alerts(
     experiment_id: str, agent_id: str
 ) -> AlertsResponse:
     """Get alerts flagged by the agent across all decision files."""
+    loop = asyncio.get_running_loop()
     try:
-        game_state = load_game_state(experiment_id)
+        game_state = await loop.run_in_executor(
+            None, partial(load_game_state, experiment_id)
+        )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -711,8 +772,11 @@ async def get_agent_benchmarks(
     experiment_id: str, agent_id: str
 ) -> BenchmarkResponse:
     """Get benchmark comparison data (SPY + sector ETFs) normalized to starting capital."""
+    loop = asyncio.get_running_loop()
     try:
-        game_state = load_game_state(experiment_id)
+        game_state = await loop.run_in_executor(
+            None, partial(load_game_state, experiment_id)
+        )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -724,15 +788,27 @@ async def get_agent_benchmarks(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    # Determine sector ETFs from held symbols
-    etf_symbols: set[str] = {"SPY"}
-    for pos in agent.portfolio.positions:
+    # Determine sector ETFs from held symbols — fetch all stock info in parallel
+    held_symbols = [pos.symbol for pos in agent.portfolio.positions]
+
+    async def _fetch_sector(symbol: str) -> Optional[str]:
         try:
-            info = get_stock_info(pos.symbol)
-            if info.sector and info.sector in SECTOR_ETFS:
-                etf_symbols.add(SECTOR_ETFS[info.sector])
+            info = await loop.run_in_executor(
+                None, partial(get_stock_info, symbol)
+            )
+            return info.sector
         except Exception as e:
-            logger.warning(f"Could not get sector for {pos.symbol}: {e}")
+            logger.warning(f"Could not get sector for {symbol}: {e}")
+            return None
+
+    sector_results = await asyncio.gather(
+        *[_fetch_sector(sym) for sym in held_symbols]
+    )
+
+    etf_symbols: set[str] = {"SPY"}
+    for sector in sector_results:
+        if sector and sector in SECTOR_ETFS:
+            etf_symbols.add(SECTOR_ETFS[sector])
 
     # Determine date range from experiment creation
     start_date = game_state.config.created_at.strftime("%Y-%m-%d")
@@ -753,18 +829,17 @@ async def get_agent_benchmarks(
         "XLC": "Communication (XLC)",
     }
 
-    benchmarks: list[BenchmarkSeries] = []
-    for etf in sorted(etf_symbols):
+    # Fetch all ETF histories in parallel
+    def _fetch_etf_history(etf: str) -> Optional[BenchmarkSeries]:
         try:
             ticker = yf.Ticker(etf)
             hist = ticker.history(start=start_date, interval="1d")
             if hist.empty:
-                continue
+                return None
 
-            # Normalize to starting capital
             first_price = float(hist["Close"].iloc[0])
             if first_price == 0:
-                continue
+                return None
 
             data = [
                 {
@@ -774,16 +849,23 @@ async def get_agent_benchmarks(
                 for ts, price in hist["Close"].items()
             ]
 
-            benchmarks.append(
-                BenchmarkSeries(
-                    symbol=etf,
-                    label=ETF_LABELS.get(etf, etf),
-                    data=data,
-                )
+            return BenchmarkSeries(
+                symbol=etf,
+                label=ETF_LABELS.get(etf, etf),
+                data=data,
             )
         except Exception as e:
             logger.warning(f"Failed to fetch benchmark data for {etf}: {e}")
+            return None
 
+    etf_results = await asyncio.gather(
+        *[
+            loop.run_in_executor(None, partial(_fetch_etf_history, etf))
+            for etf in sorted(etf_symbols)
+        ]
+    )
+
+    benchmarks = [b for b in etf_results if b is not None]
     return BenchmarkResponse(benchmarks=benchmarks)
 
 
@@ -814,8 +896,11 @@ async def update_agent_strategy(
     experiment_id: str, agent_id: str, body: StrategyEditRequest
 ) -> dict[str, Any]:
     """Edit one or more strategy fields for an agent."""
+    loop = asyncio.get_running_loop()
     try:
-        game_state = load_game_state(experiment_id)
+        game_state = await loop.run_in_executor(
+            None, partial(load_game_state, experiment_id)
+        )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -861,8 +946,12 @@ async def update_agent_strategy(
     agent.strategy.last_updated = datetime.now(timezone.utc)
 
     try:
-        save_game_state(game_state)
-        save_strategy(experiment_id, agent_id, agent.strategy)
+        await loop.run_in_executor(
+            None, partial(save_game_state, game_state)
+        )
+        await loop.run_in_executor(
+            None, partial(save_strategy, experiment_id, agent_id, agent.strategy)
+        )
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to save strategy: {e}")
 
@@ -874,8 +963,11 @@ async def update_agent_guidance(
     experiment_id: str, agent_id: str, body: AgentGuidanceRequest
 ) -> dict[str, Any]:
     """Set or clear per-agent guidance text."""
+    loop = asyncio.get_running_loop()
     try:
-        game_state = load_game_state(experiment_id)
+        game_state = await loop.run_in_executor(
+            None, partial(load_game_state, experiment_id)
+        )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -890,7 +982,9 @@ async def update_agent_guidance(
     agent.guidance = body.guidance
 
     try:
-        save_game_state(game_state)
+        await loop.run_in_executor(
+            None, partial(save_game_state, game_state)
+        )
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"Failed to save game state: {e}")
 
