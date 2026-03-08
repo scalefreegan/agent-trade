@@ -360,6 +360,19 @@ export interface NewsSummaryRequest {
 }
 
 // ==============================================================================
+// Run Control Types
+// ==============================================================================
+
+export interface RunStatus {
+  job_id: string;
+  experiment_id: string;
+  status: 'idle' | 'running' | 'completed' | 'failed';
+  started_at: string;
+  completed_at?: string;
+  error?: string;
+}
+
+// ==============================================================================
 // Advisor Types
 // ==============================================================================
 

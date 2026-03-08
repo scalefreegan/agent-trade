@@ -3,49 +3,32 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError, fetchApi, postApi } from './client';
+import type { RunStatus } from './types';
 
-export interface RunStatus {
-  job_id: string;
-  experiment_id: string;
-  status: 'idle' | 'running' | 'completed' | 'failed';
-  started_at: string;
-  completed_at?: string;
-  error?: string;
-}
+// Re-export so existing `import { RunStatus } from './runs'` still works.
+export type { RunStatus } from './types';
 
 /**
  * Start a run for an experiment.
  */
-export async function startRun(experimentId: string): Promise<RunStatus> {
-  const response = await fetch(`/api/v1/experiments/${experimentId}/run`, {
-    method: 'POST',
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error);
-  }
-
-  return response.json();
+export async function startRun(experimentId: string, signal?: AbortSignal): Promise<RunStatus> {
+  return postApi<RunStatus>(`/experiments/${experimentId}/run`, undefined, { signal });
 }
 
 /**
  * Get run status for an experiment.
  */
-export async function getRunStatus(experimentId: string): Promise<RunStatus> {
-  const response = await fetch(`/api/v1/experiments/${experimentId}/run/status`);
+export async function getRunStatus(experimentId: string, signal?: AbortSignal): Promise<RunStatus> {
+  try {
+    return await fetchApi<RunStatus>(`/experiments/${experimentId}/run/status`, { signal });
+  } catch (err) {
+    // 404 could mean either "no job" or "experiment not found".
+    // Verify the experiment exists before returning idle status.
+    if (err instanceof ApiError && err.status === 404) {
+      // This will throw if the experiment doesn't exist.
+      await fetchApi(`/experiments/${experimentId}`, { signal });
 
-  if (!response.ok) {
-    if (response.status === 404) {
-      // 404 could mean either "no job" or "experiment not found"
-      // Verify the experiment exists before returning idle status
-      const expResponse = await fetch(`/api/v1/experiments/${experimentId}`);
-      if (!expResponse.ok) {
-        // Experiment doesn't exist
-        throw new Error('Experiment not found');
-      }
-
-      // Experiment exists, just no job - return idle status
       return {
         job_id: '',
         experiment_id: experimentId,
@@ -53,11 +36,8 @@ export async function getRunStatus(experimentId: string): Promise<RunStatus> {
         started_at: '',
       };
     }
-    const error = await response.text();
-    throw new Error(error);
+    throw err;
   }
-
-  return response.json();
 }
 
 /**
@@ -66,10 +46,9 @@ export async function getRunStatus(experimentId: string): Promise<RunStatus> {
 export function useRunStatus(experimentId: string | null) {
   return useQuery({
     queryKey: ['runStatus', experimentId],
-    queryFn: () => getRunStatus(experimentId!),
+    queryFn: ({ signal }) => getRunStatus(experimentId!, signal),
     enabled: !!experimentId,
     refetchInterval: (query) => {
-      // Poll every 2 seconds if running
       return query.state.data?.status === 'running' ? 2000 : false;
     },
   });
@@ -84,7 +63,6 @@ export function useStartRun() {
   return useMutation({
     mutationFn: startRun,
     onSuccess: (data) => {
-      // Invalidate run status
       queryClient.invalidateQueries({ queryKey: ['runStatus', data.experiment_id] });
     },
   });
@@ -93,33 +71,15 @@ export function useStartRun() {
 /**
  * Pause an experiment.
  */
-export async function pauseExperiment(experimentId: string): Promise<{ status: string; new_status: string }> {
-  const response = await fetch(`/api/v1/experiments/${experimentId}/pause`, {
-    method: 'POST',
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error);
-  }
-
-  return response.json();
+export async function pauseExperiment(experimentId: string, signal?: AbortSignal): Promise<{ status: string; new_status: string }> {
+  return postApi<{ status: string; new_status: string }>(`/experiments/${experimentId}/pause`, undefined, { signal });
 }
 
 /**
  * Resume an experiment.
  */
-export async function resumeExperiment(experimentId: string): Promise<{ status: string; new_status: string }> {
-  const response = await fetch(`/api/v1/experiments/${experimentId}/resume`, {
-    method: 'POST',
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error);
-  }
-
-  return response.json();
+export async function resumeExperiment(experimentId: string, signal?: AbortSignal): Promise<{ status: string; new_status: string }> {
+  return postApi<{ status: string; new_status: string }>(`/experiments/${experimentId}/resume`, undefined, { signal });
 }
 
 /**
@@ -131,7 +91,6 @@ export function usePauseExperiment() {
   return useMutation({
     mutationFn: pauseExperiment,
     onSuccess: (_data, experimentId) => {
-      // Invalidate experiment data
       queryClient.invalidateQueries({ queryKey: ['experiment', experimentId] });
       queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
     },
@@ -147,7 +106,6 @@ export function useResumeExperiment() {
   return useMutation({
     mutationFn: resumeExperiment,
     onSuccess: (_data, experimentId) => {
-      // Invalidate experiment data
       queryClient.invalidateQueries({ queryKey: ['experiment', experimentId] });
       queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
     },
