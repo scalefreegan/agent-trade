@@ -8,7 +8,7 @@ import hashlib
 import logging
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -143,17 +143,17 @@ class NewsSummaryManager:
                 cached_job = self._cache[cache_key]
                 if cached_job.status == SummaryStatus.COMPLETED:
                     # Update access time for LRU
-                    self._cache_access[cache_key] = datetime.now()
+                    self._cache_access[cache_key] = datetime.now(timezone.utc)
                     logger.info("Returning cached summary for %s", symbol)
                     return cached_job
 
             # Create new job
-            job_id = f"summary_{symbol}_{datetime.now().timestamp()}"
+            job_id = f"summary_{symbol}_{datetime.now(timezone.utc).timestamp()}"
             job = SummaryJob(
                 job_id=job_id,
                 symbol=symbol,
                 status=SummaryStatus.RUNNING,
-                started_at=datetime.now(),
+                started_at=datetime.now(timezone.utc),
             )
             self._jobs[job_id] = job
 
@@ -228,12 +228,12 @@ class NewsSummaryManager:
             # Update job
             job.status = SummaryStatus.COMPLETED
             job.sections = sections
-            job.completed_at = datetime.now()
+            job.completed_at = datetime.now(timezone.utc)
 
             # Cache completed job
             with self._lock:
                 self._cache[cache_key] = job
-                self._cache_access[cache_key] = datetime.now()
+                self._cache_access[cache_key] = datetime.now(timezone.utc)
                 self._evict_old_cache()
 
             logger.info("Summary completed for %s with %d sections", symbol, len(sections))
@@ -242,13 +242,13 @@ class NewsSummaryManager:
             logger.error("Error generating summary for %s: %s", symbol, str(e))
             job.status = SummaryStatus.FAILED
             job.error = str(e)
-            job.completed_at = datetime.now()
+            job.completed_at = datetime.now(timezone.utc)
 
         except Exception as e:
             logger.exception("Unexpected error generating summary for %s", symbol)
             job.status = SummaryStatus.FAILED
             job.error = f"Unexpected error: {str(e)}"
-            job.completed_at = datetime.now()
+            job.completed_at = datetime.now(timezone.utc)
 
         finally:
             if loop is not None:

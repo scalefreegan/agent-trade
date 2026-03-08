@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ConversationList } from '../components/conversation/ConversationList';
 import { ChatPanel } from '../components/conversation/ChatPanel';
 import { useCreateConversation } from '../api/conversation';
+import { ChatBubbleIcon } from '../assets/icons/ChatIcon';
 
 export function ConversationPage() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -70,15 +71,7 @@ export function ConversationPage() {
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-primary">
-                  <path
-                    d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <ChatBubbleIcon width={32} height={32} className="text-primary" />
               </div>
               <h2 className="text-xl font-bold text-foreground mb-2">Chat with Claude</h2>
               <p className="text-sm text-muted-foreground max-w-md mb-6">

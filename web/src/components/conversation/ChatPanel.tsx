@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useQueryClient } from '@tanstack/react-query';
 import { useConversation, useSendMessage } from '../../api/conversation';
 import type { ConversationMessage } from '../../api/types';
+import { ChatBubbleIcon, SunIcon } from '../../assets/icons/ChatIcon';
 
 interface ChatPanelProps {
   conversationId: string;
@@ -10,13 +12,46 @@ interface ChatPanelProps {
 
 export function ChatPanel({ conversationId }: ChatPanelProps) {
   const [input, setInput] = useState('');
+  // When true, the user has dismissed the wait — polling stops until the next send.
+  const [cancelled, setCancelled] = useState(false);
+  // Track elapsed seconds while waiting for a response.
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const queryClient = useQueryClient();
 
-  const { data: conversation, isLoading, error } = useConversation(conversationId);
+  const { data: conversation, isLoading, error } = useConversation(
+    cancelled ? null : conversationId,
+  );
   const sendMessage = useSendMessage(conversationId);
 
-  const isResponding = conversation?.status === 'responding';
+  const isResponding = !cancelled && conversation?.status === 'responding';
+
+  // Reset cancel state when conversation flips back to idle (response arrived).
+  useEffect(() => {
+    if (conversation?.status === 'idle') {
+      setCancelled(false);
+      setElapsedSeconds(0);
+    }
+  }, [conversation?.status]);
+
+  // Reset cancel state when switching conversations.
+  useEffect(() => {
+    setCancelled(false);
+    setElapsedSeconds(0);
+  }, [conversationId]);
+
+  // Increment elapsed-second counter while a response is in progress.
+  useEffect(() => {
+    if (!isResponding) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setElapsedSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isResponding]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -33,6 +68,8 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
     const trimmed = input.trim();
     if (!trimmed || isResponding || sendMessage.isPending) return;
 
+    setCancelled(false);
+    setElapsedSeconds(0);
     sendMessage.mutate(trimmed);
     setInput('');
   };
@@ -43,6 +80,14 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
       handleSubmit(e);
     }
   };
+
+  const handleCancel = useCallback(() => {
+    // Stop polling by setting cancelled. The backend will still complete the
+    // generation; the user can reload or send a new message to see the result.
+    setCancelled(true);
+    // Immediately refetch with the real ID so the UI shows the latest state.
+    queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
+  }, [conversationId, queryClient]);
 
   if (isLoading) {
     return (
@@ -81,15 +126,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
         {conversation?.messages.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center text-center py-16">
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-primary">
-                <path
-                  d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <ChatBubbleIcon width={24} height={24} className="text-primary" />
             </div>
             <h3 className="text-lg font-medium text-foreground mb-1">Start a conversation</h3>
             <p className="text-sm text-muted-foreground max-w-sm">
@@ -104,23 +141,47 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
         ))}
 
         {isResponding && (
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-start">
             <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-primary">
+              <SunIcon width={16} height={16} className="text-primary" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  {elapsedSeconds > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground tabular-nums">
+                      {elapsedSeconds}s
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleCancel}
+                className="self-start text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+              >
+                Stop waiting
+              </button>
+            </div>
+          </div>
+        )}
+
+        {cancelled && (
+          <div className="flex gap-3">
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-muted-foreground">
                 <path
-                  d="M8 1v2M8 13v2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M1 8h2M13 8h2M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"
+                  d="M8 8a3 3 0 100-6 3 3 0 000 6zM2 14a6 6 0 0112 0"
                   stroke="currentColor"
                   strokeWidth="1.5"
                   strokeLinecap="round"
                 />
               </svg>
             </div>
-            <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 max-w-[80%]">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
+            <div className="bg-muted/50 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[80%] text-xs text-muted-foreground italic">
+              Stopped waiting. Claude is still generating — send a new message or reload to see the response.
             </div>
           </div>
         )}
@@ -147,21 +208,37 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
               target.style.height = Math.min(target.scrollHeight, 120) + 'px';
             }}
           />
-          <button
-            type="submit"
-            disabled={!input.trim() || isResponding || sendMessage.isPending}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M14 2L7 9M14 2l-4.5 12-2-5.5L2 6.5 14 2z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {isResponding ? (
+            <button
+              type="button"
+              onClick={handleCancel}
+              aria-label="Stop waiting for response"
+              title="Stop waiting for response"
+              className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors flex-shrink-0 flex items-center gap-1.5"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="2" y="2" width="10" height="10" rx="1.5" fill="currentColor" />
+              </svg>
+              Stop
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim() || sendMessage.isPending}
+              aria-label="Send message"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M14 2L7 9M14 2l-4.5 12-2-5.5L2 6.5 14 2z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
         </form>
         {sendMessage.isError && (
           <p className="text-xs text-loss mt-2">{sendMessage.error?.message}</p>
@@ -192,14 +269,7 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
             />
           </svg>
         ) : (
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M8 1v2M8 13v2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M1 8h2M13 8h2M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
+          <SunIcon width={14} height={14} />
         )}
       </div>
 

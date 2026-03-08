@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..conversation_manager import (
+    ConversationBusy,
+    ConversationNotFound,
     ConversationStatus,
     MessageRole,
     conversation_manager,
@@ -143,13 +145,12 @@ async def send_message(
     The assistant response is generated asynchronously. Poll the conversation
     detail endpoint to get the response once the status returns to 'idle'.
     """
-    user_msg, error = conversation_manager.send_message(
-        conversation_id, request.content
-    )
-    if error:
-        if error == "Conversation not found":
-            raise HTTPException(status_code=404, detail=error)
-        raise HTTPException(status_code=409, detail=error)
+    try:
+        user_msg = conversation_manager.send_message(conversation_id, request.content)
+    except ConversationNotFound:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    except ConversationBusy:
+        raise HTTPException(status_code=409, detail="Conversation is already processing a response")
 
     return MessageResponse(
         id=user_msg.id,

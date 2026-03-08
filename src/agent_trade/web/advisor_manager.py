@@ -8,7 +8,7 @@ import queue
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 
@@ -150,7 +150,7 @@ class AdvisorManager:
                 job_id=job_id,
                 symbol=symbol.upper(),
                 status=AdvisorStatus.RUNNING,
-                started_at=datetime.now(),
+                started_at=datetime.now(timezone.utc),
                 agent_configs=agent_configs,
             )
             self._jobs[job_id] = job
@@ -175,11 +175,11 @@ class AdvisorManager:
             with self._job_lock:
                 job.status = AdvisorStatus.FAILED
                 job.error = f"Internal error: {str(e)}"
-                job.completed_at = datetime.now()
+                job.completed_at = datetime.now(timezone.utc)
             job.events.put(
                 AdvisorEvent(
                     type="job_error",
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     message="Job failed due to internal error",
                     error=str(e),
                 )
@@ -222,14 +222,14 @@ class AdvisorManager:
             else:
                 job.status = AdvisorStatus.COMPLETED
                 job.error = None
-            job.completed_at = datetime.now()
+            job.completed_at = datetime.now(timezone.utc)
 
         # Emit appropriate terminal event
         if all_failed:
             job.events.put(
                 AdvisorEvent(
                     type="job_error",
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     message=f"All advisors failed for {job.symbol}",
                     error=job.error,
                 )
@@ -238,7 +238,7 @@ class AdvisorManager:
             job.events.put(
                 AdvisorEvent(
                     type="job_complete",
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     message=f"{len(results) - len(failures)}/{len(results)} advisors finished for {job.symbol}",
                 )
             )
@@ -256,7 +256,7 @@ class AdvisorManager:
         job.events.put(
             AdvisorEvent(
                 type="agent_start",
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
                 agent_name=agent_name,
                 message=f"{agent_name} is analyzing {symbol}...",
             )
@@ -284,7 +284,7 @@ class AdvisorManager:
             job.events.put(
                 AdvisorEvent(
                     type="agent_complete",
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     agent_name=agent_name,
                     message=f"{agent_name} recommends {recommendation['action']}",
                     recommendation=recommendation,
@@ -297,7 +297,7 @@ class AdvisorManager:
             job.events.put(
                 AdvisorEvent(
                     type="agent_error",
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     agent_name=agent_name,
                     error=error_msg,
                 )
@@ -310,7 +310,7 @@ class AdvisorManager:
             job.events.put(
                 AdvisorEvent(
                     type="agent_error",
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     agent_name=agent_name,
                     error=error_msg,
                 )

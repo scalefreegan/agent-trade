@@ -8,7 +8,7 @@ tax drag analysis, and leaderboard rankings.
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Optional
@@ -403,7 +403,7 @@ def save_report(
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     if not filename:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         filename = f"report_{timestamp}.json"
 
     report_path = reports_dir / filename

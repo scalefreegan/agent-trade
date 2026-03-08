@@ -106,7 +106,7 @@ def init(
         effective_guidance = init_spec.guidance
 
     # Generate experiment ID from name and timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     experiment_id = f"{name.lower().replace(' ', '_')}_{timestamp}"
 
     # Create experiment directory

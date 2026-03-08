@@ -5,7 +5,7 @@ import logging
 import queue
 import threading
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Callable, Dict, Optional
 
@@ -97,12 +97,12 @@ class RunManager:
                 )
 
             # Create new job
-            job_id = f"{experiment_id}_{datetime.now().isoformat()}"
+            job_id = f"{experiment_id}_{datetime.now(timezone.utc).isoformat()}"
             job = RunJob(
                 job_id=job_id,
                 experiment_id=experiment_id,
                 status=RunStatus.RUNNING,
-                started_at=datetime.now(),
+                started_at=datetime.now(timezone.utc),
             )
             self._jobs[experiment_id] = job
 
@@ -130,14 +130,14 @@ class RunManager:
                 if event_type == "agent_error":
                     event = RunEvent(
                         type=event_type,
-                        timestamp=datetime.now(),
+                        timestamp=datetime.now(timezone.utc),
                         agent_id=agent_id,
                         error=message,
                     )
                 else:
                     event = RunEvent(
                         type=event_type,
-                        timestamp=datetime.now(),
+                        timestamp=datetime.now(timezone.utc),
                         agent_id=agent_id,
                         message=message,
                     )
@@ -152,13 +152,13 @@ class RunManager:
                 # Run was skipped or failed (e.g., non-trading day, missing config)
                 with self._job_lock:
                     job.status = RunStatus.FAILED
-                    job.completed_at = datetime.now()
+                    job.completed_at = datetime.now(timezone.utc)
                     job.error = "Run failed or was skipped (check logs for details)"
 
                 # Emit error event
                 error_event = RunEvent(
                     type="run_error",
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     error="Run failed or was skipped",
                 )
                 job.events.put(error_event)
@@ -169,12 +169,12 @@ class RunManager:
             # Mark as completed
             with self._job_lock:
                 job.status = RunStatus.COMPLETED
-                job.completed_at = datetime.now()
+                job.completed_at = datetime.now(timezone.utc)
 
             # Emit completion event
             completion_event = RunEvent(
                 type="run_complete",
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
                 message=f"Run completed for experiment {job.experiment_id}",
             )
             job.events.put(completion_event)
@@ -186,13 +186,13 @@ class RunManager:
 
             with self._job_lock:
                 job.status = RunStatus.FAILED
-                job.completed_at = datetime.now()
+                job.completed_at = datetime.now(timezone.utc)
                 job.error = str(e)
 
             # Emit error event
             error_event = RunEvent(
                 type="run_error",
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
                 error=str(e),
             )
             job.events.put(error_event)

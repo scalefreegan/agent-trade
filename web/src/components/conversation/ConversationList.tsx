@@ -102,7 +102,9 @@ function ConversationItem({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onDelete();
+          if (window.confirm('Delete this conversation?')) {
+            onDelete();
+          }
         }}
         className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-loss hover:bg-loss/10 transition-all"
         aria-label="Delete conversation"

@@ -3,7 +3,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException
@@ -119,7 +119,7 @@ async def event_stream(experiment_id: str) -> AsyncGenerator[str, None]:
             if not events or events[-1].type not in ("run_complete", "run_error"):
                 error_event = {
                     "type": "run_error",
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "error": "Job not found",
                 }
                 yield f"data: {json.dumps(error_event)}\n\n"

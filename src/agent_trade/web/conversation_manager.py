@@ -12,10 +12,10 @@ import tempfile
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,14 @@ _PROJECT_ROOT = str(Path(__file__).parent.parent.parent.parent)
 # while leaving room for system prompt, tool results, and response.
 MAX_HISTORY_MESSAGES = 40  # keep last N messages (20 turns)
 MAX_PROMPT_CHARS = 150_000
+
+
+class ConversationNotFound(Exception):
+    pass
+
+
+class ConversationBusy(Exception):
+    pass
 
 
 class MessageRole(str, Enum):
@@ -61,14 +69,15 @@ class Conversation:
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def add_message(self, role: MessageRole, content: str) -> Message:
+        now = datetime.now(timezone.utc)
         msg = Message(
             id=str(uuid.uuid4()),
             role=role,
             content=content,
-            timestamp=datetime.now(),
+            timestamp=now,
         )
         self.messages.append(msg)
-        self.updated_at = datetime.now()
+        self.updated_at = now
         return msg
 
 
@@ -131,6 +140,8 @@ async def _run_conversation_turn(
         history_text = "\n\n".join(history_parts)
         logger.info("Trimmed oldest history entry to stay within prompt char budget")
 
+    # History is flattened into the prompt rather than using --resume because the
+    # Claude CLI does not expose persistent session IDs in non-interactive (-p) mode.
     if history_parts:
         prompt = (
             "Here is the conversation so far:\n\n"
@@ -212,7 +223,7 @@ class ConversationManager:
     def create_conversation(self, title: str | None = None) -> Conversation:
         """Create a new conversation session."""
         conv_id = str(uuid.uuid4())
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         conv = Conversation(
             id=conv_id,
             title=title or "New Conversation",
@@ -255,22 +266,26 @@ class ConversationManager:
             return None
         with conv._lock:
             conv.title = title
-            conv.updated_at = datetime.now()
+            conv.updated_at = datetime.now(timezone.utc)
         return conv
 
-    def send_message(self, conv_id: str, content: str) -> tuple[Message | None, str | None]:
+    def send_message(self, conv_id: str, content: str) -> Message:
         """Add a user message and trigger an async response.
 
         Returns the user message immediately. The assistant response
         will be generated asynchronously (use get_response or poll status).
+
+        Raises:
+            ConversationNotFound: If no conversation with conv_id exists.
+            ConversationBusy: If the conversation is already generating a response.
         """
         conv = self.get_conversation(conv_id)
         if not conv:
-            return None, "Conversation not found"
+            raise ConversationNotFound(conv_id)
 
         with conv._lock:
             if conv.status == ConversationStatus.RESPONDING:
-                return None, "Conversation is already processing a response"
+                raise ConversationBusy(conv_id)
 
             user_msg = conv.add_message(MessageRole.USER, content)
             conv.status = ConversationStatus.RESPONDING
@@ -283,7 +298,7 @@ class ConversationManager:
         )
         thread.start()
 
-        return user_msg, None
+        return user_msg
 
     def _generate_response(self, conv: Conversation):
         """Generate assistant response in background thread."""

@@ -16,6 +16,12 @@ export function useConversations() {
   });
 }
 
+// Exponential backoff intervals for polling while a response is in progress.
+// Starts at 1s, doubles each step, caps at 8s.
+// This reduces server load for long-running Claude invocations.
+const POLL_INTERVALS_MS = [1000, 2000, 4000, 8000];
+const MAX_POLL_INTERVAL_MS = POLL_INTERVALS_MS[POLL_INTERVALS_MS.length - 1];
+
 export function useConversation(conversationId: string | null) {
   return useQuery({
     queryKey: ['conversation', conversationId],
@@ -24,7 +30,12 @@ export function useConversation(conversationId: string | null) {
     enabled: !!conversationId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === 'responding' ? 1000 : false;
+      if (status !== 'responding') return false;
+
+      // Use the number of successful fetches while responding to pick the
+      // backoff tier, so the interval grows the longer we wait.
+      const fetchCount = query.state.dataUpdateCount ?? 0;
+      return POLL_INTERVALS_MS[Math.min(fetchCount, POLL_INTERVALS_MS.length - 1)] ?? MAX_POLL_INTERVAL_MS;
     },
   });
 }
