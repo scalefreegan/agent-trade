@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   useStockNews,
   useStartNewsSummary,
@@ -325,7 +326,7 @@ export function StockNews({ symbol }: StockNewsProps) {
                     {currentSection.title}
                   </h3>
                   <div className="text-sm text-foreground leading-relaxed">
-                    <ReactMarkdown>{currentSection.content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentSection.content}</ReactMarkdown>
                   </div>
                 </div>
               )}
