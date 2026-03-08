@@ -1,9 +1,11 @@
 """Shared dependencies for FastAPI routes."""
+import threading
 import time
+from collections import deque
 from decimal import Decimal
 from typing import Any
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 
 from agent_trade.experiment.config import load_config, list_experiments
 from agent_trade.experiment.coordinator import load_game_state
@@ -13,6 +15,70 @@ from agent_trade.experiment.models import ExperimentConfig, GameState
 # Price cache: symbol -> (price, timestamp)
 _price_cache: dict[str, tuple[Decimal, float]] = {}
 _PRICE_CACHE_TTL = 30.0  # seconds
+
+
+# ---------------------------------------------------------------------------
+# Rate limiter
+# ---------------------------------------------------------------------------
+
+
+class RateLimiter:
+    """Sliding-window rate limiter keyed by client IP.
+
+    Tracks request timestamps per IP in a deque and rejects requests
+    that exceed ``max_requests`` within ``window_seconds``.
+    """
+
+    def __init__(self, max_requests: int, window_seconds: float):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._hits: dict[str, deque[float]] = {}
+        self._lock = threading.Lock()
+
+    def check(self, key: str) -> bool:
+        """Return True if the request is allowed, False if rate-limited."""
+        now = time.monotonic()
+        cutoff = now - self.window_seconds
+        with self._lock:
+            dq = self._hits.setdefault(key, deque())
+            # Purge expired timestamps
+            while dq and dq[0] <= cutoff:
+                dq.popleft()
+            if len(dq) >= self.max_requests:
+                return False
+            dq.append(now)
+            return True
+
+
+# Global limiters: conversations (5/min), messages (10/min)
+_conversation_limiter = RateLimiter(max_requests=5, window_seconds=60)
+_message_limiter = RateLimiter(max_requests=10, window_seconds=60)
+
+
+def _client_ip(request: Request) -> str:
+    """Extract a rate-limit key from the request (client IP)."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def require_conversation_rate_limit(request: Request) -> None:
+    """FastAPI dependency — reject if conversation-creation rate exceeded."""
+    if not _conversation_limiter.check(_client_ip(request)):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded for conversation creation. Try again later.",
+        )
+
+
+def require_message_rate_limit(request: Request) -> None:
+    """FastAPI dependency — reject if message-send rate exceeded."""
+    if not _message_limiter.check(_client_ip(request)):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded for sending messages. Try again later.",
+        )
 
 
 def validate_experiment_exists(experiment_id: str) -> None:

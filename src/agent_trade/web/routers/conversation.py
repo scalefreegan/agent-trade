@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..conversation_manager import (
@@ -12,6 +12,7 @@ from ..conversation_manager import (
     MessageRole,
     conversation_manager,
 )
+from ..dependencies import require_conversation_rate_limit, require_message_rate_limit
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -87,7 +88,11 @@ async def list_conversations() -> ConversationListResponse:
     )
 
 
-@router.post("/conversations", status_code=201)
+@router.post(
+    "/conversations",
+    status_code=201,
+    dependencies=[Depends(require_conversation_rate_limit)],
+)
 async def create_conversation(
     request: CreateConversationRequest,
 ) -> ConversationDetail:
@@ -126,7 +131,10 @@ async def update_conversation_title(
     return _conv_to_detail(conv)
 
 
-@router.post("/conversations/{conversation_id}/messages")
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    dependencies=[Depends(require_message_rate_limit)],
+)
 async def send_message(
     conversation_id: str, request: SendMessageRequest
 ) -> MessageResponse:
