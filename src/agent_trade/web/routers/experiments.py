@@ -15,6 +15,7 @@ from agent_trade.experiment.config import (
     list_experiments,
     save_config,
 )
+from agent_trade.web.run_manager import RunStatus, run_manager
 from agent_trade.experiment.agent_runner import generate_agent_names_via_claude
 from agent_trade.experiment.coordinator import load_game_state, save_game_state
 from agent_trade.experiment.models import (
@@ -229,6 +230,14 @@ async def delete_experiment(
     config: ExperimentConfig = Depends(load_experiment_config),
 ) -> None:
     """Delete an experiment and all its data."""
+    # Guard: cannot delete an experiment with a running job
+    job = run_manager.get_job(experiment_id)
+    if job and job.status == RunStatus.RUNNING:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete experiment while a run is in progress. Stop or wait for the run to complete first.",
+        )
+
     experiment_dir = get_experiment_dir(experiment_id)
     try:
         shutil.rmtree(experiment_dir)

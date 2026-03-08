@@ -184,6 +184,14 @@ async def pause_experiment(experiment_id: str) -> dict:
         if not game_state:
             raise HTTPException(status_code=404, detail="Experiment not found")
 
+        # Guard: only active or running experiments can be paused
+        current_status = game_state.config.status
+        if current_status not in ("active", "running"):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot pause experiment with status '{current_status}'. Only 'active' or 'running' experiments can be paused.",
+            )
+
         # Update status to paused
         game_state.config.status = "paused"
 
@@ -226,6 +234,14 @@ async def resume_experiment(experiment_id: str) -> dict:
         game_state = load_game_state(experiment_id)
         if not game_state:
             raise HTTPException(status_code=404, detail="Experiment not found")
+
+        # Guard: only paused experiments can be resumed
+        current_status = game_state.config.status
+        if current_status != "paused":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot resume experiment with status '{current_status}'. Only 'paused' experiments can be resumed.",
+            )
 
         # Update status to active
         game_state.config.status = "active"
