@@ -12,7 +12,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const { data: conversation, isLoading } = useConversation(conversationId);
+  const { data: conversation, isLoading, error } = useConversation(conversationId);
   const sendMessage = useSendMessage(conversationId);
 
   const isResponding = conversation?.status === 'responding';
@@ -47,6 +47,28 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
         Loading conversation...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
+        <div className="w-12 h-12 rounded-full bg-loss/10 flex items-center justify-center mb-4">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-loss">
+            <path
+              d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+        <h3 className="text-lg font-medium text-foreground mb-1">Failed to load conversation</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          {error.message || 'Something went wrong. The conversation may have been deleted or is unavailable.'}
+        </p>
       </div>
     );
   }
