@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useConversation, useSendMessage } from '../../api/conversation';
 import type { ConversationMessage } from '../../api/types';
 
@@ -227,7 +228,7 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
             prose-a:text-primary hover:prose-a:text-primary/80
             prose-blockquote:border-l-4 prose-blockquote:border-primary/50 prose-blockquote:text-muted-foreground prose-blockquote:not-italic
           ">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
           </div>
         )}
       </div>
