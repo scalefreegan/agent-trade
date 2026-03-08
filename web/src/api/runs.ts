@@ -61,7 +61,7 @@ export function useStartRun() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: startRun,
+    mutationFn: (experimentId: string) => startRun(experimentId),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['runStatus', data.experiment_id] });
     },
@@ -89,7 +89,7 @@ export function usePauseExperiment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: pauseExperiment,
+    mutationFn: (experimentId: string) => pauseExperiment(experimentId),
     onSuccess: (_data, experimentId) => {
       queryClient.invalidateQueries({ queryKey: ['experiment', experimentId] });
       queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
@@ -104,7 +104,7 @@ export function useResumeExperiment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: resumeExperiment,
+    mutationFn: (experimentId: string) => resumeExperiment(experimentId),
     onSuccess: (_data, experimentId) => {
       queryClient.invalidateQueries({ queryKey: ['experiment', experimentId] });
       queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
