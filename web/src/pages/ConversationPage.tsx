@@ -3,6 +3,7 @@ import { ConversationList } from '../components/conversation/ConversationList';
 import { ChatPanel } from '../components/conversation/ChatPanel';
 import { useCreateConversation } from '../api/conversation';
 import { ChatBubbleIcon } from '../assets/icons/ChatIcon';
+import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
 export function ConversationPage() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -67,7 +68,19 @@ export function ConversationPage() {
           )}
 
           {activeConversationId ? (
-            <ChatPanel conversationId={activeConversationId} />
+            <ErrorBoundary fallback={(error, reset) => (
+              <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
+                <p className="text-sm font-mono font-semibold uppercase tracking-widest text-red-500 mb-2">
+                  Something went wrong
+                </p>
+                <p className="text-sm text-muted-foreground mb-4">{error.message}</p>
+                <button onClick={reset} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                  Try again
+                </button>
+              </div>
+            )}>
+              <ChatPanel conversationId={activeConversationId} />
+            </ErrorBoundary>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">

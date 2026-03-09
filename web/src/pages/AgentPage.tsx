@@ -26,6 +26,7 @@ import { TransactionList } from '../components/agent/TransactionList';
 import { Badge, statusVariant } from '../components/ui/Badge';
 import { InlineEdit } from '../components/ui/InlineEdit';
 import { Tabs } from '../components/ui/Tabs';
+import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
 type Tab = 'portfolio' | 'history' | 'info' | 'performance' | 'strategy' | 'decisions' | 'alerts';
 
@@ -158,7 +159,14 @@ export function AgentPage() {
             {holdingsLoading ? (
               <div className="text-center py-12 text-muted-foreground">Loading holdings info...</div>
             ) : holdings ? (
-              <HoldingsInfo data={holdings} />
+              <ErrorBoundary fallback={(err, reset) => (
+                <div className="text-center py-8">
+                  <p className="text-sm text-red-500 mb-2">Failed to display holdings: {err.message}</p>
+                  <button onClick={reset} className="text-xs underline text-muted-foreground hover:text-foreground">Try again</button>
+                </div>
+              )}>
+                <HoldingsInfo data={holdings} />
+              </ErrorBoundary>
             ) : (
               <div className="text-center py-12 text-muted-foreground">No holdings data available</div>
             )}

@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useExperiment } from '../../api/experiments';
 import RunProgress from './RunProgress';
 import { Badge, statusVariant } from '../ui/Badge';
+import { ErrorBoundary } from '../ui/ErrorBoundary';
 
 interface RunControlsProps {
   experimentId: string;
@@ -139,7 +140,16 @@ export default function RunControls({ experimentId }: RunControlsProps) {
         </div>
       )}
 
-      {isRunning && <RunProgress events={events} />}
+      {isRunning && (
+        <ErrorBoundary fallback={(err, reset) => (
+          <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">
+            <p>Run progress display error: {err.message}</p>
+            <button onClick={reset} className="mt-2 underline text-xs">Try again</button>
+          </div>
+        )}>
+          <RunProgress events={events} />
+        </ErrorBoundary>
+      )}
     </div>
   );
 }

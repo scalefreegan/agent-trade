@@ -63,7 +63,47 @@ export function useSendMessage(conversationId: string | null) {
         { content }
       );
     },
-    onSuccess: () => {
+    onMutate: async (content: string) => {
+      if (!conversationId) return;
+
+      await queryClient.cancelQueries({
+        queryKey: ['conversation', conversationId],
+      });
+
+      const previous = queryClient.getQueryData<ConversationDetail>([
+        'conversation',
+        conversationId,
+      ]);
+
+      if (previous) {
+        const optimisticMessage: ConversationMessage = {
+          id: `optimistic-${Date.now()}`,
+          role: 'user',
+          content,
+          timestamp: new Date().toISOString(),
+        };
+
+        queryClient.setQueryData<ConversationDetail>(
+          ['conversation', conversationId],
+          {
+            ...previous,
+            messages: [...previous.messages, optimisticMessage],
+            status: 'responding',
+          },
+        );
+      }
+
+      return { previous };
+    },
+    onError: (_err, _content, context) => {
+      if (context?.previous && conversationId) {
+        queryClient.setQueryData(
+          ['conversation', conversationId],
+          context.previous,
+        );
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: ['conversation', conversationId],
       });
