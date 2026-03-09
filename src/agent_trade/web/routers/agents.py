@@ -761,12 +761,15 @@ async def get_agent_alerts(
             for a in data.get("alerts") or []:
                 if not isinstance(a, dict):
                     continue
+                raw_confidence = a.get("confidence", "high")
+                if raw_confidence not in ("high", "very_high"):
+                    raw_confidence = "high"
                 alerts.append(
                     AlertEntryResponse(
                         date=date_str,
                         symbol=a.get("symbol", ""),
                         thesis=a.get("thesis", ""),
-                        confidence=a.get("confidence", "high"),
+                        confidence=raw_confidence,
                         catalyst=a.get("catalyst", ""),
                         time_horizon=a.get("time_horizon", ""),
                     )

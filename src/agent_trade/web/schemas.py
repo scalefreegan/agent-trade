@@ -274,7 +274,7 @@ class TransactionRecord(BaseModel):
     """Single transaction record."""
 
     date: str
-    action: str  # "BUY" or "SELL"
+    action: str
     symbol: str
     shares: float
     price: float
@@ -410,7 +410,7 @@ class AlertEntryResponse(BaseModel):
     date: str
     symbol: str
     thesis: str
-    confidence: str
+    confidence: Literal["high", "very_high"]
     catalyst: str
     time_horizon: str
 

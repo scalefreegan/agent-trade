@@ -17,6 +17,9 @@ export interface ExperimentDetail {
   num_agents: number;
   status: string;
   current_day: number | null;
+  trading_mode: string;
+  options_enabled: boolean;
+  futures_enabled: boolean;
 }
 
 export interface TaxLot {
@@ -35,9 +38,35 @@ export interface StockPosition {
   lots: TaxLot[];
 }
 
+export interface OptionPosition {
+  underlying: string;
+  contract_type: string;
+  strike_price: number;
+  expiration_date: string;
+  contracts: number;
+  premium_per_share: number;
+  total_premium: number;
+  intrinsic_value: number | null;
+}
+
+export interface FuturesPosition {
+  symbol: string;
+  direction: string;
+  contracts: number;
+  entry_price: number;
+  contract_multiplier: number;
+  expiration_date: string;
+  margin_per_contract: number;
+  total_margin: number;
+  unrealized_pnl: number | null;
+}
+
 export interface Portfolio {
   cash: number;
   positions: Record<string, StockPosition>;
+  option_positions: OptionPosition[];
+  futures_positions: FuturesPosition[];
+  margin_used: number;
 }
 
 export interface AgentState {
@@ -117,7 +146,7 @@ export interface AgentStrategy {
 
 export interface TransactionRecord {
   date: string;
-  action: 'BUY' | 'SELL';
+  action: string;
   symbol: string;
   shares: number;
   price: number;
