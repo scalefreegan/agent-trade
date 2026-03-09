@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import AsyncGenerator
 
@@ -75,6 +76,10 @@ async def get_run_status(experiment_id: ExperimentId) -> RunStatusResponse:
     )
 
 
+_SSE_MAX_DURATION = 30 * 60  # 30 minutes
+_SSE_HEARTBEAT_INTERVAL = 30  # seconds
+
+
 async def event_stream(experiment_id: ExperimentId) -> AsyncGenerator[str, None]:
     """
     Generate SSE events for a run.
@@ -94,8 +99,28 @@ async def event_stream(experiment_id: ExperimentId) -> AsyncGenerator[str, None]
         yield f"data: {json.dumps({'type': 'error', 'message': 'No job found'})}\n\n"
         return
 
+    start_time = time.monotonic()
+    last_heartbeat = start_time
+
     # Stream events until job completes
     while True:
+        now = time.monotonic()
+
+        # Enforce max stream duration
+        if now - start_time >= _SSE_MAX_DURATION:
+            timeout_event = {
+                "type": "stream_timeout",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "message": "SSE stream exceeded maximum duration",
+            }
+            yield f"data: {json.dumps(timeout_event)}\n\n"
+            return
+
+        # Send periodic heartbeat to detect dead clients
+        if now - last_heartbeat >= _SSE_HEARTBEAT_INTERVAL:
+            yield ": heartbeat\n\n"
+            last_heartbeat = now
+
         # Get pending events (use to_thread to avoid blocking event loop)
         events = await asyncio.to_thread(run_manager.get_events, experiment_id, 0.1)
 

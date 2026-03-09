@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import signal
 import tempfile
 import threading
 import uuid
@@ -173,6 +174,7 @@ async def _run_conversation_turn(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=_PROJECT_ROOT,
+            start_new_session=True,
         )
 
         try:
@@ -184,7 +186,10 @@ async def _run_conversation_turn(
             else:
                 stdout, stderr = await proc.communicate()
         except (asyncio.TimeoutError, TimeoutError):
-            proc.kill()
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (OSError, ProcessLookupError):
+                proc.kill()
             await proc.communicate()
             raise TimeoutError(f"Claude agent timed out after {timeout}s")
 
@@ -343,15 +348,31 @@ class ConversationManager:
             loop.close()
 
     def _evict_old(self):
-        """Evict oldest conversations when limit is exceeded. Must hold self._lock."""
+        """Evict oldest conversations when limit is exceeded. Must hold self._lock.
+
+        Conversations with status RESPONDING are never evicted to avoid
+        dropping actively-responding sessions and orphaning subprocesses.
+        """
         if len(self._conversations) <= self.MAX_CONVERSATIONS:
             return
-        sorted_convs = sorted(
-            self._conversations.items(),
+        # Separate responding (protected) from evictable conversations
+        protected = {
+            cid: conv
+            for cid, conv in self._conversations.items()
+            if conv.status == ConversationStatus.RESPONDING
+        }
+        evictable = {
+            cid: conv
+            for cid, conv in self._conversations.items()
+            if conv.status != ConversationStatus.RESPONDING
+        }
+        max_evictable = max(0, self.MAX_CONVERSATIONS - len(protected))
+        sorted_evictable = sorted(
+            evictable.items(),
             key=lambda x: x[1].updated_at,
             reverse=True,
         )
-        self._conversations = dict(sorted_convs[: self.MAX_CONVERSATIONS])
+        self._conversations = {**protected, **dict(sorted_evictable[:max_evictable])}
 
 
 # Singleton instance

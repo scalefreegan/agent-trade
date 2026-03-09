@@ -160,11 +160,11 @@ class NewsSummaryManager:
             # Evict old jobs if needed
             self._evict_old_jobs()
 
-        # Spawn background thread
+        # Spawn background thread (daemon so it won't block server shutdown)
         thread = threading.Thread(
             target=self._run_summary,
             args=(job, symbol, articles, cache_key),
-            daemon=False,  # Non-daemon to prevent orphaned work
+            daemon=True,
         )
         thread.start()
 

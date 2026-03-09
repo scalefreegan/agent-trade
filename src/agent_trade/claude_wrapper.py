@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import re
+import signal
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -147,12 +148,14 @@ async def run_agent(
             with open(sys_prompt_path) as f:
                 cmd.extend(["--append-system-prompt", f.read()])
 
-        # Spawn subprocess
+        # Spawn subprocess in its own process group so we can kill the
+        # entire tree (including grandchild MCP servers) on timeout.
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=work_dir,
+            start_new_session=True,
         )
 
         try:
@@ -164,7 +167,10 @@ async def run_agent(
             else:
                 stdout, stderr = await proc.communicate()
         except (asyncio.TimeoutError, TimeoutError):
-            proc.kill()
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (OSError, ProcessLookupError):
+                proc.kill()
             await proc.communicate()
             raise TimeoutError(
                 f"Claude agent timed out after {timeout}s"
