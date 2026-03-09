@@ -8,7 +8,7 @@ import queue
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 
@@ -104,6 +104,9 @@ class AdvisorManager:
     investment philosophy, to generate diverse stock recommendations.
     """
 
+    MAX_JOBS = 100
+    EVICT_AGE = timedelta(minutes=30)
+
     _instance: Optional["AdvisorManager"] = None
     _lock = threading.Lock()
 
@@ -118,6 +121,42 @@ class AdvisorManager:
     def _initialize(self):
         self._jobs: Dict[str, AdvisorJob] = {}
         self._job_lock = threading.Lock()
+
+    def _evict_old_jobs(self) -> None:
+        """Evict completed/failed jobs older than EVICT_AGE or when over MAX_JOBS.
+
+        Must be called with self._job_lock held.
+        """
+        now = datetime.now(timezone.utc)
+        terminal = {AdvisorStatus.COMPLETED, AdvisorStatus.FAILED}
+
+        # Phase 1: Remove terminal jobs older than EVICT_AGE
+        expired = [
+            jid
+            for jid, j in self._jobs.items()
+            if j.status in terminal
+            and j.completed_at
+            and (now - j.completed_at) > self.EVICT_AGE
+        ]
+        for jid in expired:
+            del self._jobs[jid]
+
+        # Phase 2: If still over max, remove oldest terminal jobs first
+        if len(self._jobs) <= self.MAX_JOBS:
+            return
+
+        candidates = sorted(
+            (
+                (jid, j)
+                for jid, j in self._jobs.items()
+                if j.status in terminal
+            ),
+            key=lambda x: x[1].completed_at or x[1].started_at,
+        )
+        for jid, _ in candidates:
+            if len(self._jobs) <= self.MAX_JOBS:
+                break
+            del self._jobs[jid]
 
     def start_job(
         self,
@@ -154,6 +193,7 @@ class AdvisorManager:
                 agent_configs=agent_configs,
             )
             self._jobs[job_id] = job
+            self._evict_old_jobs()
 
         # Start background thread to run agents
         thread = threading.Thread(

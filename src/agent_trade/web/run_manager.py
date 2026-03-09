@@ -5,7 +5,7 @@ import logging
 import queue
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Callable, Dict, Optional
 
@@ -59,6 +59,9 @@ class RunManager:
     progress events via queue for SSE consumption.
     """
 
+    MAX_JOBS = 100
+    EVICT_AGE = timedelta(minutes=30)
+
     _instance: Optional["RunManager"] = None
     _lock = threading.Lock()
 
@@ -74,6 +77,42 @@ class RunManager:
         """Initialize the singleton instance."""
         self._jobs: Dict[str, RunJob] = {}
         self._job_lock = threading.Lock()
+
+    def _evict_old_jobs(self) -> None:
+        """Evict completed/failed jobs older than EVICT_AGE or when over MAX_JOBS.
+
+        Must be called with self._job_lock held.
+        """
+        now = datetime.now(timezone.utc)
+        terminal = {RunStatus.COMPLETED, RunStatus.FAILED}
+
+        # Phase 1: Remove terminal jobs older than EVICT_AGE
+        expired = [
+            jid
+            for jid, j in self._jobs.items()
+            if j.status in terminal
+            and j.completed_at
+            and (now - j.completed_at) > self.EVICT_AGE
+        ]
+        for jid in expired:
+            del self._jobs[jid]
+
+        # Phase 2: If still over max, remove oldest terminal jobs first
+        if len(self._jobs) <= self.MAX_JOBS:
+            return
+
+        candidates = sorted(
+            (
+                (jid, j)
+                for jid, j in self._jobs.items()
+                if j.status in terminal
+            ),
+            key=lambda x: x[1].completed_at or x[1].started_at,
+        )
+        for jid, _ in candidates:
+            if len(self._jobs) <= self.MAX_JOBS:
+                break
+            del self._jobs[jid]
 
     def start_run(self, experiment_id: str) -> RunJob:
         """
@@ -105,6 +144,7 @@ class RunManager:
                 started_at=datetime.now(timezone.utc),
             )
             self._jobs[experiment_id] = job
+            self._evict_old_jobs()
 
             # Start the run in a background thread
             thread = threading.Thread(

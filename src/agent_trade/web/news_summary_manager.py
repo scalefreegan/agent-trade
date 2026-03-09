@@ -225,13 +225,12 @@ class NewsSummaryManager:
             # Parse sections (raises ValueError if invalid or empty)
             sections = self._parse_summary_sections(result)
 
-            # Update job
-            job.status = SummaryStatus.COMPLETED
-            job.sections = sections
-            job.completed_at = datetime.now(timezone.utc)
-
-            # Cache completed job
+            # Update job and cache under lock for thread safety
             with self._lock:
+                job.status = SummaryStatus.COMPLETED
+                job.sections = sections
+                job.completed_at = datetime.now(timezone.utc)
+
                 self._cache[cache_key] = job
                 self._cache_access[cache_key] = datetime.now(timezone.utc)
                 self._evict_old_cache()
@@ -240,15 +239,17 @@ class NewsSummaryManager:
 
         except (RuntimeError, TimeoutError, ValueError) as e:
             logger.error("Error generating summary for %s: %s", symbol, str(e))
-            job.status = SummaryStatus.FAILED
-            job.error = str(e)
-            job.completed_at = datetime.now(timezone.utc)
+            with self._lock:
+                job.status = SummaryStatus.FAILED
+                job.error = str(e)
+                job.completed_at = datetime.now(timezone.utc)
 
         except Exception as e:
             logger.exception("Unexpected error generating summary for %s", symbol)
-            job.status = SummaryStatus.FAILED
-            job.error = f"Unexpected error: {str(e)}"
-            job.completed_at = datetime.now(timezone.utc)
+            with self._lock:
+                job.status = SummaryStatus.FAILED
+                job.error = f"Unexpected error: {str(e)}"
+                job.completed_at = datetime.now(timezone.utc)
 
         finally:
             if loop is not None:
