@@ -3,6 +3,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from agent_trade.web.dependencies import ExperimentId
 from agent_trade.experiment.analysis_reporter import (
     calculate_holding_period_distribution,
     calculate_tax_metrics,
@@ -16,7 +17,7 @@ router = APIRouter()
 
 
 @router.get("/experiments/{experiment_id}/tax-metrics")
-async def get_tax_metrics(experiment_id: str) -> dict[str, dict[str, float]]:
+async def get_tax_metrics(experiment_id: ExperimentId) -> dict[str, dict[str, float]]:
     """
     Get tax efficiency metrics for all agents in an experiment.
 
@@ -37,7 +38,7 @@ async def get_tax_metrics(experiment_id: str) -> dict[str, dict[str, float]]:
 
 
 @router.get("/experiments/{experiment_id}/holding-periods")
-async def get_holding_periods(experiment_id: str) -> dict[str, dict[str, int]]:
+async def get_holding_periods(experiment_id: ExperimentId) -> dict[str, dict[str, int]]:
     """
     Get holding period distribution for all agents.
 
@@ -59,7 +60,7 @@ async def get_holding_periods(experiment_id: str) -> dict[str, dict[str, int]]:
 
 @router.get("/experiments/{experiment_id}/report")
 async def get_experiment_report(
-    experiment_id: str,
+    experiment_id: ExperimentId,
     include_tax_metrics: bool = True,
 ) -> dict:
     """

@@ -3,14 +3,25 @@ import threading
 import time
 from collections import deque
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Path, Request
 
 from agent_trade.experiment.config import load_config, list_experiments
 from agent_trade.experiment.coordinator import load_game_state
 from agent_trade.experiment.market_data import get_current_prices
 from agent_trade.experiment.models import ExperimentConfig, GameState
+
+# ---------------------------------------------------------------------------
+# Path parameter types with validation (prevents path traversal)
+# ---------------------------------------------------------------------------
+
+_SAFE_ID_PATTERN = r"^[a-zA-Z0-9_-]+$"
+_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+
+ExperimentId = Annotated[str, Path(pattern=_SAFE_ID_PATTERN)]
+AgentId = Annotated[str, Path(pattern=_SAFE_ID_PATTERN)]
+DateStr = Annotated[str, Path(pattern=_DATE_PATTERN)]
 
 # Price cache: symbol -> (price, timestamp)
 _price_cache: dict[str, tuple[Decimal, float]] = {}
@@ -81,6 +92,19 @@ def require_message_rate_limit(request: Request) -> None:
         )
 
 
+def assert_path_within(child: "pathlib.Path", parent: "pathlib.Path") -> None:
+    """Raise 400 if *child* escapes *parent* after symlink resolution."""
+    import pathlib  # noqa: F811 — local to avoid circular at module level
+
+    resolved = child.resolve()
+    expected = parent.resolve()
+    if not resolved.is_relative_to(expected):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid path — traversal detected",
+        )
+
+
 def validate_experiment_exists(experiment_id: str) -> None:
     """Validate that experiment exists, raise 404 if not."""
     experiments = list_experiments()
@@ -91,7 +115,7 @@ def validate_experiment_exists(experiment_id: str) -> None:
         )
 
 
-def load_experiment_config(experiment_id: str) -> ExperimentConfig:
+def load_experiment_config(experiment_id: ExperimentId) -> ExperimentConfig:
     """Load experiment configuration."""
     validate_experiment_exists(experiment_id)
     config = load_config(experiment_id)
@@ -102,7 +126,7 @@ def load_experiment_config(experiment_id: str) -> ExperimentConfig:
     return config
 
 
-def load_experiment_state(experiment_id: str) -> GameState:
+def load_experiment_state(experiment_id: ExperimentId) -> GameState:
     """Load game state for experiment."""
     validate_experiment_exists(experiment_id)
     state = load_game_state(experiment_id)

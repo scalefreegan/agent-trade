@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from ..advisor_manager import AdvisorStatus, advisor_manager
 from ..advisor_presets import ADVISOR_PRESETS
+from ..dependencies import ExperimentId
 from ...experiment.coordinator import load_game_state
 
 router = APIRouter()
@@ -179,7 +180,7 @@ async def stream_job(job_id: str):
 
 
 @router.get("/advisor/experiments/{experiment_id}/agents")
-async def get_experiment_agents(experiment_id: str) -> list[ExperimentAgentInfo]:
+async def get_experiment_agents(experiment_id: ExperimentId) -> list[ExperimentAgentInfo]:
     """Return agent names and philosophies from an experiment."""
     try:
         game_state = load_game_state(experiment_id)

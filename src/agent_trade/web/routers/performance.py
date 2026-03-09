@@ -2,7 +2,7 @@
 from fastapi import APIRouter
 
 from agent_trade.experiment.analysis_reporter import load_all_daily_outcomes
-from agent_trade.web.dependencies import validate_experiment_exists
+from agent_trade.web.dependencies import ExperimentId, validate_experiment_exists
 from agent_trade.web.schemas import PerformanceDataPoint, PerformanceResponse
 
 router = APIRouter(prefix="/experiments/{experiment_id}", tags=["performance"])
@@ -10,7 +10,7 @@ router = APIRouter(prefix="/experiments/{experiment_id}", tags=["performance"])
 
 @router.get("/performance", response_model=PerformanceResponse)
 async def get_performance(
-    experiment_id: str,
+    experiment_id: ExperimentId,
 ) -> PerformanceResponse:
     """
     Get performance time-series data for all agents.

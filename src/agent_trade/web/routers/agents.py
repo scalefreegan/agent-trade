@@ -12,6 +12,8 @@ import yfinance as yf
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from agent_trade.web.dependencies import AgentId, DateStr, ExperimentId, assert_path_within
+
 from agent_trade.experiment.analysis_reporter import load_all_daily_outcomes
 from agent_trade.experiment.config import get_experiment_dir
 from agent_trade.experiment.coordinator import load_game_state, save_game_state
@@ -187,7 +189,7 @@ def _collect_portfolio_symbols(portfolio: Portfolio) -> set[str]:
 
 
 @router.get("/experiments/{experiment_id}/agents")
-async def list_agents(experiment_id: str) -> list[AgentStateResponse]:
+async def list_agents(experiment_id: ExperimentId) -> list[AgentStateResponse]:
     """List all agents in an experiment."""
     loop = asyncio.get_running_loop()
     try:
@@ -231,7 +233,7 @@ async def list_agents(experiment_id: str) -> list[AgentStateResponse]:
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}")
 async def get_agent_detail(
-    experiment_id: str, agent_id: str
+    experiment_id: ExperimentId, agent_id: AgentId
 ) -> AgentDetailResponse:
     """Get complete agent details."""
     loop = asyncio.get_running_loop()
@@ -297,7 +299,7 @@ async def get_agent_detail(
 
 @router.patch("/experiments/{experiment_id}/agents/{agent_id}")
 async def update_agent(
-    experiment_id: str, agent_id: str, body: UpdateAgentRequest
+    experiment_id: ExperimentId, agent_id: AgentId, body: UpdateAgentRequest
 ) -> UpdateAgentResponse:
     """Update an agent's name and/or description."""
     loop = asyncio.get_running_loop()
@@ -340,7 +342,7 @@ async def update_agent(
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}/portfolio")
 async def get_agent_portfolio(
-    experiment_id: str, agent_id: str
+    experiment_id: ExperimentId, agent_id: AgentId
 ) -> dict[str, Any]:
     """Get agent portfolio with metrics."""
     detail = await get_agent_detail(experiment_id, agent_id)
@@ -352,7 +354,7 @@ async def get_agent_portfolio(
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}/strategy")
 async def get_agent_strategy(
-    experiment_id: str, agent_id: str
+    experiment_id: ExperimentId, agent_id: AgentId
 ) -> StrategyResponse:
     """Get agent strategy."""
     loop = asyncio.get_running_loop()
@@ -391,7 +393,7 @@ async def get_agent_strategy(
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}/transactions")
 async def get_agent_transactions(
-    experiment_id: str, agent_id: str
+    experiment_id: ExperimentId, agent_id: AgentId
 ) -> TransactionHistoryResponse:
     """Get agent transaction history."""
     loop = asyncio.get_running_loop()
@@ -483,10 +485,12 @@ async def get_agent_transactions(
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}/decisions")
 async def list_agent_decisions(
-    experiment_id: str, agent_id: str
+    experiment_id: ExperimentId, agent_id: AgentId
 ) -> list[DecisionLogEntry]:
     """List agent decision files."""
-    agent_dir = get_experiment_dir(experiment_id) / "agents" / agent_id / "decisions"
+    exp_dir = get_experiment_dir(experiment_id)
+    agent_dir = exp_dir / "agents" / agent_id / "decisions"
+    assert_path_within(agent_dir, exp_dir)
 
     if not agent_dir.exists():
         return []
@@ -522,11 +526,13 @@ async def list_agent_decisions(
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}/decisions/{date}")
 async def get_agent_decision(
-    experiment_id: str, agent_id: str, date: str
+    experiment_id: ExperimentId, agent_id: AgentId, date: DateStr
 ) -> dict[str, str]:
     """Get agent decision for a specific date, returned as rendered markdown."""
-    agent_dir = get_experiment_dir(experiment_id) / "agents" / agent_id / "decisions"
+    exp_dir = get_experiment_dir(experiment_id)
+    agent_dir = exp_dir / "agents" / agent_id / "decisions"
     decision_file = agent_dir / f"{date}.json"
+    assert_path_within(decision_file, exp_dir)
 
     if not decision_file.exists():
         raise HTTPException(status_code=404, detail="Decision not found")
@@ -581,7 +587,7 @@ async def get_agent_decision(
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}/holdings")
 async def get_agent_holdings(
-    experiment_id: str, agent_id: str
+    experiment_id: ExperimentId, agent_id: AgentId
 ) -> HoldingsInfoResponse:
     """Get per-holding breakdown with buy rationale from decision history."""
     loop = asyncio.get_running_loop()
@@ -611,7 +617,9 @@ async def get_agent_holdings(
     )
 
     # Scan decision files for buy reasoning per symbol
-    agent_dir = get_experiment_dir(experiment_id) / "agents" / agent_id / "decisions"
+    exp_dir = get_experiment_dir(experiment_id)
+    agent_dir = exp_dir / "agents" / agent_id / "decisions"
+    assert_path_within(agent_dir, exp_dir)
     buy_reasons: dict[str, list[BuyReasonEntry]] = {sym: [] for sym in symbols}
 
     if agent_dir.exists():
@@ -720,7 +728,7 @@ async def get_agent_holdings(
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}/alerts")
 async def get_agent_alerts(
-    experiment_id: str, agent_id: str
+    experiment_id: ExperimentId, agent_id: AgentId
 ) -> AlertsResponse:
     """Get alerts flagged by the agent across all decision files."""
     loop = asyncio.get_running_loop()
@@ -738,7 +746,9 @@ async def get_agent_alerts(
     if agent_id not in game_state.agents:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    agent_dir = get_experiment_dir(experiment_id) / "agents" / agent_id / "decisions"
+    exp_dir = get_experiment_dir(experiment_id)
+    agent_dir = exp_dir / "agents" / agent_id / "decisions"
+    assert_path_within(agent_dir, exp_dir)
 
     if not agent_dir.exists():
         return AlertsResponse(alerts=[], total_count=0)
@@ -769,7 +779,7 @@ async def get_agent_alerts(
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}/benchmarks")
 async def get_agent_benchmarks(
-    experiment_id: str, agent_id: str
+    experiment_id: ExperimentId, agent_id: AgentId
 ) -> BenchmarkResponse:
     """Get benchmark comparison data (SPY + sector ETFs) normalized to starting capital."""
     loop = asyncio.get_running_loop()
@@ -893,7 +903,7 @@ class AgentGuidanceRequest(BaseModel):
 
 @router.put("/experiments/{experiment_id}/agents/{agent_id}/strategy")
 async def update_agent_strategy(
-    experiment_id: str, agent_id: str, body: StrategyEditRequest
+    experiment_id: ExperimentId, agent_id: AgentId, body: StrategyEditRequest
 ) -> dict[str, Any]:
     """Edit one or more strategy fields for an agent."""
     loop = asyncio.get_running_loop()
@@ -960,7 +970,7 @@ async def update_agent_strategy(
 
 @router.put("/experiments/{experiment_id}/agents/{agent_id}/guidance")
 async def update_agent_guidance(
-    experiment_id: str, agent_id: str, body: AgentGuidanceRequest
+    experiment_id: ExperimentId, agent_id: AgentId, body: AgentGuidanceRequest
 ) -> dict[str, Any]:
     """Set or clear per-agent guidance text."""
     loop = asyncio.get_running_loop()

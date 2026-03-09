@@ -6,6 +6,8 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path
+
+from agent_trade.web.dependencies import ExperimentId
 from pydantic import BaseModel, Field
 
 from agent_trade.experiment.config import (
@@ -87,7 +89,7 @@ async def get_experiments() -> list[ExperimentListItem]:
 
 @router.get("/{experiment_id}", response_model=ExperimentDetail)
 async def get_experiment(
-    experiment_id: str = Path(..., description="Experiment ID"),
+    experiment_id: ExperimentId,
     config: ExperimentConfig = Depends(load_experiment_config),
 ) -> ExperimentDetail:
     """Get experiment details."""
@@ -119,7 +121,7 @@ async def get_experiment(
 @router.patch("/{experiment_id}", response_model=ExperimentDetail)
 async def update_experiment(
     body: UpdateExperimentRequest,
-    experiment_id: str = Path(..., description="Experiment ID"),
+    experiment_id: ExperimentId,
     config: ExperimentConfig = Depends(load_experiment_config),
 ) -> ExperimentDetail:
     """Rename an experiment."""
@@ -226,7 +228,7 @@ async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
 
 @router.delete("/{experiment_id}", status_code=204)
 async def delete_experiment(
-    experiment_id: str = Path(..., description="Experiment ID"),
+    experiment_id: ExperimentId,
     config: ExperimentConfig = Depends(load_experiment_config),
 ) -> None:
     """Delete an experiment and all its data."""

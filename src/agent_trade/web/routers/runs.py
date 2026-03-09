@@ -9,6 +9,7 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from ..dependencies import ExperimentId
 from ..run_manager import RunStatus, run_manager
 from ..schemas import RunStatusResponse
 from ...experiment.coordinator import load_game_state, save_game_state
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/experiments/{experiment_id}/run")
-async def start_run(experiment_id: str) -> RunStatusResponse:
+async def start_run(experiment_id: ExperimentId) -> RunStatusResponse:
     """
     Start a new run for the experiment.
 
@@ -50,7 +51,7 @@ async def start_run(experiment_id: str) -> RunStatusResponse:
 
 
 @router.get("/experiments/{experiment_id}/run/status")
-async def get_run_status(experiment_id: str) -> RunStatusResponse:
+async def get_run_status(experiment_id: ExperimentId) -> RunStatusResponse:
     """
     Get current run status for an experiment.
 
@@ -74,7 +75,7 @@ async def get_run_status(experiment_id: str) -> RunStatusResponse:
     )
 
 
-async def event_stream(experiment_id: str) -> AsyncGenerator[str, None]:
+async def event_stream(experiment_id: ExperimentId) -> AsyncGenerator[str, None]:
     """
     Generate SSE events for a run.
 
@@ -141,7 +142,7 @@ async def event_stream(experiment_id: str) -> AsyncGenerator[str, None]:
 
 
 @router.get("/experiments/{experiment_id}/run/stream")
-async def stream_run(experiment_id: str):
+async def stream_run(experiment_id: ExperimentId):
     """
     Stream run progress via Server-Sent Events.
 
@@ -163,7 +164,7 @@ async def stream_run(experiment_id: str):
 
 
 @router.post("/experiments/{experiment_id}/pause")
-async def pause_experiment(experiment_id: str) -> dict:
+async def pause_experiment(experiment_id: ExperimentId) -> dict:
     """
     Pause an experiment.
 
@@ -214,7 +215,7 @@ async def pause_experiment(experiment_id: str) -> dict:
 
 
 @router.post("/experiments/{experiment_id}/resume")
-async def resume_experiment(experiment_id: str) -> dict:
+async def resume_experiment(experiment_id: ExperimentId) -> dict:
     """
     Resume a paused experiment.
 
