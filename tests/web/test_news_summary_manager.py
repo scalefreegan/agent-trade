@@ -9,7 +9,7 @@ Covers:
 - Cache/job eviction
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
@@ -101,7 +101,7 @@ class TestCacheHit:
         )
         with manager._lock:
             manager._cache[cache_key] = cached_job
-            manager._cache_access[cache_key] = datetime.now()
+            manager._cache_access[cache_key] = datetime.now(timezone.utc)
 
         # Start job should return cached job
         job = manager.start_job("AAPL", sample_articles)
@@ -111,7 +111,7 @@ class TestCacheHit:
     def test_cache_hit_updates_access_time(self, manager, sample_articles):
         """Cache hit updates access time for LRU."""
         cache_key = manager._compute_cache_key("AAPL", sample_articles)
-        old_time = datetime(2026, 1, 1)
+        old_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
         cached_job = Mock(
             job_id="cached_job",
             symbol="AAPL",
@@ -228,7 +228,7 @@ class TestEviction:
         from datetime import timedelta
 
         # Fill cache to max
-        base_time = datetime(2026, 1, 1)
+        base_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
         old_keys = []
         for i in range(manager.MAX_CACHE):
             key = f"key_{i}"
@@ -243,7 +243,7 @@ class TestEviction:
         new_job = Mock(job_id="new_job", symbol="TEST")
         with manager._lock:
             manager._cache[new_key] = new_job
-            manager._cache_access[new_key] = datetime.now()
+            manager._cache_access[new_key] = datetime.now(timezone.utc)
             manager._evict_old_cache()
 
         # Oldest entry should be evicted
@@ -257,7 +257,7 @@ class TestEviction:
         from datetime import timedelta
 
         # Create a cached job (old but in cache)
-        base_time = datetime(2026, 1, 1)
+        base_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
         cached_job = Mock(
             job_id="cached_job",
             symbol="AAPL",
