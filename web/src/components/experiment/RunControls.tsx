@@ -128,13 +128,13 @@ export default function RunControls({ experimentId }: RunControlsProps) {
       </div>
 
       {error && (
-        <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">
+        <div role="alert" className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">
           {error}
         </div>
       )}
 
       {runStatus?.error && !error && (
-        <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">
+        <div role="alert" className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">
           {runStatus.error}
         </div>
       )}

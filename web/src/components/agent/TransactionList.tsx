@@ -106,6 +106,11 @@ export function TransactionList({ transactions }: TransactionListProps) {
     setCurrentPage(0); // Reset to first page
   };
 
+  const ariaSort = (field: SortField): 'ascending' | 'descending' | 'none' => {
+    if (sortField !== field) return 'none';
+    return sortDirection === 'asc' ? 'ascending' : 'descending';
+  };
+
   // Sort indicator
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
@@ -218,6 +223,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
               <thead>
                 <tr>
                   <th
+                    aria-sort={ariaSort('date')}
                     className="text-left text-xs font-semibold tracking-wide uppercase text-muted-foreground px-4 py-3 bg-muted border-b border-border cursor-pointer hover:bg-muted/80 transition-colors"
                     onClick={() => handleSort('date')}
                   >
@@ -227,6 +233,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                     </div>
                   </th>
                   <th
+                    aria-sort={ariaSort('action')}
                     className="text-left text-xs font-semibold tracking-wide uppercase text-muted-foreground px-4 py-3 bg-muted border-b border-border cursor-pointer hover:bg-muted/80 transition-colors"
                     onClick={() => handleSort('action')}
                   >
@@ -236,6 +243,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                     </div>
                   </th>
                   <th
+                    aria-sort={ariaSort('symbol')}
                     className="text-left text-xs font-semibold tracking-wide uppercase text-muted-foreground px-4 py-3 bg-muted border-b border-border cursor-pointer hover:bg-muted/80 transition-colors"
                     onClick={() => handleSort('symbol')}
                   >
@@ -245,6 +253,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                     </div>
                   </th>
                   <th
+                    aria-sort={ariaSort('shares')}
                     className="text-right text-xs font-semibold tracking-wide uppercase text-muted-foreground px-4 py-3 bg-muted border-b border-border cursor-pointer hover:bg-muted/80 transition-colors"
                     onClick={() => handleSort('shares')}
                   >
@@ -254,6 +263,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                     </div>
                   </th>
                   <th
+                    aria-sort={ariaSort('price')}
                     className="text-right text-xs font-semibold tracking-wide uppercase text-muted-foreground px-4 py-3 bg-muted border-b border-border cursor-pointer hover:bg-muted/80 transition-colors"
                     onClick={() => handleSort('price')}
                   >
@@ -263,6 +273,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                     </div>
                   </th>
                   <th
+                    aria-sort={ariaSort('total')}
                     className="text-right text-xs font-semibold tracking-wide uppercase text-muted-foreground px-4 py-3 bg-muted border-b border-border cursor-pointer hover:bg-muted/80 transition-colors"
                     onClick={() => handleSort('total')}
                   >
@@ -272,6 +283,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                     </div>
                   </th>
                   <th
+                    aria-sort={ariaSort('tax')}
                     className="text-right text-xs font-semibold tracking-wide uppercase text-muted-foreground px-4 py-3 bg-muted border-b border-border cursor-pointer hover:bg-muted/80 transition-colors"
                     onClick={() => handleSort('tax')}
                   >

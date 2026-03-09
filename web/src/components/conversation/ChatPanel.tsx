@@ -17,7 +17,10 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
   // Track elapsed seconds while waiting for a response.
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const prevMessageCountRef = useRef(0);
+  const userScrolledUpRef = useRef(false);
   const queryClient = useQueryClient();
 
   const { data: conversation, isLoading, error } = useConversation(
@@ -53,9 +56,33 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
     return () => clearInterval(timer);
   }, [isResponding]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Detect when user scrolls away from the bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const threshold = 40;
+      const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
+      userScrolledUpRef.current = !atBottom;
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll only when a NEW message arrives and user hasn't scrolled up
+  useEffect(() => {
+    const messages = conversation?.messages;
+    if (!messages) return;
+    const count = messages.length;
+    const isInitialLoad = prevMessageCountRef.current === 0 && count > 0;
+    const hasNewMessage = count > prevMessageCountRef.current;
+    prevMessageCountRef.current = count;
+
+    if (isInitialLoad) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+    } else if (hasNewMessage && !userScrolledUpRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [conversation?.messages]);
 
   // Focus input on mount
@@ -122,7 +149,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite">
         {conversation?.messages.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center text-center py-16">
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
@@ -241,7 +268,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
           )}
         </form>
         {sendMessage.isError && (
-          <p className="text-xs text-loss mt-2">{sendMessage.error?.message}</p>
+          <p role="alert" className="text-xs text-loss mt-2">{sendMessage.error?.message}</p>
         )}
       </div>
     </div>

@@ -67,7 +67,7 @@ export default function RunProgress({ events }: RunProgressProps) {
   return (
     <Card className="bg-muted/40">
       <h3 className="text-sm font-medium text-foreground mb-3">Agent Progress</h3>
-      <div className="space-y-2">
+      <div className="space-y-2" aria-live="polite">
         {agents.map((agent) => (
           <div key={agent.agent_id} className="flex items-center gap-3">
             <div className="flex-shrink-0">
