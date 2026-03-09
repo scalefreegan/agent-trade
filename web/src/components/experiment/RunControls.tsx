@@ -18,7 +18,7 @@ interface RunControlsProps {
 export default function RunControls({ experimentId }: RunControlsProps) {
   const queryClient = useQueryClient();
   const { data: experiment } = useExperiment(experimentId);
-  const { data: runStatus, isLoading: runStatusLoading } = useRunStatus(experimentId);
+  const { data: runStatus } = useRunStatus(experimentId);
   const startRunMutation = useStartRun();
   const pauseMutation = usePauseExperiment();
   const resumeMutation = useResumeExperiment();
@@ -28,17 +28,28 @@ export default function RunControls({ experimentId }: RunControlsProps) {
   const onComplete = useCallback(() => {
     setIsStreaming(false);
     setError(null);
-    queryClient.invalidateQueries();
-  }, [queryClient]);
+    // Instant state transition — no flicker while refetch settles
+    queryClient.setQueryData(['runStatus', experimentId], (old: Record<string, unknown> | undefined) =>
+      old ? { ...old, status: 'completed' } : old
+    );
+    // Then invalidate only relevant keys for eventual consistency
+    queryClient.invalidateQueries({ queryKey: ['runStatus', experimentId] });
+    queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
+    queryClient.invalidateQueries({ queryKey: ['experiment', experimentId] });
+    queryClient.invalidateQueries({ queryKey: ['experiments'] });
+  }, [queryClient, experimentId]);
 
   const onError = useCallback((errorMsg: string) => {
     console.error('Run error:', errorMsg);
     setIsStreaming(false);
     setError(errorMsg);
-    queryClient.invalidateQueries();
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: ['runStatus', experimentId] });
+    queryClient.invalidateQueries({ queryKey: ['gameState', experimentId] });
+    queryClient.invalidateQueries({ queryKey: ['experiment', experimentId] });
+    queryClient.invalidateQueries({ queryKey: ['experiments'] });
+  }, [queryClient, experimentId]);
 
-  const { events } = useRunStream(
+  const { isConnected, events } = useRunStream(
     runStatus?.status === 'running' ? experimentId : null,
     { onComplete, onError }
   );
@@ -79,7 +90,9 @@ export default function RunControls({ experimentId }: RunControlsProps) {
     }
   };
 
-  const isRunning = runStatus?.status === 'running' || isStreaming || runStatusLoading;
+  // SSE stream is primary source of truth; isStreaming covers the gap between
+  // clicking "Run Day" and the SSE connection opening
+  const isRunning = isConnected || isStreaming || runStatus?.status === 'running';
   const isPaused = experiment?.status === 'paused';
   const isCompleted = experiment?.status === 'completed';
 
