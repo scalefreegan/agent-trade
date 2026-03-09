@@ -6,13 +6,13 @@ import logging
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ..advisor_manager import AdvisorStatus, advisor_manager
 from ..advisor_presets import ADVISOR_PRESETS
-from ..dependencies import ExperimentId
+from ..dependencies import ExperimentId, require_advisor_rate_limit
 from ...experiment.coordinator import load_game_state
 
 router = APIRouter()
@@ -90,7 +90,7 @@ async def get_presets() -> DefaultPresetsResponse:
     )
 
 
-@router.post("/advisor/recommend")
+@router.post("/advisor/recommend", dependencies=[Depends(require_advisor_rate_limit)])
 async def start_recommendation(request: AdvisorRequest) -> AdvisorJobStatus:
     """Start a new recommendation job."""
     if not request.symbol or not request.symbol.strip():

@@ -7,7 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path
 
-from agent_trade.web.dependencies import ExperimentId
+from agent_trade.web.dependencies import ExperimentId, require_experiment_rate_limit
 from pydantic import BaseModel, Field
 
 from agent_trade.experiment.config import (
@@ -157,7 +157,7 @@ async def update_experiment(
     )
 
 
-@router.post("", response_model=ExperimentDetail, status_code=201)
+@router.post("", response_model=ExperimentDetail, status_code=201, dependencies=[Depends(require_experiment_rate_limit)])
 async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
     """Create a new experiment with full initialization (config, game state, agents)."""
     try:

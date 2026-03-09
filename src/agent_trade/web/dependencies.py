@@ -51,23 +51,38 @@ class RateLimiter:
         now = time.monotonic()
         cutoff = now - self.window_seconds
         with self._lock:
-            dq = self._hits.setdefault(key, deque())
-            # Purge expired timestamps
-            while dq and dq[0] <= cutoff:
-                dq.popleft()
-            if len(dq) >= self.max_requests:
+            dq = self._hits.get(key)
+            if dq is not None:
+                # Purge expired timestamps
+                while dq and dq[0] <= cutoff:
+                    dq.popleft()
+                # Remove entry if all timestamps expired (prevents unbounded growth)
+                if not dq:
+                    del self._hits[key]
+                    dq = None
+            if dq is not None and len(dq) >= self.max_requests:
                 return False
+            if dq is None:
+                dq = deque()
+                self._hits[key] = dq
             dq.append(now)
             return True
 
 
-# Global limiters: conversations (5/min), messages (10/min)
+# Global limiters
 _conversation_limiter = RateLimiter(max_requests=5, window_seconds=60)
 _message_limiter = RateLimiter(max_requests=10, window_seconds=60)
+_experiment_limiter = RateLimiter(max_requests=5, window_seconds=60)
+_advisor_limiter = RateLimiter(max_requests=5, window_seconds=60)
 
 
 def _client_ip(request: Request) -> str:
-    """Extract a rate-limit key from the request (client IP)."""
+    """Extract a rate-limit key from the request (client IP).
+
+    WARNING: X-Forwarded-For is trivially spoofable. Only trust this header
+    when the application is deployed behind a known reverse proxy (e.g. nginx,
+    Caddy, or a cloud load balancer) that overwrites the header.
+    """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
         return forwarded.split(",")[0].strip()
@@ -89,6 +104,24 @@ def require_message_rate_limit(request: Request) -> None:
         raise HTTPException(
             status_code=429,
             detail="Rate limit exceeded for sending messages. Try again later.",
+        )
+
+
+def require_experiment_rate_limit(request: Request) -> None:
+    """FastAPI dependency — reject if experiment-creation rate exceeded."""
+    if not _experiment_limiter.check(_client_ip(request)):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded for experiment creation. Try again later.",
+        )
+
+
+def require_advisor_rate_limit(request: Request) -> None:
+    """FastAPI dependency — reject if advisor-recommendation rate exceeded."""
+    if not _advisor_limiter.check(_client_ip(request)):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded for advisor recommendations. Try again later.",
         )
 
 
