@@ -3,6 +3,7 @@ import type { BenchmarkSeries, PerformanceDataPoint } from '../../api/types';
 import { Card } from '../ui/Card';
 import { MetricCard } from '../ui/MetricCard';
 import { useChartTheme } from '../../hooks/useChartTheme';
+import { formatCurrency } from '../../lib/format';
 
 // Muted colors for benchmark lines (distinct from agent's primary green)
 const BENCHMARK_COLORS = ['#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#f97316'];
@@ -23,15 +24,6 @@ export function AgentPerformanceChart({
   benchmarks = [],
 }: AgentPerformanceChartProps) {
   const ct = useChartTheme();
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
 
   // Build a lookup: date -> benchmark value per symbol
   const benchmarkByDate: Record<string, Record<string, number>> = {};
@@ -80,7 +72,7 @@ export function AgentPerformanceChart({
         <Card>
           <MetricCard
             label="Current Value"
-            value={<span className="font-mono text-2xl font-bold">{formatCurrency(currentValue)}</span>}
+            value={<span className="font-mono text-2xl font-bold">{formatCurrency(currentValue, 0)}</span>}
           />
         </Card>
         <Card>
@@ -88,7 +80,7 @@ export function AgentPerformanceChart({
             label="Total Gain/Loss"
             value={
               <span className={`font-mono text-2xl font-bold ${gainColor}`}>
-                {currentGain >= 0 ? '+' : ''}{formatCurrency(currentGain)}
+                {currentGain >= 0 ? '+' : ''}{formatCurrency(currentGain, 0)}
               </span>
             }
             secondary={`${currentGainPct >= 0 ? '+' : ''}${currentGainPct.toFixed(2)}%`}
@@ -97,7 +89,7 @@ export function AgentPerformanceChart({
         <Card>
           <MetricCard
             label="Starting Capital"
-            value={<span className="font-mono text-2xl font-bold">{formatCurrency(startingCapital)}</span>}
+            value={<span className="font-mono text-2xl font-bold">{formatCurrency(startingCapital, 0)}</span>}
           />
         </Card>
       </div>
@@ -135,14 +127,14 @@ export function AgentPerformanceChart({
                 formatter={(value: number | undefined, name: string | undefined) => {
                   const v = value ?? 0;
                   if (name === 'value') {
-                    return [formatCurrency(v), agentName];
+                    return [formatCurrency(v, 0), agentName];
                   }
                   if (name === 'gain') {
-                    return [formatCurrency(v), 'Gain/Loss'];
+                    return [formatCurrency(v, 0), 'Gain/Loss'];
                   }
                   // Benchmark — find label by symbol
                   const series = benchmarks.find((b) => b.symbol === name);
-                  return [formatCurrency(v), series?.label ?? name ?? ''];
+                  return [formatCurrency(v, 0), series?.label ?? name ?? ''];
                 }}
                 labelFormatter={(day) => `Day ${day}`}
               />

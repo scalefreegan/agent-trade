@@ -1,15 +1,11 @@
 import type { ExperimentReport } from '../../api/analysis';
 import { Card } from '../ui/Card';
 import { Badge, statusVariant } from '../ui/Badge';
+import { formatCurrency } from '../../lib/format';
 
 interface ExperimentReportViewProps {
   report: ExperimentReport;
 }
-
-const formatCurrency = (value: number | null | undefined): string => {
-  if (value == null || !isFinite(value)) return '—';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
-};
 
 const formatPct = (value: number | null | undefined): string => {
   if (value == null || !isFinite(value)) return '—';
@@ -73,7 +69,7 @@ export function ExperimentReportView({ report }: ExperimentReportViewProps) {
                   <td className="py-3 pr-4 text-muted-foreground font-mono">#{entry.rank}</td>
                   <td className="py-3 pr-4 font-medium text-foreground">{entry.name}</td>
                   <td className="py-3 pr-4 text-right font-medium text-foreground tabular-nums">
-                    {formatCurrency(entry.portfolio_value)}
+                    {formatCurrency(entry.portfolio_value, 0)}
                   </td>
                   <td className="py-3">
                     <Badge variant={statusVariant(entry.status)}>
@@ -149,13 +145,13 @@ export function ExperimentReportView({ report }: ExperimentReportViewProps) {
                     <tr key={agentId} className="hover:bg-muted/50 transition-colors">
                       <td className="py-3 pr-4 font-medium text-foreground">{agentName}</td>
                       <td className="py-3 pr-4 text-right tabular-nums text-foreground">
-                        {formatCurrency(metrics.total_tax)}
+                        {formatCurrency(metrics.total_tax, 0)}
                       </td>
                       <td className="py-3 pr-4 text-right tabular-nums text-warning">
-                        {formatCurrency(metrics.short_term_tax)}
+                        {formatCurrency(metrics.short_term_tax, 0)}
                       </td>
                       <td className="py-3 pr-4 text-right tabular-nums text-gain">
-                        {formatCurrency(metrics.long_term_tax)}
+                        {formatCurrency(metrics.long_term_tax, 0)}
                       </td>
                       <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">
                         {formatPct(metrics.tax_drag_pct)}

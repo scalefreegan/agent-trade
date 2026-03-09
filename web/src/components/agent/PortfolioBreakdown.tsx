@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Portfolio, PortfolioMetrics } from '../../api/types';
 import { Card } from '../ui/Card';
 import { MetricCard } from '../ui/MetricCard';
+import { formatCurrency, formatDate } from '../../lib/format';
 
 interface PortfolioBreakdownProps {
   portfolio: Portfolio;
@@ -11,24 +12,8 @@ interface PortfolioBreakdownProps {
 export function PortfolioBreakdown({ portfolio, metrics }: PortfolioBreakdownProps) {
   const [expandedPosition, setExpandedPosition] = useState<string | null>(null);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(value);
-  };
-
   const formatPercent = (value: number) => {
     return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   const calculateHoldingPeriod = (purchaseDate: string) => {

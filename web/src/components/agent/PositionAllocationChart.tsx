@@ -2,6 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import type { Portfolio } from '../../api/types';
 import { Card } from '../ui/Card';
 import { useChartTheme } from '../../hooks/useChartTheme';
+import { formatCurrency } from '../../lib/format';
 
 interface PositionAllocationChartProps {
   portfolio: Portfolio;
@@ -9,15 +10,6 @@ interface PositionAllocationChartProps {
 
 export function PositionAllocationChart({ portfolio }: PositionAllocationChartProps) {
   const ct = useChartTheme();
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
 
   // Prepare chart data
   const chartData = [];
@@ -100,7 +92,7 @@ export function PositionAllocationChart({ portfolio }: PositionAllocationChartPr
           {/* Center label */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
             <div className="text-[0.625rem] font-semibold tracking-widest uppercase text-muted-foreground mb-1">Total Value</div>
-            <div className="font-mono text-2xl font-bold text-foreground tracking-tight">{formatCurrency(totalValue)}</div>
+            <div className="font-mono text-2xl font-bold text-foreground tracking-tight">{formatCurrency(totalValue, 0)}</div>
           </div>
         </div>
 
@@ -122,7 +114,7 @@ export function PositionAllocationChart({ portfolio }: PositionAllocationChartPr
                 {item.percentage.toFixed(1)}%
               </div>
               <div className="font-mono text-[0.8125rem] text-foreground text-right min-w-[80px] font-medium">
-                {formatCurrency(item.value)}
+                {formatCurrency(item.value, 0)}
               </div>
             </div>
           ))}

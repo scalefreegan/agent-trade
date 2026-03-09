@@ -16,6 +16,7 @@ interface TooltipCallbackProps {
 import { useChartTheme } from '../../hooks/useChartTheme';
 import { Card } from '../ui/Card';
 import { MetricCard } from '../ui/MetricCard';
+import { formatCurrency } from '../../lib/format';
 
 interface TaxMetrics {
   total_tax: number;
@@ -43,16 +44,6 @@ interface ChartDataPoint {
   taxDragPct: number;
 }
 
-const formatCurrency = (value: number | null | undefined): string => {
-  if (value == null || !isFinite(value)) return '—';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-};
-
 export function TaxImpactChart({ taxMetrics, agentNames }: TaxImpactChartProps) {
   const ct = useChartTheme();
 
@@ -75,18 +66,18 @@ export function TaxImpactChart({ taxMetrics, agentNames }: TaxImpactChartProps) 
               <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: ct.shortTermColor }} />
               <span className="text-muted-foreground">Short-term</span>
             </div>
-            <span className="font-medium" style={{ color: ct.tooltip.text }}>{formatCurrency(data.shortTermTax)}</span>
+            <span className="font-medium" style={{ color: ct.tooltip.text }}>{formatCurrency(data.shortTermTax, 0)}</span>
           </div>
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: ct.longTermColor }} />
               <span className="text-muted-foreground">Long-term</span>
             </div>
-            <span className="font-medium" style={{ color: ct.tooltip.text }}>{formatCurrency(data.longTermTax)}</span>
+            <span className="font-medium" style={{ color: ct.tooltip.text }}>{formatCurrency(data.longTermTax, 0)}</span>
           </div>
           <div className="pt-2 mt-2 border-t flex justify-between items-center" style={{ borderColor: ct.tooltip.border }}>
             <span className="font-medium" style={{ color: ct.tooltip.text }}>Total Tax</span>
-            <span className="font-semibold" style={{ color: ct.tooltip.text }}>{formatCurrency(data.totalTax)}</span>
+            <span className="font-semibold" style={{ color: ct.tooltip.text }}>{formatCurrency(data.totalTax, 0)}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground text-xs">Tax Drag</span>
@@ -193,15 +184,15 @@ export function TaxImpactChart({ taxMetrics, agentNames }: TaxImpactChartProps) 
       <div className="mt-8 pt-6 border-t border-border grid grid-cols-3 gap-4">
         <MetricCard
           label="Total Taxes Paid"
-          value={<span className="font-mono text-2xl font-bold text-foreground">{formatCurrency(totalTaxAll)}</span>}
+          value={<span className="font-mono text-2xl font-bold text-foreground">{formatCurrency(totalTaxAll, 0)}</span>}
         />
         <MetricCard
           label="Short-term"
-          value={<span className="font-mono text-2xl font-bold" style={{ color: ct.shortTermColor }}>{formatCurrency(totalShortTermAll)}</span>}
+          value={<span className="font-mono text-2xl font-bold" style={{ color: ct.shortTermColor }}>{formatCurrency(totalShortTermAll, 0)}</span>}
         />
         <MetricCard
           label="Long-term"
-          value={<span className="font-mono text-2xl font-bold" style={{ color: ct.longTermColor }}>{formatCurrency(totalLongTermAll)}</span>}
+          value={<span className="font-mono text-2xl font-bold" style={{ color: ct.longTermColor }}>{formatCurrency(totalLongTermAll, 0)}</span>}
         />
       </div>
     </Card>

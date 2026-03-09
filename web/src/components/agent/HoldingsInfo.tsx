@@ -3,33 +3,12 @@ import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
 import type { HoldingsInfo as HoldingsInfoType } from '../../api/types';
 import { Card } from '../ui/Card';
 import { useChartTheme } from '../../hooks/useChartTheme';
+import { formatCurrency, formatDate, formatMarketCap } from '../../lib/format';
 
 type PriceViewMode = 'price' | 'percent';
 
 interface HoldingsInfoProps {
   data: HoldingsInfoType;
-}
-
-function formatCurrency(value: number, decimals = 2) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value);
-}
-
-function formatMarketCap(value: number): string {
-  if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
-  if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-  if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
-  return `$${value.toLocaleString()}`;
-}
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    year: 'numeric', month: 'short', day: 'numeric',
-  });
 }
 
 function toPercentChange(data: { date: string; close: number }[]) {

@@ -3,6 +3,7 @@ import type { TransactionHistory } from '../../api/types';
 import { Card } from '../ui/Card';
 import { MetricCard } from '../ui/MetricCard';
 import { Badge } from '../ui/Badge';
+import { formatCurrency } from '../../lib/format';
 
 interface TransactionListProps {
   transactions?: TransactionHistory;
@@ -22,14 +23,6 @@ export function TransactionList({ transactions }: TransactionListProps) {
   useEffect(() => {
     setCurrentPage(0);
   }, [transactions]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(value);
-  };
 
   // Helper: safe date parsing that returns 0 for malformed dates
   const safeDate = (dateStr: string): number => {

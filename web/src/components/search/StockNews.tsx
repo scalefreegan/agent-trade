@@ -8,25 +8,13 @@ import {
 } from '../../api/search';
 import { Card } from '../ui/Card';
 import { Tabs } from '../ui/Tabs';
+import { formatDate } from '../../lib/format';
 
 interface StockNewsProps {
   symbol: string;
 }
 
 const ARTICLES_PER_PAGE = 3;
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '';
-  try {
-    return new Date(dateStr).toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  } catch {
-    return dateStr;
-  }
-}
 
 interface PaginationProps {
   currentPage: number;
