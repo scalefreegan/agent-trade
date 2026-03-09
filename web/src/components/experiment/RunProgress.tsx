@@ -2,6 +2,7 @@
  * Run progress indicators showing per-agent status.
  */
 
+import { useMemo } from 'react';
 import type { RunEvent } from '../../hooks/useRunStream';
 import { Card } from '../ui/Card';
 import { Badge, statusVariant } from '../ui/Badge';
@@ -18,40 +19,42 @@ interface AgentProgress {
 }
 
 export default function RunProgress({ events }: RunProgressProps) {
-  const agentProgress = new Map<string, AgentProgress>();
+  const agents = useMemo(() => {
+    const agentProgress = new Map<string, AgentProgress>();
 
-  for (const event of events) {
-    if (!event.agent_id) continue;
+    for (const event of events) {
+      if (!event.agent_id) continue;
 
-    switch (event.type) {
-      case 'agent_start':
-        agentProgress.set(event.agent_id, {
-          agent_id: event.agent_id,
-          status: 'running',
-          message: event.message,
-        });
-        break;
+      switch (event.type) {
+        case 'agent_start':
+          agentProgress.set(event.agent_id, {
+            agent_id: event.agent_id,
+            status: 'running',
+            message: event.message,
+          });
+          break;
 
-      case 'agent_complete':
-        agentProgress.set(event.agent_id, {
-          agent_id: event.agent_id,
-          status: 'complete',
-          message: event.message,
-        });
-        break;
+        case 'agent_complete':
+          agentProgress.set(event.agent_id, {
+            agent_id: event.agent_id,
+            status: 'complete',
+            message: event.message,
+          });
+          break;
 
-      case 'agent_error':
-        agentProgress.set(event.agent_id, {
-          agent_id: event.agent_id,
-          status: 'error',
-          error: event.error,
-          message: event.message,
-        });
-        break;
+        case 'agent_error':
+          agentProgress.set(event.agent_id, {
+            agent_id: event.agent_id,
+            status: 'error',
+            error: event.error,
+            message: event.message,
+          });
+          break;
+      }
     }
-  }
 
-  const agents = Array.from(agentProgress.values());
+    return Array.from(agentProgress.values());
+  }, [events]);
 
   if (agents.length === 0) {
     return (

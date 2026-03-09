@@ -44,6 +44,9 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
     isPollingRef.current = false;
     setEvents([]); // Clear events from previous runs
 
+    // AbortController to cancel in-flight polls on experimentId change
+    const abortController = new AbortController();
+
     const startPollingFallback = () => {
       if (isPollingRef.current || isTerminalRef.current) {
         return;
@@ -58,7 +61,9 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
         }
 
         try {
-          const response = await fetch(`/api/v1/experiments/${experimentId}/run/status`);
+          const response = await fetch(`/api/v1/experiments/${experimentId}/run/status`, {
+            signal: abortController.signal,
+          });
 
           if (response.ok) {
             const status = await response.json();
@@ -71,7 +76,7 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
                 timestamp: new Date().toISOString(),
                 message: 'Run completed',
               };
-              setEvents((prev) => [...prev, completeEvent]);
+              setEvents((prev) => [...prev.slice(-199), completeEvent]);
               if (callbacksRef.current.onComplete) {
                 callbacksRef.current.onComplete();
               }
@@ -85,7 +90,7 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
                 timestamp: new Date().toISOString(),
                 error: status.error || 'Run failed',
               };
-              setEvents((prev) => [...prev, errorEvent]);
+              setEvents((prev) => [...prev.slice(-199), errorEvent]);
               if (callbacksRef.current.onError) {
                 callbacksRef.current.onError(status.error || 'Run failed');
               }
@@ -101,7 +106,7 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
                 timestamp: new Date().toISOString(),
                 error: 'Run job not found',
               };
-              setEvents((prev) => [...prev, errorEvent]);
+              setEvents((prev) => [...prev.slice(-199), errorEvent]);
               if (callbacksRef.current.onError) {
                 callbacksRef.current.onError('Run job not found');
               }
@@ -120,7 +125,7 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
               timestamp: new Date().toISOString(),
               error: errorText,
             };
-            setEvents((prev) => [...prev, errorEvent]);
+            setEvents((prev) => [...prev.slice(-199), errorEvent]);
             if (callbacksRef.current.onError) {
               callbacksRef.current.onError(errorText);
             }
@@ -129,9 +134,10 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
             }
           }
         } catch (error) {
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return; // Expected on experimentId change
+          }
           console.error('Polling error:', error);
-          // Network errors could be transient, don't treat as terminal
-          // But log for debugging
         }
       };
 
@@ -152,14 +158,15 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
 
       eventSource.onopen = () => {
         setIsConnected(true);
-        reconnectAttemptsRef.current = 0;
+        // Do NOT reset reconnectAttemptsRef here — cumulative failures
+        // must persist across brief SSE successes to prevent oscillation
       };
 
       eventSource.onmessage = (event) => {
         try {
           const data: RunEvent = JSON.parse(event.data);
 
-          setEvents((prev) => [...prev, data]);
+          setEvents((prev) => [...prev.slice(-199), data]);
 
           // Call event callback
           if (callbacksRef.current.onEvent) {
@@ -220,9 +227,10 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
 
     connect();
 
-    // Cleanup on unmount
+    // Cleanup on unmount or experimentId change
     return () => {
       isTerminalRef.current = true;
+      abortController.abort();
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
