@@ -1,77 +1,70 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useKalshiEvents, type KalshiMarket } from '../api/kalshi';
+import { useKalshiMarkets, type KalshiMarket } from '../api/kalshi';
 import { MarketCard } from '../components/predictions/MarketCard';
 import { SortControls, type SortOption, type MaxDateRange } from '../components/predictions/SortControls';
-
-function getMaxCloseDate(range: MaxDateRange): Date | null {
-  if (range === 'none') return null;
-  const now = new Date();
-  switch (range) {
-    case '1m':
-      now.setMonth(now.getMonth() + 1);
-      return now;
-    case '3m':
-      now.setMonth(now.getMonth() + 3);
-      return now;
-    case '6m':
-      now.setMonth(now.getMonth() + 6);
-      return now;
-    case '1y':
-      now.setFullYear(now.getFullYear() + 1);
-      return now;
-    default: {
-      const _exhaustive: never = range;
-      void _exhaustive;
-      return null;
-    }
-  }
-}
 
 export function PredictionMarketsPage() {
   const [sortBy, setSortBy] = useState<SortOption>('volume_24h');
   const [statusFilter, setStatusFilter] = useState('open');
-  const [maxDateRange, setMaxDateRange] = useState<MaxDateRange>('6m');
+  const [maxDateRange, setMaxDateRange] = useState<MaxDateRange>('none');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [category, setCategory] = useState('');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allMarkets, setAllMarkets] = useState<KalshiMarket[]>([]);
 
-  const { data, isLoading, error, isFetching } = useKalshiEvents({
+  // Compute max_close_ts from maxDateRange
+  const maxCloseTs = useMemo(() => {
+    if (maxDateRange === 'none') return undefined;
+    const now = new Date();
+    switch (maxDateRange) {
+      case '1m':
+        now.setMonth(now.getMonth() + 1);
+        break;
+      case '3m':
+        now.setMonth(now.getMonth() + 3);
+        break;
+      case '6m':
+        now.setMonth(now.getMonth() + 6);
+        break;
+      case '1y':
+        now.setFullYear(now.getFullYear() + 1);
+        break;
+    }
+    return Math.floor(now.getTime() / 1000);
+  }, [maxDateRange]);
+
+  const { data, isLoading, error, isFetching } = useKalshiMarkets({
     status: statusFilter || undefined,
-    limit: 20,
+    limit: 1000,
     cursor,
-    with_nested_markets: true,
+    max_close_ts: maxCloseTs,
+    series_ticker: category || undefined,
   });
 
   // Accumulate markets from all loaded pages
   useEffect(() => {
-    if (!data?.events || error) return;
+    if (!data?.markets || error) return;
 
-    const newMarkets = data.events.flatMap((event) =>
-      (event.markets || []).map((market) => ({
-        ...market,
-        eventTicker: event.ticker,
-        eventTitle: event.title,
-      }))
-    );
     if (cursor) {
-      // Append to existing markets
-      setAllMarkets((prev) => [...prev, ...newMarkets]);
+      setAllMarkets((prev) => [...prev, ...data.markets]);
     } else {
-      // Reset markets (new filter/sort)
-      setAllMarkets(newMarkets);
+      setAllMarkets(data.markets);
     }
   }, [data, cursor, error]);
 
-  // Client-side filtering and sorting — reacts to all filter/sort state changes
+  // Client-side filtering and sorting
   const displayedMarkets = useMemo(() => {
-    // Filter by max close date
-    const maxDate = getMaxCloseDate(maxDateRange);
     let markets = allMarkets;
-    if (maxDate) {
-      const maxTime = maxDate.getTime();
-      markets = markets.filter((m) => {
-        const closeTime = new Date(m.close_time).getTime();
-        return !isNaN(closeTime) && closeTime <= maxTime;
-      });
+
+    // Text search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      markets = markets.filter(
+        (m) =>
+          m.title.toLowerCase().includes(q) ||
+          (m.subtitle && m.subtitle.toLowerCase().includes(q)) ||
+          m.ticker.toLowerCase().includes(q)
+      );
     }
 
     // Sort
@@ -99,7 +92,7 @@ export function PredictionMarketsPage() {
         return sorted;
       }
     }
-  }, [allMarkets, sortBy, maxDateRange]);
+  }, [allMarkets, sortBy, searchQuery]);
 
   const resetPagination = () => {
     setCursor(undefined);
@@ -117,6 +110,12 @@ export function PredictionMarketsPage() {
 
   const handleMaxDateRangeChange = (newRange: MaxDateRange) => {
     setMaxDateRange(newRange);
+    resetPagination();
+  };
+
+  const handleCategoryChange = (newCategory: string) => {
+    setCategory(newCategory);
+    resetPagination();
   };
 
   const handleLoadMore = () => {
@@ -126,6 +125,15 @@ export function PredictionMarketsPage() {
   };
 
   const hasMore = !!data?.cursor;
+
+  // Collect unique series_tickers for category dropdown
+  const categories = useMemo(() => {
+    const tickers = new Set<string>();
+    allMarkets.forEach((m) => {
+      if (m.series_ticker) tickers.add(m.series_ticker);
+    });
+    return Array.from(tickers).sort();
+  }, [allMarkets]);
 
   return (
     <div className="space-y-6">
@@ -142,7 +150,21 @@ export function PredictionMarketsPage() {
         onStatusFilterChange={handleStatusFilterChange}
         maxDateRange={maxDateRange}
         onMaxDateRangeChange={handleMaxDateRangeChange}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        category={category}
+        onCategoryChange={handleCategoryChange}
+        categories={categories}
       />
+
+      {/* Result count */}
+      {allMarkets.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {displayedMarkets.length === allMarkets.length
+            ? `${allMarkets.length} markets loaded`
+            : `${displayedMarkets.length} markets matching '${searchQuery}' (${allMarkets.length} loaded)`}
+        </p>
+      )}
 
       {/* Loading skeleton */}
       {isLoading && allMarkets.length === 0 && (

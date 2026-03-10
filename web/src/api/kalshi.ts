@@ -8,6 +8,7 @@ export interface KalshiMarket {
   ticker: string;
   title: string;
   status: string;
+  result?: string;
   volume: number;
   volume_24h: number;
   open_interest: number;
@@ -19,11 +20,9 @@ export interface KalshiMarket {
   close_time: string;
   created_time: string;
   event_ticker?: string;
+  series_ticker?: string;
   category?: string;
   subtitle?: string;
-  // Added for URL construction
-  eventTicker?: string;
-  eventTitle?: string;
 }
 
 export interface KalshiEvent {
@@ -119,24 +118,33 @@ export interface UseKalshiMarketsParams {
   limit?: number;
   cursor?: string;
   event_ticker?: string;
+  series_ticker?: string;
+  min_close_ts?: number;
+  max_close_ts?: number;
 }
 
 export function useKalshiMarkets(params: UseKalshiMarketsParams = {}) {
   const {
     status,
-    limit = 40,
+    limit = 1000,
     cursor,
     event_ticker,
+    series_ticker,
+    min_close_ts,
+    max_close_ts,
   } = params;
 
   return useQuery({
-    queryKey: ['kalshi-markets', { status, limit, cursor, event_ticker }],
+    queryKey: ['kalshi-markets', { status, limit, cursor, event_ticker, series_ticker, min_close_ts, max_close_ts }],
     queryFn: () =>
       fetchKalshi<KalshiMarketsResponse>('/markets', {
         status,
         limit,
         cursor,
         event_ticker,
+        series_ticker,
+        min_close_ts,
+        max_close_ts,
       }),
     staleTime: 60_000, // 1 minute
   });

@@ -15,6 +15,11 @@ interface SortControlsProps {
   onStatusFilterChange: (status: string) => void;
   maxDateRange: MaxDateRange;
   onMaxDateRangeChange: (range: MaxDateRange) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  category: string;
+  onCategoryChange: (category: string) => void;
+  categories: string[];
 }
 
 const sortOptions: { value: SortOption; label: string }[] = [
@@ -32,11 +37,11 @@ const statusOptions = [
 ];
 
 const maxDateRangeOptions: { value: MaxDateRange; label: string }[] = [
+  { value: 'none', label: 'No Limit' },
   { value: '1m', label: '1 Month' },
   { value: '3m', label: '3 Months' },
   { value: '6m', label: '6 Months' },
   { value: '1y', label: '1 Year' },
-  { value: 'none', label: 'No Limit' },
 ];
 
 export function SortControls({
@@ -46,64 +51,101 @@ export function SortControls({
   onStatusFilterChange,
   maxDateRange,
   onMaxDateRangeChange,
+  searchQuery,
+  onSearchChange,
+  category,
+  onCategoryChange,
+  categories,
 }: SortControlsProps) {
   return (
-    <div className="flex items-center gap-3 flex-wrap">
-      {/* Sort dropdown */}
-      <div className="flex items-center gap-2">
-        <label htmlFor="sort" className="text-sm font-medium text-foreground">
-          Sort by:
-        </label>
-        <select
-          id="sort"
-          value={sortBy}
-          onChange={(e) => onSortChange(e.target.value as SortOption)}
-          className="px-3 py-1.5 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+    <div className="space-y-3">
+      {/* Search bar */}
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={(e) => onSearchChange(e.target.value)}
+        placeholder="Search markets..."
+        className="w-full px-4 py-2 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
+      />
 
-      {/* Status filter */}
-      <div className="flex items-center gap-2">
-        <label htmlFor="status" className="text-sm font-medium text-foreground">
-          Status:
-        </label>
-        <select
-          id="status"
-          value={statusFilter}
-          onChange={(e) => onStatusFilterChange(e.target.value)}
-          className="px-3 py-1.5 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          {statusOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Filter/sort row */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* Sort dropdown */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="sort" className="text-sm font-medium text-foreground">
+            Sort by:
+          </label>
+          <select
+            id="sort"
+            value={sortBy}
+            onChange={(e) => onSortChange(e.target.value as SortOption)}
+            className="px-3 py-1.5 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            {sortOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      {/* Max close date filter */}
-      <div className="flex items-center gap-2">
-        <label htmlFor="maxDate" className="text-sm font-medium text-foreground">
-          Closes within:
-        </label>
-        <select
-          id="maxDate"
-          value={maxDateRange}
-          onChange={(e) => onMaxDateRangeChange(e.target.value as MaxDateRange)}
-          className="px-3 py-1.5 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          {maxDateRangeOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        {/* Status filter */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="status" className="text-sm font-medium text-foreground">
+            Status:
+          </label>
+          <select
+            id="status"
+            value={statusFilter}
+            onChange={(e) => onStatusFilterChange(e.target.value)}
+            className="px-3 py-1.5 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Max close date filter */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="maxDate" className="text-sm font-medium text-foreground">
+            Closes within:
+          </label>
+          <select
+            id="maxDate"
+            value={maxDateRange}
+            onChange={(e) => onMaxDateRangeChange(e.target.value as MaxDateRange)}
+            className="px-3 py-1.5 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            {maxDateRangeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Category filter */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="category" className="text-sm font-medium text-foreground">
+            Category:
+          </label>
+          <select
+            id="category"
+            value={category}
+            onChange={(e) => onCategoryChange(e.target.value)}
+            className="px-3 py-1.5 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">All Categories</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );
