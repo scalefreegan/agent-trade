@@ -26,14 +26,22 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
+      - name: Verify test collection
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          echo "Collecting tests..."
+          uv run pytest tests/ --collect-only -q 2>&1 | tail -5
+          echo "Collection complete."
+
       - name: Run tests
         env:
           PYTHONUNBUFFERED: "1"
-        run: >
-          uv run pytest tests/
-          --cov=src/agent_trade
-          --cov-report=term-missing
-          --cov-fail-under=85
-          -v
-          --timeout=60
-          --timeout-method=thread
+        run: |
+          uv run pytest tests/ \
+            --cov=src/agent_trade \
+            --cov-report=term-missing \
+            --cov-fail-under=85 \
+            -v \
+            --timeout=60 \
+            --timeout-method=thread
