@@ -28,10 +28,14 @@ from agent_trade.experiment.strategy_manager import (
 )
 from agent_trade.experiment.models import Portfolio
 from agent_trade.web.schemas import (
+    AgentDecisionResponse,
     AgentDetailResponse,
+    AgentGuidanceResponse,
+    AgentPortfolioResponse,
     AgentStateResponse,
     AlertEntryResponse,
     AlertsResponse,
+    BenchmarkDataPoint,
     BenchmarkResponse,
     BenchmarkSeries,
     BuyReasonEntry,
@@ -47,6 +51,7 @@ from agent_trade.web.schemas import (
     StockPositionResponse,
     StrategyLearningResponse,
     StrategyResponse,
+    StrategyUpdateResponse,
     TaxLotResponse,
     TransactionHistoryResponse,
     TransactionRecord,
@@ -340,16 +345,16 @@ async def update_agent(
     )
 
 
-@router.get("/experiments/{experiment_id}/agents/{agent_id}/portfolio")
+@router.get(
+    "/experiments/{experiment_id}/agents/{agent_id}/portfolio",
+    response_model=AgentPortfolioResponse,
+)
 async def get_agent_portfolio(
     experiment_id: ExperimentId, agent_id: AgentId
-) -> dict[str, Any]:
+) -> AgentPortfolioResponse:
     """Get agent portfolio with metrics."""
     detail = await get_agent_detail(experiment_id, agent_id)
-    return {
-        "portfolio": detail.portfolio,
-        "metrics": detail.metrics,
-    }
+    return AgentPortfolioResponse(portfolio=detail.portfolio, metrics=detail.metrics)
 
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}/strategy")
@@ -524,10 +529,13 @@ async def list_agent_decisions(
     return sorted(decisions, key=lambda x: x.date, reverse=True)
 
 
-@router.get("/experiments/{experiment_id}/agents/{agent_id}/decisions/{date}")
+@router.get(
+    "/experiments/{experiment_id}/agents/{agent_id}/decisions/{date}",
+    response_model=AgentDecisionResponse,
+)
 async def get_agent_decision(
     experiment_id: ExperimentId, agent_id: AgentId, date: DateStr
-) -> dict[str, str]:
+) -> AgentDecisionResponse:
     """Get agent decision for a specific date, returned as rendered markdown."""
     exp_dir = get_experiment_dir(experiment_id)
     agent_dir = exp_dir / "agents" / agent_id / "decisions"
@@ -582,7 +590,7 @@ async def get_agent_decision(
                 lines.append(f"**Lesson**: {strategy_updates['lesson']}")
             lines.append("")
 
-    return {"markdown": "\n".join(lines)}
+    return AgentDecisionResponse(markdown="\n".join(lines))
 
 
 @router.get("/experiments/{experiment_id}/agents/{agent_id}/holdings")
@@ -904,10 +912,13 @@ class AgentGuidanceRequest(BaseModel):
     guidance: Optional[str] = None  # None / omitted = clear guidance
 
 
-@router.put("/experiments/{experiment_id}/agents/{agent_id}/strategy")
+@router.put(
+    "/experiments/{experiment_id}/agents/{agent_id}/strategy",
+    response_model=StrategyUpdateResponse,
+)
 async def update_agent_strategy(
     experiment_id: ExperimentId, agent_id: AgentId, body: StrategyEditRequest
-) -> dict[str, Any]:
+) -> StrategyUpdateResponse:
     """Edit one or more strategy fields for an agent."""
     loop = asyncio.get_running_loop()
     try:
@@ -954,7 +965,7 @@ async def update_agent_strategy(
         changed.append("rationale")
 
     if not changed:
-        return {"updated": [], "message": "No fields were changed"}
+        return StrategyUpdateResponse(updated=[], message="No fields were changed")
 
     agent.strategy.last_updated = datetime.now(timezone.utc)
 
@@ -969,13 +980,16 @@ async def update_agent_strategy(
         logger.exception(f"Failed to save strategy for {agent_id}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-    return {"updated": changed, "message": f"Updated {agent_id}: {', '.join(changed)}"}
+    return StrategyUpdateResponse(updated=changed, message=f"Updated {agent_id}: {', '.join(changed)}")
 
 
-@router.put("/experiments/{experiment_id}/agents/{agent_id}/guidance")
+@router.put(
+    "/experiments/{experiment_id}/agents/{agent_id}/guidance",
+    response_model=AgentGuidanceResponse,
+)
 async def update_agent_guidance(
     experiment_id: ExperimentId, agent_id: AgentId, body: AgentGuidanceRequest
-) -> dict[str, Any]:
+) -> AgentGuidanceResponse:
     """Set or clear per-agent guidance text."""
     loop = asyncio.get_running_loop()
     try:
@@ -1004,5 +1018,5 @@ async def update_agent_guidance(
         raise HTTPException(status_code=500, detail="Internal server error")
 
     if body.guidance:
-        return {"guidance": body.guidance, "message": f"Guidance set for {agent_id}"}
-    return {"guidance": None, "message": f"Guidance cleared for {agent_id}"}
+        return AgentGuidanceResponse(guidance=body.guidance, message=f"Guidance set for {agent_id}")
+    return AgentGuidanceResponse(guidance=None, message=f"Guidance cleared for {agent_id}")

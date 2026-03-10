@@ -10,14 +10,24 @@ from agent_trade.experiment.analysis_reporter import (
     generate_experiment_report,
 )
 from agent_trade.web.dependencies import validate_experiment_exists
+from agent_trade.web.schemas import (
+    AgentTaxMetrics,
+    ExperimentReportResponse,
+    HoldingPeriodBuckets,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.get("/experiments/{experiment_id}/tax-metrics")
-async def get_tax_metrics(experiment_id: ExperimentId) -> dict[str, dict[str, float]]:
+@router.get(
+    "/experiments/{experiment_id}/tax-metrics",
+    response_model=dict[str, AgentTaxMetrics],
+)
+async def get_tax_metrics(
+    experiment_id: ExperimentId,
+) -> dict[str, AgentTaxMetrics]:
     """
     Get tax efficiency metrics for all agents in an experiment.
 
@@ -37,8 +47,13 @@ async def get_tax_metrics(experiment_id: ExperimentId) -> dict[str, dict[str, fl
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/experiments/{experiment_id}/holding-periods")
-async def get_holding_periods(experiment_id: ExperimentId) -> dict[str, dict[str, int]]:
+@router.get(
+    "/experiments/{experiment_id}/holding-periods",
+    response_model=dict[str, HoldingPeriodBuckets],
+)
+async def get_holding_periods(
+    experiment_id: ExperimentId,
+) -> dict[str, HoldingPeriodBuckets]:
     """
     Get holding period distribution for all agents.
 
@@ -58,11 +73,14 @@ async def get_holding_periods(experiment_id: ExperimentId) -> dict[str, dict[str
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/experiments/{experiment_id}/report")
+@router.get(
+    "/experiments/{experiment_id}/report",
+    response_model=ExperimentReportResponse,
+)
 async def get_experiment_report(
     experiment_id: ExperimentId,
     include_tax_metrics: bool = True,
-) -> dict:
+) -> ExperimentReportResponse:
     """
     Get comprehensive experiment report.
 

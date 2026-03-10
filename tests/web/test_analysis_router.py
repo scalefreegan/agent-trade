@@ -22,6 +22,19 @@ def client(app):
     return TestClient(app)
 
 
+_TAX_METRICS_AGENT = {
+    "total_tax": 1500.0,
+    "short_term_tax": 1000.0,
+    "long_term_tax": 500.0,
+    "short_term_gains": 5000.0,
+    "long_term_gains": 2000.0,
+    "gross_proceeds": 10000.0,
+    "tax_drag_pct": 15.0,
+    "avg_holding_period_days": 45.0,
+    "num_trades": 10,
+}
+
+
 class TestGetTaxMetrics:
     """Tests for GET /experiments/{experiment_id}/tax-metrics"""
 
@@ -31,18 +44,8 @@ class TestGetTaxMetrics:
         """Should return tax metrics on success"""
         mock_validate.return_value = None
         mock_calculate.return_value = {
-            "agent1": {
-                "total_taxes": 1500.0,
-                "short_term_taxes": 1000.0,
-                "long_term_taxes": 500.0,
-                "tax_drag_pct": 15.0,
-            },
-            "agent2": {
-                "total_taxes": 800.0,
-                "short_term_taxes": 500.0,
-                "long_term_taxes": 300.0,
-                "tax_drag_pct": 12.0,
-            },
+            "agent1": dict(_TAX_METRICS_AGENT),
+            "agent2": {**_TAX_METRICS_AGENT, "total_tax": 800.0, "tax_drag_pct": 12.0},
         }
 
         response = client.get("/experiments/exp1/tax-metrics")
@@ -51,7 +54,7 @@ class TestGetTaxMetrics:
         data = response.json()
         assert "agent1" in data
         assert "agent2" in data
-        assert data["agent1"]["total_taxes"] == 1500.0
+        assert data["agent1"]["total_tax"] == 1500.0
         mock_validate.assert_called_once_with("exp1")
         mock_calculate.assert_called_once_with("exp1")
 
@@ -90,20 +93,8 @@ class TestGetHoldingPeriods:
         """Should return holding period distribution on success"""
         mock_validate.return_value = None
         mock_calculate.return_value = {
-            "agent1": {
-                "0-30_days": 5,
-                "31-90_days": 3,
-                "91-180_days": 2,
-                "181-365_days": 1,
-                "365+_days": 10,
-            },
-            "agent2": {
-                "0-30_days": 8,
-                "31-90_days": 4,
-                "91-180_days": 1,
-                "181-365_days": 0,
-                "365+_days": 7,
-            },
+            "agent1": {"0-30": 5, "31-90": 3, "91-180": 2, "181-365": 1, "365+": 10},
+            "agent2": {"0-30": 8, "31-90": 4, "91-180": 1, "181-365": 0, "365+": 7},
         }
 
         response = client.get("/experiments/exp1/holding-periods")
@@ -112,8 +103,8 @@ class TestGetHoldingPeriods:
         data = response.json()
         assert "agent1" in data
         assert "agent2" in data
-        assert data["agent1"]["0-30_days"] == 5
-        assert data["agent1"]["365+_days"] == 10
+        assert data["agent1"]["0-30"] == 5
+        assert data["agent1"]["365+"] == 10
         mock_validate.assert_called_once_with("exp1")
         mock_calculate.assert_called_once_with("exp1")
 
@@ -143,6 +134,18 @@ class TestGetHoldingPeriods:
         assert response.json()["detail"] == "Internal server error"
 
 
+_REPORT_BASE = {
+    "experiment_id": "exp1",
+    "name": "Test Experiment",
+    "status": "active",
+    "trading_day": 5,
+    "last_run": None,
+    "num_agents_total": 2,
+    "num_agents_active": 2,
+    "leaderboard": [],
+}
+
+
 class TestGetExperimentReport:
     """Tests for GET /experiments/{experiment_id}/report"""
 
@@ -152,11 +155,11 @@ class TestGetExperimentReport:
         """Should generate report with tax metrics by default"""
         mock_validate.return_value = None
         mock_generate.return_value = {
-            "experiment_id": "exp1",
-            "status": "active",
-            "leaderboard": [],
-            "tax_metrics": {"agent1": {}},
-            "holding_periods": {"agent1": {}},
+            **_REPORT_BASE,
+            "tax_metrics": {"agent1": dict(_TAX_METRICS_AGENT)},
+            "holding_period_distribution": {
+                "agent1": {"0-30": 5, "31-90": 3, "91-180": 2, "181-365": 1, "365+": 0}
+            },
         }
 
         response = client.get("/experiments/exp1/report")
@@ -165,7 +168,7 @@ class TestGetExperimentReport:
         data = response.json()
         assert data["experiment_id"] == "exp1"
         assert "tax_metrics" in data
-        assert "holding_periods" in data
+        assert "holding_period_distribution" in data
         mock_validate.assert_called_once_with("exp1")
         mock_generate.assert_called_once_with("exp1", include_tax_metrics=True)
 
@@ -174,19 +177,15 @@ class TestGetExperimentReport:
     def test_success_without_tax_metrics(self, mock_validate, mock_generate, client):
         """Should generate report without tax metrics when flag is false"""
         mock_validate.return_value = None
-        mock_generate.return_value = {
-            "experiment_id": "exp1",
-            "status": "active",
-            "leaderboard": [],
-        }
+        mock_generate.return_value = dict(_REPORT_BASE)
 
         response = client.get("/experiments/exp1/report?include_tax_metrics=false")
 
         assert response.status_code == 200
         data = response.json()
         assert data["experiment_id"] == "exp1"
-        assert "tax_metrics" not in data
-        assert "holding_periods" not in data
+        assert data.get("tax_metrics") is None
+        assert data.get("holding_period_distribution") is None
         mock_validate.assert_called_once_with("exp1")
         mock_generate.assert_called_once_with("exp1", include_tax_metrics=False)
 
@@ -198,8 +197,8 @@ class TestGetExperimentReport:
         """Should include tax metrics when explicitly set to true"""
         mock_validate.return_value = None
         mock_generate.return_value = {
-            "experiment_id": "exp1",
-            "tax_metrics": {},
+            **_REPORT_BASE,
+            "tax_metrics": {"agent1": dict(_TAX_METRICS_AGENT)},
         }
 
         response = client.get("/experiments/exp1/report?include_tax_metrics=true")

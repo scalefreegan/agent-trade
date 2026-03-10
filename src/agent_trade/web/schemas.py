@@ -3,7 +3,16 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_serializer, model_validator
+from pydantic import BaseModel, Field, field_serializer, model_serializer, model_validator, RootModel
+
+
+class DecimalMixin(BaseModel):
+    """Mixin that converts Decimal field values to float during serialization."""
+
+    @model_serializer(mode="wrap")
+    def _coerce_decimals(self, handler: Any) -> dict[str, Any]:
+        data = handler(self)
+        return {k: float(v) if isinstance(v, Decimal) else v for k, v in data.items()}
 
 
 class ExperimentListItem(BaseModel):
@@ -17,7 +26,7 @@ class ExperimentListItem(BaseModel):
     current_day: int | None = None
 
 
-class ExperimentDetail(BaseModel):
+class ExperimentDetail(DecimalMixin):
     """Full experiment details."""
 
     id: str
@@ -31,30 +40,16 @@ class ExperimentDetail(BaseModel):
     options_enabled: bool = False
     futures_enabled: bool = False
 
-    @field_serializer("starting_capital")
-    def serialize_decimal(self, v: Any) -> float:
-        """Convert Decimal to float."""
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
-
-class TaxLotResponse(BaseModel):
+class TaxLotResponse(DecimalMixin):
     """Tax lot information."""
 
     shares: float
     cost_basis: float
     purchase_date: datetime
 
-    @field_serializer("shares", "cost_basis")
-    def serialize_decimal(self, v: Any) -> float:
-        """Convert Decimal to float."""
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
-
-class StockPositionResponse(BaseModel):
+class StockPositionResponse(DecimalMixin):
     """Stock position with tax lots."""
 
     symbol: str
@@ -65,23 +60,8 @@ class StockPositionResponse(BaseModel):
     unrealized_gain: float | None = None
     lots: list[TaxLotResponse]
 
-    @field_serializer(
-        "total_shares",
-        "total_cost_basis",
-        "current_price",
-        "current_value",
-        "unrealized_gain",
-    )
-    def serialize_decimal(self, v: Any) -> float | None:
-        """Convert Decimal to float."""
-        if v is None:
-            return None
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
-
-class OptionPositionResponse(BaseModel):
+class OptionPositionResponse(DecimalMixin):
     """Option position information."""
 
     underlying: str
@@ -93,17 +73,8 @@ class OptionPositionResponse(BaseModel):
     total_premium: float
     intrinsic_value: float | None = None
 
-    @field_serializer("strike_price", "premium_per_share", "total_premium", "intrinsic_value")
-    def serialize_decimal(self, v: Any) -> float | None:
-        """Convert Decimal to float."""
-        if v is None:
-            return None
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
-
-class FuturesPositionResponse(BaseModel):
+class FuturesPositionResponse(DecimalMixin):
     """Futures position information."""
 
     symbol: str
@@ -116,20 +87,8 @@ class FuturesPositionResponse(BaseModel):
     total_margin: float
     unrealized_pnl: float | None = None
 
-    @field_serializer(
-        "entry_price", "contract_multiplier", "margin_per_contract",
-        "total_margin", "unrealized_pnl",
-    )
-    def serialize_decimal(self, v: Any) -> float | None:
-        """Convert Decimal to float."""
-        if v is None:
-            return None
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
-
-class PortfolioResponse(BaseModel):
+class PortfolioResponse(DecimalMixin):
     """Portfolio state."""
 
     cash: float
@@ -137,13 +96,6 @@ class PortfolioResponse(BaseModel):
     option_positions: list[OptionPositionResponse] = Field(default_factory=list)
     futures_positions: list[FuturesPositionResponse] = Field(default_factory=list)
     margin_used: float = 0.0
-
-    @field_serializer("cash", "margin_used")
-    def serialize_decimal(self, v: Any) -> float:
-        """Convert Decimal to float."""
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
 
 class AgentStateResponse(BaseModel):
@@ -168,7 +120,7 @@ class GameStateResponse(BaseModel):
 # ==============================================================================
 
 
-class LeaderboardEntry(BaseModel):
+class LeaderboardEntry(DecimalMixin):
     """Leaderboard entry for a single agent."""
 
     rank: int
@@ -177,15 +129,6 @@ class LeaderboardEntry(BaseModel):
     portfolio_value: float
     returns_pct: float | None = None
     status: str
-
-    @field_serializer("portfolio_value", "returns_pct")
-    def serialize_decimal(self, v: Any) -> float | None:
-        """Convert Decimal to float."""
-        if v is None:
-            return None
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
 
 class LeaderboardResponse(BaseModel):
@@ -218,7 +161,7 @@ class PerformanceResponse(BaseModel):
 # ==============================================================================
 
 
-class PortfolioMetrics(BaseModel):
+class PortfolioMetrics(DecimalMixin):
     """Calculated metrics for a portfolio."""
 
     total_value: float
@@ -227,19 +170,6 @@ class PortfolioMetrics(BaseModel):
     positions_count: int
     cash_pct: float
     invested_pct: float
-
-    @field_serializer(
-        "total_value",
-        "unrealized_gain",
-        "unrealized_gain_pct",
-        "cash_pct",
-        "invested_pct",
-    )
-    def serialize_decimal(self, v: Any) -> float:
-        """Convert Decimal to float."""
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
 
 class InvestmentThesisResponse(BaseModel):
@@ -270,7 +200,7 @@ class StrategyResponse(BaseModel):
     last_updated: datetime
 
 
-class TransactionRecord(BaseModel):
+class TransactionRecord(DecimalMixin):
     """Single transaction record."""
 
     date: str
@@ -281,30 +211,14 @@ class TransactionRecord(BaseModel):
     total: float
     tax_paid: float | None = None
 
-    @field_serializer("shares", "price", "total", "tax_paid")
-    def serialize_decimal(self, v: Any) -> float | None:
-        """Convert Decimal to float."""
-        if v is None:
-            return None
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
-
-class TransactionHistoryResponse(BaseModel):
+class TransactionHistoryResponse(DecimalMixin):
     """Transaction history for an agent."""
 
     transactions: list[TransactionRecord]
     total_buy_volume: float
     total_sell_volume: float
     total_tax_paid: float
-
-    @field_serializer("total_buy_volume", "total_sell_volume", "total_tax_paid")
-    def serialize_decimal(self, v: Any) -> float:
-        """Convert Decimal to float."""
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
 
 class DecisionLogEntry(BaseModel):
@@ -427,12 +341,19 @@ class AlertsResponse(BaseModel):
 # ==============================================================================
 
 
+class BenchmarkDataPoint(BaseModel):
+    """Single benchmark data point with date and normalized value."""
+
+    date: str
+    value: float
+
+
 class BenchmarkSeries(BaseModel):
     """Performance series for a single benchmark."""
 
     symbol: str
     label: str
-    data: list[dict]  # [{date, value}] normalized to starting capital
+    data: list[BenchmarkDataPoint]  # normalized to starting capital
 
 
 class BenchmarkResponse(BaseModel):
@@ -479,7 +400,7 @@ class TickerSearchResponse(BaseModel):
     count: int
 
 
-class StockInfoResponse(BaseModel):
+class StockInfoResponse(DecimalMixin):
     """Stock info response for search."""
 
     symbol: str
@@ -495,19 +416,8 @@ class StockInfoResponse(BaseModel):
     average_volume: int | None = None
     business_summary: str | None = None
 
-    @field_serializer(
-        "current_price", "pe_ratio", "fifty_two_week_high", "fifty_two_week_low",
-    )
-    def serialize_decimal(self, v: Any) -> float | None:
-        """Convert Decimal to float."""
-        if v is None:
-            return None
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
-
-class HistoricalPricePoint(BaseModel):
+class HistoricalPricePoint(DecimalMixin):
     """Single historical price point."""
 
     date: str
@@ -516,13 +426,6 @@ class HistoricalPricePoint(BaseModel):
     low: float
     close: float
     volume: int
-
-    @field_serializer("open", "high", "low", "close")
-    def serialize_decimal(self, v: Any) -> float:
-        """Convert Decimal to float."""
-        if isinstance(v, Decimal):
-            return float(v)
-        return v
 
 
 class HistoricalPriceResponse(BaseModel):
@@ -589,3 +492,83 @@ class NewsSummaryJobResponse(BaseModel):
         if self.status == "failed" and not self.error:
             self.error = "Summary generation failed"
         return self
+
+
+# ==============================================================================
+# Agent Endpoint Response Models
+# ==============================================================================
+
+
+class AgentPortfolioResponse(BaseModel):
+    """Response for GET /agents/{agent_id}/portfolio."""
+
+    portfolio: PortfolioResponse
+    metrics: PortfolioMetrics
+
+
+class AgentDecisionResponse(BaseModel):
+    """Response for GET /agents/{agent_id}/decisions/{date}."""
+
+    markdown: str
+
+
+class StrategyUpdateResponse(BaseModel):
+    """Response for PUT /agents/{agent_id}/strategy."""
+
+    updated: list[str]
+    message: str
+
+
+class AgentGuidanceResponse(BaseModel):
+    """Response for PUT /agents/{agent_id}/guidance."""
+
+    guidance: str | None
+    message: str
+
+
+# ==============================================================================
+# Analysis Endpoint Response Models
+# ==============================================================================
+
+
+class AgentTaxMetrics(BaseModel):
+    """Tax efficiency metrics for a single agent."""
+
+    total_tax: float
+    short_term_tax: float
+    long_term_tax: float
+    short_term_gains: float
+    long_term_gains: float
+    gross_proceeds: float
+    tax_drag_pct: float
+    avg_holding_period_days: float
+    num_trades: int
+
+
+class HoldingPeriodBuckets(RootModel[dict[str, int]]):
+    """Holding period distribution buckets for a single agent."""
+
+
+class ExperimentReportLeaderboardEntry(BaseModel):
+    """Leaderboard entry within an experiment report."""
+
+    rank: int
+    agent_id: str
+    name: str
+    portfolio_value: float
+    status: str
+
+
+class ExperimentReportResponse(BaseModel):
+    """Comprehensive experiment report response."""
+
+    experiment_id: str
+    name: str
+    status: str
+    trading_day: int
+    last_run: str | None = None
+    num_agents_total: int
+    num_agents_active: int
+    leaderboard: list[ExperimentReportLeaderboardEntry]
+    tax_metrics: dict[str, AgentTaxMetrics] | None = None
+    holding_period_distribution: dict[str, dict[str, int]] | None = None
