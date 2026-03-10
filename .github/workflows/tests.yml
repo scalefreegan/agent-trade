@@ -12,8 +12,8 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
+    runs-on: macos-latest
+    timeout-minutes: 10
     env:
       PYTHONUNBUFFERED: "1"
     steps:
@@ -28,32 +28,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Diagnose - single file test
+      - name: Run tests
+        run: uv run pytest tests/ -v -x --no-header -p no:timeout
+
+      - name: Run full suite with coverage
+        if: success()
         run: |
-          echo "::group::test_logging_config"
-          uv run pytest tests/test_logging_config.py -v -x --no-header -p no:timeout
-          echo "::endgroup::"
-
-          echo "::group::test_claude_wrapper"
-          uv run pytest tests/test_claude_wrapper.py -v -x --no-header -p no:timeout
-          echo "::endgroup::"
-
-          echo "::group::experiment/test_agent_runner"
-          uv run pytest tests/experiment/test_agent_runner.py -v -x --no-header -p no:timeout
-          echo "::endgroup::"
-
-          echo "::group::experiment/test_models"
-          uv run pytest tests/experiment/test_models.py -v -x --no-header -p no:timeout
-          echo "::endgroup::"
-
-          echo "::group::web/test_search_router"
-          uv run pytest tests/web/test_search_router.py -v -x --no-header -p no:timeout
-          echo "::endgroup::"
-
-          echo "=== ALL INDIVIDUAL FILES PASSED ==="
-
-      - name: Run all tests together
-        run: |
-          echo "=== STARTING ALL TESTS ==="
-          uv run pytest tests/ -v -x --no-header -p no:timeout
-          echo "=== ALL TESTS PASSED ==="
+          uv run pytest tests/ \
+            --cov=src/agent_trade \
+            --cov-report=term-missing \
+            --cov-fail-under=85 \
+            -v \
+            --timeout=60 \
+            --timeout-method=thread
