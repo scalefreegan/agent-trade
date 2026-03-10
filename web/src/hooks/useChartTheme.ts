@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { CHART_COLORS } from '../lib/colors';
 
 interface ChartTheme {
   grid: string;
@@ -40,14 +41,7 @@ function buildTheme(): ChartTheme {
       text: resolveVar('--foreground', '#111827'),
     },
     // Brand color palette — same hex in both themes (colors are perceptually distinct)
-    brandColors: [
-      '#007F5F',
-      '#2B9348',
-      '#55A630',
-      '#80B918',
-      '#AACC00',
-      '#BFD200',
-    ],
+    brandColors: CHART_COLORS,
     cashColor: isDark ? '#64748b' : '#6B7280',
     primaryColor: isDark ? '#55A630' : '#007F5F',
     gainColor: resolveVar('--gain', '#059669'),

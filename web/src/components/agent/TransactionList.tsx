@@ -289,7 +289,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
               </thead>
               <tbody>
                 {currentTransactions.map((txn, idx) => (
-                  <tr key={idx} className="border-b border-border/50 last:border-0 hover:bg-muted/50 transition-colors">
+                  <tr key={`${txn.date}-${txn.symbol}-${txn.action}-${idx}`} className="border-b border-border/50 last:border-0 hover:bg-muted/50 transition-colors">
                     <td className="px-4 py-3.5 text-sm text-foreground">{txn.date}</td>
                     <td className="px-4 py-3.5">
                       <Badge

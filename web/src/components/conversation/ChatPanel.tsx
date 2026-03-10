@@ -90,6 +90,13 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
     inputRef.current?.focus();
   }, [conversationId]);
 
+  // Reset textarea height when input is cleared (e.g. after send)
+  useEffect(() => {
+    if (input === '' && inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
+  }, [input]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = input.trim();

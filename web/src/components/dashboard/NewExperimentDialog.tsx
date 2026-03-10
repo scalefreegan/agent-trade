@@ -30,9 +30,6 @@ const inputClass =
 const labelClass =
   'block text-xs font-mono font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1.5';
 
-let _positionCounter = 0;
-function nextPositionId() { return ++_positionCounter; }
-
 export function NewExperimentDialog({
   open,
   onClose,
@@ -40,6 +37,8 @@ export function NewExperimentDialog({
   isLoading,
   error,
 }: NewExperimentDialogProps) {
+  const positionCounterRef = useRef<number>(0);
+
   // Basic fields
   const [name, setName] = useState('');
   const [numAgents, setNumAgents] = useState(10);
@@ -182,7 +181,7 @@ export function NewExperimentDialog({
   };
 
   const addPosition = () =>
-    setPositions((prev) => [...prev, { id: nextPositionId(), symbol: '', shares: 0, cost_basis: 0 }]);
+    setPositions((prev) => [...prev, { id: ++positionCounterRef.current, symbol: '', shares: 0, cost_basis: 0 }]);
   const removePosition = (id: number) =>
     setPositions((prev) => prev.filter((p) => p.id !== id));
   const updatePosition = (id: number, field: keyof PortfolioPositionSpec, value: string | number) =>
