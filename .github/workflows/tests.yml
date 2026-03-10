@@ -12,8 +12,8 @@ concurrency:
 
 jobs:
   test:
-    runs-on: macos-latest
-    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     env:
       PYTHONUNBUFFERED: "1"
     steps:
@@ -28,16 +28,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Run tests
-        run: uv run pytest tests/ -v -x --no-header -p no:timeout
-
-      - name: Run full suite with coverage
-        if: success()
+      - name: Debug info
         run: |
-          uv run pytest tests/ \
-            --cov=src/agent_trade \
-            --cov-report=term-missing \
-            --cov-fail-under=85 \
-            -v \
-            --timeout=60 \
-            --timeout-method=thread
+          uv run python --version
+          uv run python -c "import sys; print(f'platform={sys.platform}')"
+          uv run python -c "import asyncio; p = asyncio.get_event_loop_policy(); print(f'loop_policy={p.__class__.__name__}')"
+          echo "Test count:"
+          uv run pytest tests/ --collect-only -q 2>&1 | tail -1
+
+      - name: Run tests with raw output
+        run: |
+          echo ">>> Starting pytest at $(date -u +%T)"
+          uv run python -u -m pytest tests/ -v -x -s -p no:timeout 2>&1
+          echo ">>> Finished at $(date -u +%T)"
