@@ -190,11 +190,11 @@ async def get_experiment_agents(experiment_id: ExperimentId) -> list[ExperimentA
         # Re-raise HTTPException as-is (don't convert 404 to 500)
         raise
     except (OSError, json.JSONDecodeError) as e:
-        logger.error("Failed to load experiment %s: %s", experiment_id, e)
-        raise HTTPException(status_code=500, detail=f"Corrupt experiment data: {str(e)}")
+        logger.exception("Failed to load experiment %s", experiment_id)
+        raise HTTPException(status_code=500, detail="Internal server error")
     except Exception as e:
         logger.exception("Failed to load experiment %s", experiment_id)
-        raise HTTPException(status_code=500, detail=f"Failed to load experiment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     agents = []
     for agent in game_state.agents.values():

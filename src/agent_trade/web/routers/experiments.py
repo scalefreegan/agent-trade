@@ -133,8 +133,8 @@ async def update_experiment(
         try:
             save_config(config)
         except Exception as e:
-            logger.error("Failed to save config for %s: %s", experiment_id, e)
-            raise HTTPException(status_code=500, detail=str(e))
+            logger.exception("Failed to save config for %s", experiment_id)
+            raise HTTPException(status_code=500, detail="Internal server error")
 
     current_day = None
     try:
@@ -163,7 +163,8 @@ async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
     try:
         experiment_id = generate_experiment_id()
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Failed to generate experiment ID")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     config = create_experiment_config(
         experiment_id=experiment_id,
@@ -210,7 +211,8 @@ async def create_experiment(body: CreateExperimentRequest) -> ExperimentDetail:
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except OSError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to initialize experiment: {e}")
+        logger.exception("Failed to initialize experiment %s", experiment_id)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     return ExperimentDetail(
         id=experiment_id,
@@ -244,4 +246,5 @@ async def delete_experiment(
     try:
         shutil.rmtree(experiment_dir)
     except OSError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete experiment: {e}")
+        logger.exception("Failed to delete experiment %s", experiment_id)
+        raise HTTPException(status_code=500, detail="Internal server error")

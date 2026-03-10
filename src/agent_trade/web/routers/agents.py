@@ -198,7 +198,7 @@ async def list_agents(experiment_id: ExperimentId) -> list[AgentStateResponse]:
         )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if game_state is None:
         raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
@@ -243,7 +243,7 @@ async def get_agent_detail(
         )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if game_state is None:
         raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
@@ -309,7 +309,7 @@ async def update_agent(
         )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if game_state is None:
         raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
@@ -331,7 +331,7 @@ async def update_agent(
         await loop.run_in_executor(None, partial(save_game_state, game_state))
     except Exception as e:
         logger.exception(f"Failed to save game state for {experiment_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     return UpdateAgentResponse(
         agent_id=agent.agent_id,
@@ -364,7 +364,7 @@ async def get_agent_strategy(
         )
     except Exception as e:
         logger.exception(f"Failed to load strategy for {agent_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if strategy is None:
         raise HTTPException(status_code=404, detail=f"Strategy not found for agent {agent_id}")
@@ -403,7 +403,7 @@ async def get_agent_transactions(
         )
     except Exception as e:
         logger.exception(f"Failed to load outcomes for {experiment_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     # Extract transactions for this agent from flat transaction list
     transactions = []
@@ -541,7 +541,7 @@ async def get_agent_decision(
         data = json.loads(decision_file.read_text())
     except Exception as e:
         logger.exception(f"Failed to read decision file {decision_file}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     # Render structured JSON as markdown for the frontend
     lines: list[str] = [f"# Trading Decision: {date}", ""]
@@ -597,7 +597,7 @@ async def get_agent_holdings(
         )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if game_state is None:
         raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
@@ -738,7 +738,7 @@ async def get_agent_alerts(
         )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if game_state is None:
         raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
@@ -792,7 +792,7 @@ async def get_agent_benchmarks(
         )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if game_state is None:
         raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
@@ -916,7 +916,7 @@ async def update_agent_strategy(
         )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if game_state is None:
         raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
@@ -966,7 +966,8 @@ async def update_agent_strategy(
             None, partial(save_strategy, experiment_id, agent_id, agent.strategy)
         )
     except OSError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save strategy: {e}")
+        logger.exception(f"Failed to save strategy for {agent_id}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     return {"updated": changed, "message": f"Updated {agent_id}: {', '.join(changed)}"}
 
@@ -983,7 +984,7 @@ async def update_agent_guidance(
         )
     except Exception as e:
         logger.exception(f"Failed to load game state for {experiment_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if game_state is None:
         raise HTTPException(status_code=404, detail=f"Game state not found for experiment {experiment_id}")
@@ -999,7 +1000,8 @@ async def update_agent_guidance(
             None, partial(save_game_state, game_state)
         )
     except OSError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save game state: {e}")
+        logger.exception(f"Failed to save game state for {agent_id}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if body.guidance:
         return {"guidance": body.guidance, "message": f"Guidance set for {agent_id}"}

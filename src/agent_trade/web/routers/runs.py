@@ -48,7 +48,7 @@ async def start_run(experiment_id: ExperimentId) -> RunStatusResponse:
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to start run for {experiment_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/experiments/{experiment_id}/run/status")
@@ -236,7 +236,7 @@ async def pause_experiment(experiment_id: ExperimentId) -> dict:
         raise
     except Exception as e:
         logger.error(f"Failed to pause experiment {experiment_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/experiments/{experiment_id}/resume")
@@ -287,4 +287,4 @@ async def resume_experiment(experiment_id: ExperimentId) -> dict:
         raise
     except Exception as e:
         logger.error(f"Failed to resume experiment {experiment_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

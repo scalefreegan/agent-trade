@@ -33,8 +33,8 @@ async def get_tax_metrics(experiment_id: ExperimentId) -> dict[str, dict[str, fl
         metrics = calculate_tax_metrics(experiment_id)
         return metrics
     except Exception as e:
-        logger.error(f"Failed to calculate tax metrics: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Failed to calculate tax metrics for %s", experiment_id)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/experiments/{experiment_id}/holding-periods")
@@ -54,8 +54,8 @@ async def get_holding_periods(experiment_id: ExperimentId) -> dict[str, dict[str
         distribution = calculate_holding_period_distribution(experiment_id)
         return distribution
     except Exception as e:
-        logger.error(f"Failed to calculate holding period distribution: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Failed to calculate holding period distribution for %s", experiment_id)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/experiments/{experiment_id}/report")
@@ -79,5 +79,5 @@ async def get_experiment_report(
         )
         return report
     except Exception as e:
-        logger.error(f"Failed to generate experiment report: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Failed to generate experiment report for %s", experiment_id)
+        raise HTTPException(status_code=500, detail="Internal server error")
