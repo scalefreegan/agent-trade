@@ -28,12 +28,23 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Run tests with coverage
+      - name: Debug - run minimal test
+        run: |
+          uv run python -c "import agent_trade; print('import ok')"
+          uv run pytest tests/test_logging_config.py -v --no-header --timeout=15 -x
+          echo "=== logging_config done ==="
+
+      - name: Debug - run all unit tests (no coverage)
+        run: |
+          uv run pytest tests/ -v --timeout=30 -x --no-header
+
+      - name: Run full suite with coverage
+        if: success()
         run: |
           uv run pytest tests/ \
             --cov=src/agent_trade \
             --cov-report=term-missing \
             --cov-fail-under=85 \
             -v \
-            --timeout=30 \
-            -x
+            --timeout=60 \
+            --timeout-method=thread
