@@ -7,16 +7,9 @@ interface MarketCardProps {
 }
 
 export function MarketCard({ market }: MarketCardProps) {
-  // Generate Kalshi URL: /markets/{event_ticker} (simple format)
-  // Extract event ticker from market ticker if not available (e.g., "kxoaianth-40" -> "kxoaianth")
-  let eventTicker = market.eventTicker || market.event_ticker || market.ticker || '';
-
-  // Remove common market ticker suffixes to get base event ticker
-  if (eventTicker) {
-    eventTicker = eventTicker.toLowerCase().replace(/-\d+.*$/, '');
-  }
-
-  const kalshiUrl = eventTicker ? `https://kalshi.com/markets/${eventTicker}` : '#';
+  // Use event_ticker directly for Kalshi URL
+  const eventTicker = market.event_ticker || '';
+  const kalshiUrl = eventTicker ? `https://kalshi.com/markets/${eventTicker.toLowerCase()}` : '#';
 
   // Kalshi returns prices in cents (1-99), display as percentage
   const yesPrice = market.yes_bid ? `${market.yes_bid}` : '—';
@@ -43,7 +36,10 @@ export function MarketCard({ market }: MarketCardProps) {
   };
 
   // Status badge variant
-  const statusVariant = market.status === 'open' ? 'success' : 'neutral';
+  const statusVariant =
+    market.status === 'open' ? 'success' :
+    market.status === 'settled' ? 'warning' :
+    'neutral';
 
   return (
     <a
@@ -88,9 +84,16 @@ export function MarketCard({ market }: MarketCardProps) {
             <div className="flex items-center gap-3">
               <div>
                 <span className="font-medium text-foreground">
+                  {formatVolume(market.volume)}
+                </span>
+                <span className="ml-1">vol</span>
+              </div>
+              <div className="w-px h-4 bg-border" />
+              <div>
+                <span className="font-medium text-foreground">
                   {formatVolume(market.volume_24h)}
                 </span>
-                <span className="ml-1">24h vol</span>
+                <span className="ml-1">24h</span>
               </div>
               <div className="w-px h-4 bg-border" />
               <div>
