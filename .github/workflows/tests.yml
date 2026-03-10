@@ -27,6 +27,8 @@ jobs:
         run: uv sync --extra dev
 
       - name: Run tests
+        env:
+          PYTHONUNBUFFERED: "1"
         run: >
           uv run pytest tests/
           --cov=src/agent_trade
@@ -34,3 +36,4 @@ jobs:
           --cov-fail-under=85
           -v
           --timeout=60
+          --timeout-method=thread
