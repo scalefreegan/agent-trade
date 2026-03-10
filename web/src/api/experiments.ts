@@ -10,11 +10,11 @@ export function useExperiments() {
   });
 }
 
-export function useExperiment(experimentId: string) {
+export function useExperiment(experimentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['experiment', experimentId],
     queryFn: () => fetchApi<ExperimentDetail>(`/experiments/${experimentId}`),
-    enabled: !!experimentId,
+    enabled: !!experimentId && (options?.enabled ?? true),
   });
 }
 

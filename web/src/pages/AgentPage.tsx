@@ -45,37 +45,44 @@ export function AgentPage() {
   const [activeTab, setActiveTab] = useState<Tab>('portfolio');
   const [strategyEditOpen, setStrategyEditOpen] = useState(false);
 
-  const { data: experiment } = useExperiment(experimentId || '');
+  const { data: experiment } = useExperiment(experimentId || '', { enabled: activeTab === 'performance' });
   const { data: agent, isLoading: agentLoading, error: agentError } = useAgentDetail(
     experimentId || '',
     agentId || ''
   );
   const { data: strategy, isLoading: strategyLoading } = useAgentStrategy(
     experimentId || '',
-    agentId || ''
+    agentId || '',
+    { enabled: activeTab === 'strategy' }
   );
   const { data: transactions, isLoading: transactionsLoading } = useAgentTransactions(
     experimentId || '',
-    agentId || ''
+    agentId || '',
+    { enabled: activeTab === 'history' }
   );
   const { data: decisions, isLoading: decisionsLoading } = useAgentDecisions(
     experimentId || '',
-    agentId || ''
+    agentId || '',
+    { enabled: activeTab === 'decisions' }
   );
   const { data: performance, isLoading: performanceLoading } = usePerformance(
-    experimentId || ''
+    experimentId || '',
+    { enabled: activeTab === 'performance' }
   );
   const { data: holdings, isLoading: holdingsLoading } = useAgentHoldings(
     experimentId || '',
-    agentId || ''
+    agentId || '',
+    { enabled: activeTab === 'info' }
   );
   const { data: alerts, isLoading: alertsLoading } = useAgentAlerts(
     experimentId || '',
-    agentId || ''
+    agentId || '',
+    { enabled: activeTab === 'alerts' }
   );
   const { data: benchmarks } = useAgentBenchmarks(
     experimentId || '',
-    agentId || ''
+    agentId || '',
+    { enabled: activeTab === 'performance' }
   );
   const updateAgent = useUpdateAgent(experimentId || '', agentId || '');
   const updateStrategy = useUpdateStrategy(experimentId || '', agentId || '');

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useReducer, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { CreateExperimentInput } from '../../api/experiments';
 import type { AgentInitHints, PortfolioPositionSpec } from '../../api/types';
@@ -25,6 +25,65 @@ interface FormErrors {
 
 const RISK_OPTIONS = ['conservative', 'moderate', 'aggressive'] as const;
 
+interface FormState {
+  name: string;
+  numAgents: number;
+  startingCapital: number;
+  errors: FormErrors;
+  showAdvanced: boolean;
+  guidance: string;
+  agentPhilosophy: string;
+  agentRisk: string;
+  agentSectors: string;
+  agentHorizon: string;
+  agentMetrics: string;
+  agentRationale: string;
+  cashOverride: string;
+  positions: PositionRow[];
+}
+
+type FormAction =
+  | { type: 'RESET' }
+  | { type: 'SET_FIELD'; field: keyof Omit<FormState, 'positions' | 'errors'>; value: string | number | boolean }
+  | { type: 'SET_ERRORS'; errors: FormErrors }
+  | { type: 'ADD_POSITION' }
+  | { type: 'REMOVE_POSITION'; id: number }
+  | { type: 'UPDATE_POSITION'; id: number; field: keyof PortfolioPositionSpec; value: string | number };
+
+const INITIAL_STATE: FormState = {
+  name: '',
+  numAgents: 10,
+  startingCapital: 1000,
+  errors: {},
+  showAdvanced: false,
+  guidance: '',
+  agentPhilosophy: '',
+  agentRisk: '',
+  agentSectors: '',
+  agentHorizon: '',
+  agentMetrics: '',
+  agentRationale: '',
+  cashOverride: '',
+  positions: [],
+};
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case 'RESET':
+      return INITIAL_STATE;
+    case 'SET_FIELD':
+      return { ...state, [action.field]: action.value };
+    case 'SET_ERRORS':
+      return { ...state, errors: action.errors };
+    case 'ADD_POSITION':
+      return { ...state, positions: [...state.positions, { id: nextPositionId(), symbol: '', shares: 0, cost_basis: 0 }] };
+    case 'REMOVE_POSITION':
+      return { ...state, positions: state.positions.filter((p) => p.id !== action.id) };
+    case 'UPDATE_POSITION':
+      return { ...state, positions: state.positions.map((p) => (p.id === action.id ? { ...p, [action.field]: action.value } : p)) };
+  }
+}
+
 const inputClass =
   'w-full px-3 py-2.5 text-sm font-mono bg-gray-50 dark:bg-gray-800 border rounded transition-colors outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-brand-700 focus:border-brand-700 dark:focus:ring-brand-600 dark:focus:border-brand-600 border-gray-300 dark:border-gray-600';
 const labelClass =
@@ -37,49 +96,17 @@ export function NewExperimentDialog({
   isLoading,
   error,
 }: NewExperimentDialogProps) {
-  const positionCounterRef = useRef<number>(0);
-
-  // Basic fields
-  const [name, setName] = useState('');
-  const [numAgents, setNumAgents] = useState(10);
-  const [startingCapital, setStartingCapital] = useState(1000);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [state, dispatch] = useReducer(formReducer, INITIAL_STATE);
+  const {
+    name, numAgents, startingCapital, errors, showAdvanced,
+    guidance, agentPhilosophy, agentRisk, agentSectors,
+    agentHorizon, agentMetrics, agentRationale, cashOverride, positions,
+  } = state;
   const nameRef = useRef<HTMLInputElement>(null);
-
-  // Advanced options toggle
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  // Guidance
-  const [guidance, setGuidance] = useState('');
-
-  // Agent strategy defaults
-  const [agentPhilosophy, setAgentPhilosophy] = useState('');
-  const [agentRisk, setAgentRisk] = useState('');
-  const [agentSectors, setAgentSectors] = useState('');
-  const [agentHorizon, setAgentHorizon] = useState('');
-  const [agentMetrics, setAgentMetrics] = useState('');
-  const [agentRationale, setAgentRationale] = useState('');
-
-  // Starting portfolio
-  const [cashOverride, setCashOverride] = useState('');
-  const [positions, setPositions] = useState<PositionRow[]>([]);
 
   useEffect(() => {
     if (open) {
-      setName('');
-      setNumAgents(10);
-      setStartingCapital(1000);
-      setErrors({});
-      setShowAdvanced(false);
-      setGuidance('');
-      setAgentPhilosophy('');
-      setAgentRisk('');
-      setAgentSectors('');
-      setAgentHorizon('');
-      setAgentMetrics('');
-      setAgentRationale('');
-      setCashOverride('');
-      setPositions([]);
+      dispatch({ type: 'RESET' });
       setTimeout(() => nameRef.current?.focus(), 50);
     }
   }, [open]);
@@ -133,7 +160,7 @@ export function NewExperimentDialog({
       if (!Number.isFinite(val) || val < 0)
         next.cash_override = 'Cash override must be a non-negative number';
     }
-    setErrors(next);
+    dispatch({ type: 'SET_ERRORS', errors: next });
     return Object.keys(next).length === 0;
   };
 
@@ -180,12 +207,10 @@ export function NewExperimentDialog({
     onCreate(payload);
   };
 
-  const addPosition = () =>
-    setPositions((prev) => [...prev, { id: ++positionCounterRef.current, symbol: '', shares: 0, cost_basis: 0 }]);
-  const removePosition = (id: number) =>
-    setPositions((prev) => prev.filter((p) => p.id !== id));
+  const addPosition = () => dispatch({ type: 'ADD_POSITION' });
+  const removePosition = (id: number) => dispatch({ type: 'REMOVE_POSITION', id });
   const updatePosition = (id: number, field: keyof PortfolioPositionSpec, value: string | number) =>
-    setPositions((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+    dispatch({ type: 'UPDATE_POSITION', id, field, value });
 
   if (!open) return null;
 
@@ -242,7 +267,7 @@ export function NewExperimentDialog({
                 id="exp-name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'name', value: e.target.value })}
                 placeholder="e.g. Bull Market Trial #1"
                 maxLength={100}
                 className={`${inputClass} ${errors.name ? 'border-red-400 dark:border-red-600 bg-red-50 dark:bg-red-900/10' : ''}`}
@@ -269,7 +294,7 @@ export function NewExperimentDialog({
                   id="exp-agents"
                   type="number"
                   value={numAgents}
-                  onChange={(e) => setNumAgents(Number(e.target.value))}
+                  onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'numAgents', value: Number(e.target.value) })}
                   min={1}
                   max={50}
                   step={1}
@@ -297,7 +322,7 @@ export function NewExperimentDialog({
                     id="exp-capital"
                     type="number"
                     value={startingCapital}
-                    onChange={(e) => setStartingCapital(Number(e.target.value))}
+                    onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'startingCapital', value: Number(e.target.value) })}
                     min={100}
                     max={1_000_000}
                     step={100}
@@ -318,7 +343,7 @@ export function NewExperimentDialog({
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
               <button
                 type="button"
-                onClick={() => setShowAdvanced((v) => !v)}
+                onClick={() => dispatch({ type: 'SET_FIELD', field: 'showAdvanced', value: !showAdvanced })}
                 className="flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
               >
                 <svg
@@ -345,7 +370,7 @@ export function NewExperimentDialog({
                     id="exp-guidance"
                     rows={3}
                     value={guidance}
-                    onChange={(e) => setGuidance(e.target.value)}
+                    onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'guidance', value: e.target.value })}
                     placeholder="Optional text injected into every agent's prompt each trading day…"
                     className={`${inputClass} resize-y`}
                   />
@@ -366,7 +391,7 @@ export function NewExperimentDialog({
                         id="adv-philosophy"
                         rows={2}
                         value={agentPhilosophy}
-                        onChange={(e) => setAgentPhilosophy(e.target.value)}
+                        onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'agentPhilosophy', value: e.target.value })}
                         placeholder="e.g. Value investing with a focus on undervalued companies"
                         className={`${inputClass} resize-y`}
                       />
@@ -377,7 +402,7 @@ export function NewExperimentDialog({
                         <select
                           id="adv-risk"
                           value={agentRisk}
-                          onChange={(e) => setAgentRisk(e.target.value)}
+                          onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'agentRisk', value: e.target.value })}
                           className={inputClass}
                         >
                           <option value="">— randomized —</option>
@@ -394,7 +419,7 @@ export function NewExperimentDialog({
                           id="adv-horizon"
                           type="text"
                           value={agentHorizon}
-                          onChange={(e) => setAgentHorizon(e.target.value)}
+                          onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'agentHorizon', value: e.target.value })}
                           placeholder="e.g. 6-12 months"
                           className={inputClass}
                         />
@@ -406,7 +431,7 @@ export function NewExperimentDialog({
                         id="adv-sectors"
                         type="text"
                         value={agentSectors}
-                        onChange={(e) => setAgentSectors(e.target.value)}
+                        onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'agentSectors', value: e.target.value })}
                         placeholder="e.g. Technology, Healthcare"
                         className={inputClass}
                       />
@@ -418,7 +443,7 @@ export function NewExperimentDialog({
                         id="adv-metrics"
                         type="text"
                         value={agentMetrics}
-                        onChange={(e) => setAgentMetrics(e.target.value)}
+                        onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'agentMetrics', value: e.target.value })}
                         placeholder="e.g. P/E ratio, Revenue growth"
                         className={inputClass}
                       />
@@ -430,7 +455,7 @@ export function NewExperimentDialog({
                         id="adv-rationale"
                         rows={2}
                         value={agentRationale}
-                        onChange={(e) => setAgentRationale(e.target.value)}
+                        onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'agentRationale', value: e.target.value })}
                         placeholder="e.g. This strategy prioritizes capital preservation…"
                         className={`${inputClass} resize-y`}
                       />
@@ -452,7 +477,7 @@ export function NewExperimentDialog({
                           id="adv-cash"
                           type="number"
                           value={cashOverride}
-                          onChange={(e) => setCashOverride(e.target.value)}
+                          onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'cashOverride', value: e.target.value })}
                           min={0}
                           step={100}
                           placeholder="Leave blank to use Starting Capital"

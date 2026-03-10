@@ -35,31 +35,31 @@ export function useAgentPortfolio(experimentId: string, agentId: string) {
   });
 }
 
-export function useAgentStrategy(experimentId: string, agentId: string) {
+export function useAgentStrategy(experimentId: string, agentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['agentStrategy', experimentId, agentId],
     queryFn: () => fetchApi<AgentStrategy>(`/experiments/${experimentId}/agents/${agentId}/strategy`),
-    enabled: !!experimentId && !!agentId,
+    enabled: !!experimentId && !!agentId && (options?.enabled ?? true),
   });
 }
 
-export function useAgentTransactions(experimentId: string, agentId: string) {
+export function useAgentTransactions(experimentId: string, agentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['agentTransactions', experimentId, agentId],
     queryFn: () => fetchApi<TransactionHistory>(
       `/experiments/${experimentId}/agents/${agentId}/transactions`
     ),
-    enabled: !!experimentId && !!agentId,
+    enabled: !!experimentId && !!agentId && (options?.enabled ?? true),
   });
 }
 
-export function useAgentDecisions(experimentId: string, agentId: string) {
+export function useAgentDecisions(experimentId: string, agentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['agentDecisions', experimentId, agentId],
     queryFn: () => fetchApi<DecisionLogEntry[]>(
       `/experiments/${experimentId}/agents/${agentId}/decisions`
     ),
-    enabled: !!experimentId && !!agentId,
+    enabled: !!experimentId && !!agentId && (options?.enabled ?? true),
   });
 }
 
@@ -73,33 +73,33 @@ export function useAgentDecision(experimentId: string, agentId: string, date: st
   });
 }
 
-export function useAgentHoldings(experimentId: string, agentId: string) {
+export function useAgentHoldings(experimentId: string, agentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['agentHoldings', experimentId, agentId],
     queryFn: () => fetchApi<HoldingsInfo>(
       `/experiments/${experimentId}/agents/${agentId}/holdings`
     ),
-    enabled: !!experimentId && !!agentId,
+    enabled: !!experimentId && !!agentId && (options?.enabled ?? true),
   });
 }
 
-export function useAgentAlerts(experimentId: string, agentId: string) {
+export function useAgentAlerts(experimentId: string, agentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['agentAlerts', experimentId, agentId],
     queryFn: () => fetchApi<AlertsResponse>(
       `/experiments/${experimentId}/agents/${agentId}/alerts`
     ),
-    enabled: !!experimentId && !!agentId,
+    enabled: !!experimentId && !!agentId && (options?.enabled ?? true),
   });
 }
 
-export function useAgentBenchmarks(experimentId: string, agentId: string) {
+export function useAgentBenchmarks(experimentId: string, agentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['agentBenchmarks', experimentId, agentId],
     queryFn: () => fetchApi<BenchmarkResponse>(
       `/experiments/${experimentId}/agents/${agentId}/benchmarks`
     ),
-    enabled: !!experimentId && !!agentId,
+    enabled: !!experimentId && !!agentId && (options?.enabled ?? true),
     staleTime: 5 * 60 * 1000, // 5 min — ETF data doesn't change often
   });
 }

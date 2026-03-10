@@ -10,10 +10,10 @@ export function useLeaderboard(experimentId: string) {
   });
 }
 
-export function usePerformance(experimentId: string) {
+export function usePerformance(experimentId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['performance', experimentId],
     queryFn: () => fetchApi<PerformanceResponse>(`/experiments/${experimentId}/performance`),
-    enabled: !!experimentId,
+    enabled: !!experimentId && (options?.enabled ?? true),
   });
 }
