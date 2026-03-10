@@ -214,9 +214,9 @@ class TestStockNews:
 
     @patch("agent_trade.web.routers.search.search_news")
     def test_returns_news_articles(self, mock_search):
-        """Returns news articles from NewsAPI."""
+        """Returns news articles from NewsAPI, filtered by relevance."""
         mock_article = Mock(
-            title="Apple launches new product",
+            title="AAPL stock surges on new product launch",
             description="Apple Inc. announced...",
             url="https://example.com/article",
             source="TechCrunch",
@@ -230,7 +230,9 @@ class TestStockNews:
         data = response.json()
         assert data["symbol"] == "AAPL"
         assert len(data["articles"]) == 1
-        assert data["articles"][0]["title"] == "Apple launches new product"
+        assert "AAPL" in data["articles"][0]["title"]
+        # all_articles contains unfiltered set
+        assert len(data["all_articles"]) == 1
 
     @patch("agent_trade.web.routers.search.search_news")
     def test_handles_newsapi_errors_gracefully(self, mock_search):

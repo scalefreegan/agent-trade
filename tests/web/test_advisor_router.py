@@ -14,9 +14,18 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent_trade.web.api import app
+from agent_trade.web.dependencies import _advisor_limiter
 
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _clear_rate_limiter():
+    """Reset advisor rate limiter state between tests."""
+    _advisor_limiter._hits.clear()
+    yield
+    _advisor_limiter._hits.clear()
 
 
 class TestAdvisorPresets:

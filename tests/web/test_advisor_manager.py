@@ -45,14 +45,21 @@ class TestAPIKeyEnforcement:
         """start_job works when ANTHROPIC_API_KEY is not set."""
         manager = _fresh_manager()
 
+        mock_result = {"action": "BUY", "confidence": 0.8, "reasoning": "Test"}
         with patch.dict(os.environ, {}, clear=True):
-            with patch("agent_trade.web.advisor_manager.run_agent", new_callable=AsyncMock):
+            with patch(
+                "agent_trade.web.advisor_manager.run_agent",
+                new_callable=AsyncMock,
+                return_value=mock_result,
+            ):
                 job = manager.start_job(
                     symbol="AAPL",
                     agent_configs=[{"name": "Test", "philosophy": "Value"}],
                     portfolio_value=100_000,
                 )
-                assert job.status == AdvisorStatus.RUNNING
+                # Job starts in RUNNING; background thread may or may not have
+                # completed yet, so accept either RUNNING or COMPLETED.
+                assert job.status in (AdvisorStatus.RUNNING, AdvisorStatus.COMPLETED)
                 assert job.symbol == "AAPL"
 
 
