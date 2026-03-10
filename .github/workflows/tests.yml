@@ -14,6 +14,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -26,17 +28,22 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Verify test collection
-        env:
-          PYTHONUNBUFFERED: "1"
+      - name: Run unit tests (non-web)
         run: |
-          echo "Collecting tests..."
-          uv run pytest tests/ --collect-only -q 2>&1 | tail -5
-          echo "Collection complete."
+          uv run pytest tests/ --ignore=tests/web --ignore=tests/experiment \
+            -v --timeout=60 --timeout-method=thread 2>&1
 
-      - name: Run tests
-        env:
-          PYTHONUNBUFFERED: "1"
+      - name: Run experiment tests
+        run: |
+          uv run pytest tests/experiment/ \
+            -v --timeout=60 --timeout-method=thread 2>&1
+
+      - name: Run web tests
+        run: |
+          uv run pytest tests/web/ \
+            -v --timeout=60 --timeout-method=thread 2>&1
+
+      - name: Run full suite with coverage
         run: |
           uv run pytest tests/ \
             --cov=src/agent_trade \
