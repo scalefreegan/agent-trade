@@ -28,11 +28,25 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Run tests (no timeout plugin)
+      - name: Unit tests (non-web, non-experiment)
+        timeout-minutes: 3
         run: |
-          uv run pytest tests/ -v -x -p no:timeout --no-header
+          uv run pytest tests/ --ignore=tests/web --ignore=tests/experiment \
+            -v -x -p no:timeout --no-header
 
-      - name: Run full suite with coverage
+      - name: Experiment tests
+        timeout-minutes: 3
+        run: |
+          uv run pytest tests/experiment/ \
+            -v -x -p no:timeout --no-header
+
+      - name: Web tests
+        timeout-minutes: 3
+        run: |
+          uv run pytest tests/web/ \
+            -v -x -p no:timeout --no-header
+
+      - name: Full suite with coverage
         if: success()
         run: |
           uv run pytest tests/ \
@@ -40,4 +54,5 @@ jobs:
             --cov-report=term-missing \
             --cov-fail-under=85 \
             -v \
-            -p no:timeout
+            --timeout=60 \
+            --timeout-method=thread
