@@ -13,7 +13,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     env:
       PYTHONUNBUFFERED: "1"
     steps:
@@ -28,11 +28,25 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Run tests
-        shell: bash
+      - name: Test group 1 - experiment
         run: |
-          # Run pytest directly via .venv, bypassing uv run
-          .venv/bin/python -u -m pytest tests/ \
+          echo ">>> experiment tests starting"
+          timeout -s KILL 90 .venv/bin/python -m pytest tests/experiment/ -v -x --no-header -p no:timeout && echo "PASS" || echo "FAIL/KILLED (exit $?)"
+
+      - name: Test group 2 - unit
+        run: |
+          echo ">>> unit tests starting"
+          timeout -s KILL 90 .venv/bin/python -m pytest tests/ --ignore=tests/web --ignore=tests/experiment -v -x --no-header -p no:timeout && echo "PASS" || echo "FAIL/KILLED (exit $?)"
+
+      - name: Test group 3 - web
+        run: |
+          echo ">>> web tests starting"
+          timeout -s KILL 90 .venv/bin/python -m pytest tests/web/ -v -x --no-header -p no:timeout && echo "PASS" || echo "FAIL/KILLED (exit $?)"
+
+      - name: Full suite with coverage
+        if: success()
+        run: |
+          .venv/bin/python -m pytest tests/ \
             --cov=src/agent_trade \
             --cov-report=term-missing \
             --cov-fail-under=85 \
