@@ -28,22 +28,35 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Test group 1 - experiment
+      - name: Unit without server_tools (test fastmcp theory)
         run: |
-          echo ">>> experiment tests starting"
-          timeout -s KILL 90 .venv/bin/python -m pytest tests/experiment/ -v -x --no-header -p no:timeout && echo "PASS" || echo "FAIL/KILLED (exit $?)"
+          echo ">>> unit tests WITHOUT test_server_tools.py"
+          timeout -s KILL 90 .venv/bin/python -m pytest tests/ \
+            --ignore=tests/web --ignore=tests/experiment \
+            --ignore=tests/test_server_tools.py \
+            -v -x --no-header -p no:timeout \
+            && echo "PASS" || echo "FAIL/KILLED (exit $?)"
 
-      - name: Test group 2 - unit
+      - name: Only test_server_tools
         run: |
-          echo ">>> unit tests starting"
-          timeout -s KILL 90 .venv/bin/python -m pytest tests/ --ignore=tests/web --ignore=tests/experiment -v -x --no-header -p no:timeout && echo "PASS" || echo "FAIL/KILLED (exit $?)"
+          echo ">>> just test_server_tools.py"
+          timeout -s KILL 90 .venv/bin/python -m pytest tests/test_server_tools.py \
+            -v -x --no-header -p no:timeout \
+            && echo "PASS" || echo "FAIL/KILLED (exit $?)"
 
-      - name: Test group 3 - web
+      - name: Experiment tests
         run: |
-          echo ">>> web tests starting"
-          timeout -s KILL 90 .venv/bin/python -m pytest tests/web/ -v -x --no-header -p no:timeout && echo "PASS" || echo "FAIL/KILLED (exit $?)"
+          timeout -s KILL 90 .venv/bin/python -m pytest tests/experiment/ \
+            -v -x --no-header -p no:timeout \
+            && echo "PASS" || echo "FAIL/KILLED (exit $?)"
 
-      - name: Full suite with coverage
+      - name: Web tests
+        run: |
+          timeout -s KILL 90 .venv/bin/python -m pytest tests/web/ \
+            -v -x --no-header -p no:timeout \
+            && echo "PASS" || echo "FAIL/KILLED (exit $?)"
+
+      - name: Full suite with coverage (macOS fallback if needed)
         if: success()
         run: |
           .venv/bin/python -m pytest tests/ \
