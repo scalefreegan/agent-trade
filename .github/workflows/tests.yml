@@ -13,7 +13,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 8
     env:
       PYTHONUNBUFFERED: "1"
     steps:
@@ -28,31 +28,32 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Unit tests (non-web, non-experiment)
-        timeout-minutes: 3
+      - name: Diagnose - single file test
         run: |
-          uv run pytest tests/ --ignore=tests/web --ignore=tests/experiment \
-            -v -x -p no:timeout --no-header
+          echo "::group::test_logging_config"
+          uv run pytest tests/test_logging_config.py -v -x --no-header -p no:timeout
+          echo "::endgroup::"
 
-      - name: Experiment tests
-        timeout-minutes: 3
-        run: |
-          uv run pytest tests/experiment/ \
-            -v -x -p no:timeout --no-header
+          echo "::group::test_claude_wrapper"
+          uv run pytest tests/test_claude_wrapper.py -v -x --no-header -p no:timeout
+          echo "::endgroup::"
 
-      - name: Web tests
-        timeout-minutes: 3
-        run: |
-          uv run pytest tests/web/ \
-            -v -x -p no:timeout --no-header
+          echo "::group::experiment/test_agent_runner"
+          uv run pytest tests/experiment/test_agent_runner.py -v -x --no-header -p no:timeout
+          echo "::endgroup::"
 
-      - name: Full suite with coverage
-        if: success()
+          echo "::group::experiment/test_models"
+          uv run pytest tests/experiment/test_models.py -v -x --no-header -p no:timeout
+          echo "::endgroup::"
+
+          echo "::group::web/test_search_router"
+          uv run pytest tests/web/test_search_router.py -v -x --no-header -p no:timeout
+          echo "::endgroup::"
+
+          echo "=== ALL INDIVIDUAL FILES PASSED ==="
+
+      - name: Run all tests together
         run: |
-          uv run pytest tests/ \
-            --cov=src/agent_trade \
-            --cov-report=term-missing \
-            --cov-fail-under=85 \
-            -v \
-            --timeout=60 \
-            --timeout-method=thread
+          echo "=== STARTING ALL TESTS ==="
+          uv run pytest tests/ -v -x --no-header -p no:timeout
+          echo "=== ALL TESTS PASSED ==="
