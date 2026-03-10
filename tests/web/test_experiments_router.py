@@ -380,4 +380,4 @@ class TestDeleteExperiment:
         response = client.delete("/experiments/test")
 
         assert response.status_code == 500
-        assert "Failed to delete experiment" in response.json()["detail"]
+        assert response.json()["detail"] == "Internal server error"

@@ -78,7 +78,7 @@ class TestGetTaxMetrics:
         response = client.get("/experiments/exp1/tax-metrics")
 
         assert response.status_code == 500
-        assert "Invalid transaction data" in response.json()["detail"]
+        assert response.json()["detail"] == "Internal server error"
 
 
 class TestGetHoldingPeriods:
@@ -140,7 +140,7 @@ class TestGetHoldingPeriods:
         response = client.get("/experiments/exp1/holding-periods")
 
         assert response.status_code == 500
-        assert "Database error" in response.json()["detail"]
+        assert response.json()["detail"] == "Internal server error"
 
 
 class TestGetExperimentReport:
@@ -230,4 +230,4 @@ class TestGetExperimentReport:
         response = client.get("/experiments/exp1/report")
 
         assert response.status_code == 500
-        assert "Failed to load game state" in response.json()["detail"]
+        assert response.json()["detail"] == "Internal server error"

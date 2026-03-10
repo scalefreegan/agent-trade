@@ -192,7 +192,7 @@ class TestListAgents:
         with patch(f"{P}.load_game_state", side_effect=RuntimeError("disk error")):
             resp = client.get(f"/api/v1/experiments/{EXP_ID}/agents")
         assert resp.status_code == 500
-        assert "disk error" in resp.json()["detail"]
+        assert resp.json()["detail"] == "Internal server error"
 
 
 # =============================================================================

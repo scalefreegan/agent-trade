@@ -91,7 +91,7 @@ class TestStartRun:
         response = client.post("/experiments/exp1/run")
 
         assert response.status_code == 500
-        assert "Connection failed" in response.json()["detail"]
+        assert response.json()["detail"] == "Internal server error"
 
 
 class TestGetRunStatus:
@@ -164,7 +164,7 @@ class TestPauseExperiment:
         response = client.post("/experiments/exp1/pause")
 
         assert response.status_code == 500
-        assert "Disk failure" in response.json()["detail"]
+        assert response.json()["detail"] == "Internal server error"
 
 
 class TestResumeExperiment:
@@ -207,7 +207,7 @@ class TestResumeExperiment:
         response = client.post("/experiments/exp1/resume")
 
         assert response.status_code == 500
-        assert "Disk failure" in response.json()["detail"]
+        assert response.json()["detail"] == "Internal server error"
 
 
 def _mock_event(type="agent_start", agent_id="agent1", message="Processing", error=None):

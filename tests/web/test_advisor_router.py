@@ -253,7 +253,7 @@ class TestExperimentAgentsEndpoint:
             mock_load.side_effect = json.JSONDecodeError("bad json", "", 0)
             response = client.get("/api/v1/advisor/experiments/corrupt_exp/agents")
             assert response.status_code == 500
-            assert "corrupt" in response.json()["detail"].lower()
+            assert response.json()["detail"] == "Internal server error"
 
     def test_returns_agents_for_valid_experiment(self):
         """Returns agent list for valid experiment."""
