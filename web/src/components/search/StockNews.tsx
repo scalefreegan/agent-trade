@@ -12,6 +12,7 @@ import { formatDate } from '../../lib/format';
 
 interface StockNewsProps {
   symbol: string;
+  companyName?: string;
 }
 
 const ARTICLES_PER_PAGE = 3;
@@ -80,8 +81,8 @@ function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) 
   );
 }
 
-export function StockNews({ symbol }: StockNewsProps) {
-  const { data, isLoading, error } = useStockNews(symbol);
+export function StockNews({ symbol, companyName }: StockNewsProps) {
+  const { data, isLoading, error } = useStockNews(symbol, companyName);
   const [activeTab, setActiveTab] = useState<'articles' | 'summary'>('articles');
   const [articlesPage, setArticlesPage] = useState(1);
   const [summaryPage, setSummaryPage] = useState(1);
@@ -104,11 +105,14 @@ export function StockNews({ symbol }: StockNewsProps) {
   }, [data?.count]);
 
   const handleGenerateSummary = () => {
-    const articles = data?.articles ?? [];
-    if (articles.length === 0) return;
+    // Send all_articles (broader set) to the AI for richer context
+    const summaryArticles = data?.all_articles?.length
+      ? data.all_articles
+      : data?.articles ?? [];
+    if (summaryArticles.length === 0) return;
 
     startSummaryMutation.mutate(
-      { articles },
+      { articles: summaryArticles.slice(0, 20) },
       {
         onSuccess: (response) => {
           setSummaryJobId(response.job_id);
@@ -247,8 +251,8 @@ export function StockNews({ symbol }: StockNewsProps) {
             {!summaryJobId && (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <p className="text-sm text-muted-foreground text-center">
-                  Generate an AI-powered summary analyzing these {articles.length}{' '}
-                  articles
+                  Generate an AI-powered summary analyzing{' '}
+                  {(data?.all_articles?.length || articles.length)} articles
                 </p>
                 <button
                   onClick={handleGenerateSummary}
@@ -307,7 +311,7 @@ export function StockNews({ symbol }: StockNewsProps) {
                   <div className="h-3 bg-muted rounded w-4/5" />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Analyzing {articles.length} articles...
+                  Analyzing {(data?.all_articles?.length || articles.length)} articles...
                 </p>
               </div>
             )}

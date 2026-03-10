@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 from functools import partial
 
 import yfinance as yf
@@ -26,6 +27,41 @@ from agent_trade.web.schemas import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/search", tags=["search"])
+
+_COMPANY_SUFFIX_RE = re.compile(
+    r",?\s*\b(Inc\.?|Corp\.?|Corporation|Ltd\.?|Limited|LLC|PLC|N\.?V\.?|S\.?A\.?"
+    r"|Co\.?|Company|Group|Holdings|Holding|Bancorp|Technologies|Technology"
+    r"|Enterprises?|International|Class\s+[A-Z]|Common\s+Stock)\b",
+    re.IGNORECASE,
+)
+
+
+def _clean_company_name(name: str) -> str:
+    """Strip corporate suffixes to get a matchable company name."""
+    cleaned = _COMPANY_SUFFIX_RE.sub("", name).strip().rstrip(",").strip()
+    return cleaned or name
+
+
+def _is_relevant_to_stock(
+    article: dict, symbol: str, company_name: str | None
+) -> bool:
+    """Check if an article's title or description mentions the stock."""
+    text = " ".join(
+        part for part in (article.get("title"), article.get("description")) if part
+    )
+    if not text:
+        return False
+
+    # Word-boundary match on ticker to avoid "META" matching "metadata"
+    if re.search(rf"\b{re.escape(symbol)}\b", text):
+        return True
+
+    if company_name:
+        cleaned = _clean_company_name(company_name)
+        if len(cleaned) > 2 and cleaned.lower() in text.lower():
+            return True
+
+    return False
 
 
 @router.get("/autocomplete")
@@ -143,49 +179,64 @@ async def stock_history(
 async def stock_news(
     symbol: str = Path(..., min_length=1, max_length=10, pattern="^[A-Za-z0-9.-]+$"),
     limit: int = Query(15, ge=1, le=50),
+    company_name: str | None = Query(None, max_length=200),
 ) -> StockNewsResponse:
     """Get news articles for a stock symbol using NewsAPI."""
     loop = asyncio.get_running_loop()
+    # Over-fetch so we have enough after filtering
+    fetch_limit = min(limit * 3, 50)
     try:
-        # Use NewsAPI search like the agent game does
         news = await loop.run_in_executor(
-            None, partial(search_news, f"{symbol.upper()} stock", limit)
+            None, partial(search_news, f"{symbol.upper()} stock", fetch_limit)
         )
     except ValueError:
-        # API key not configured — return empty with error
         return StockNewsResponse(
             symbol=symbol.upper(),
             count=0,
             articles=[],
+            all_articles=[],
             error="News API not configured (NEWSAPI_KEY not set)",
         )
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get news for %s", symbol)
         return StockNewsResponse(
             symbol=symbol.upper(),
             count=0,
             articles=[],
-            error=str(e),
+            all_articles=[],
+            error="Failed to fetch news articles",
         )
 
-    # Convert NewsAPI articles to stock news format
-    articles: list[StockNewsArticle] = []
+    # Convert all NewsAPI articles
+    all_articles: list[StockNewsArticle] = []
     for a in news.articles:
-        articles.append(
+        all_articles.append(
             StockNewsArticle(
                 title=a.title,
                 description=a.description,
                 url=a.url,
                 source=a.source,
                 published_at=a.published_at,
-                tickers=[symbol.upper()],  # Tag with the searched symbol
+                tickers=[symbol.upper()],
             )
         )
 
+    # Filter to relevant articles for the feed
+    sym = symbol.upper()
+    articles: list[StockNewsArticle] = []
+    for art in all_articles:
+        if _is_relevant_to_stock(
+            {"title": art.title, "description": art.description}, sym, company_name
+        ):
+            articles.append(art)
+            if len(articles) >= limit:
+                break
+
     return StockNewsResponse(
-        symbol=symbol.upper(),
+        symbol=sym,
         count=len(articles),
         articles=articles,
+        all_articles=all_articles,
         error=news.error,
     )
 

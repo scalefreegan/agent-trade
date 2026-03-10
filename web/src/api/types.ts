@@ -368,6 +368,7 @@ export interface StockNewsResponse {
   symbol: string;
   count: number;
   articles: StockNewsArticle[];
+  all_articles: StockNewsArticle[];
   error: string | null;
 }
 

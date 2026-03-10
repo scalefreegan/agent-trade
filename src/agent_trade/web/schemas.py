@@ -552,6 +552,7 @@ class StockNewsResponse(BaseModel):
     symbol: str
     count: int
     articles: list[StockNewsArticle]
+    all_articles: list[StockNewsArticle] = Field(default_factory=list)
     error: str | None = None
 
 

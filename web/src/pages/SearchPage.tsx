@@ -61,7 +61,7 @@ export function SearchPage() {
               <StockChart symbol={stock.symbol} />
             </div>
             <div className="h-[600px]">
-              <StockNews symbol={stock.symbol} />
+              <StockNews symbol={stock.symbol} companyName={stock.name ?? undefined} />
             </div>
           </div>
         </div>

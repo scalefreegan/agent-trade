@@ -47,11 +47,16 @@ export function useStockHistory(
   });
 }
 
-export function useStockNews(symbol: string | null) {
+export function useStockNews(symbol: string | null, companyName?: string) {
   return useQuery({
-    queryKey: ['stockNews', symbol],
-    queryFn: () =>
-      fetchApi<StockNewsResponse>(`/search/stocks/${symbol}/news?limit=15`),
+    queryKey: ['stockNews', symbol, companyName],
+    queryFn: () => {
+      let url = `/search/stocks/${symbol}/news?limit=15`;
+      if (companyName) {
+        url += `&company_name=${encodeURIComponent(companyName)}`;
+      }
+      return fetchApi<StockNewsResponse>(url);
+    },
     enabled: !!symbol,
     staleTime: 5 * 60 * 1000,
   });
