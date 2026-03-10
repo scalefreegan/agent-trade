@@ -28,22 +28,26 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Run unit tests (non-web)
+      - name: Identify hanging test file
         run: |
-          uv run pytest tests/ --ignore=tests/web --ignore=tests/experiment \
-            -v --timeout=60 --timeout-method=thread 2>&1
+          for f in tests/test_*.py; do
+            echo "::group::$f"
+            timeout 60 uv run pytest "$f" -v --timeout=30 --timeout-method=thread 2>&1 || echo "FAILED/TIMEOUT: $f (exit $?)"
+            echo "::endgroup::"
+          done
 
       - name: Run experiment tests
         run: |
-          uv run pytest tests/experiment/ \
-            -v --timeout=60 --timeout-method=thread 2>&1
+          timeout 120 uv run pytest tests/experiment/ \
+            -v --timeout=30 --timeout-method=thread
 
       - name: Run web tests
         run: |
-          uv run pytest tests/web/ \
-            -v --timeout=60 --timeout-method=thread 2>&1
+          timeout 120 uv run pytest tests/web/ \
+            -v --timeout=30 --timeout-method=thread
 
       - name: Run full suite with coverage
+        if: success()
         run: |
           uv run pytest tests/ \
             --cov=src/agent_trade \
