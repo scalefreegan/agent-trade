@@ -9,7 +9,7 @@ Covers:
 """
 
 import json
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from fastapi.testclient import TestClient
 
@@ -115,7 +115,7 @@ class TestRecommendationEndpoint:
         assert response.status_code == 422
 
     @patch.dict("os.environ", {}, clear=True)
-    @patch("agent_trade.web.advisor_manager.run_agent")
+    @patch("agent_trade.web.advisor_manager.run_agent", new_callable=AsyncMock)
     def test_starts_job_with_valid_request(self, mock_run_agent):
         """Returns job status when request is valid."""
         mock_run_agent.return_value = {
@@ -150,7 +150,7 @@ class TestJobStatusEndpoint:
         assert response.status_code == 404
 
     @patch.dict("os.environ", {}, clear=True)
-    @patch("agent_trade.web.advisor_manager.run_agent")
+    @patch("agent_trade.web.advisor_manager.run_agent", new_callable=AsyncMock)
     def test_returns_job_status(self, mock_run_agent):
         """Returns job status for existing job."""
         mock_run_agent.return_value = {"action": "HOLD", "confidence": 0.5}
@@ -175,7 +175,7 @@ class TestJobStatusEndpoint:
         assert "status" in data
 
     @patch.dict("os.environ", {}, clear=True)
-    @patch("agent_trade.web.advisor_manager.run_agent")
+    @patch("agent_trade.web.advisor_manager.run_agent", new_callable=AsyncMock)
     def test_tracks_dropped_recommendations(self, mock_run_agent):
         """Returns dropped_count=0 when all recommendations are valid."""
         mock_run_agent.return_value = {"action": "BUY", "confidence": 0.7}
