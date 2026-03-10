@@ -28,16 +28,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Debug info
+      - name: Run tests
+        shell: bash
         run: |
-          uv run python --version
-          uv run python -c "import sys; print(f'platform={sys.platform}')"
-          uv run python -c "import asyncio; p = asyncio.get_event_loop_policy(); print(f'loop_policy={p.__class__.__name__}')"
-          echo "Test count:"
-          uv run pytest tests/ --collect-only -q 2>&1 | tail -1
-
-      - name: Run tests with raw output
-        run: |
-          echo ">>> Starting pytest at $(date -u +%T)"
-          uv run python -u -m pytest tests/ -v -x -s -p no:timeout 2>&1
-          echo ">>> Finished at $(date -u +%T)"
+          # Run pytest directly via .venv, bypassing uv run
+          .venv/bin/python -u -m pytest tests/ \
+            --cov=src/agent_trade \
+            --cov-report=term-missing \
+            --cov-fail-under=85 \
+            -v \
+            --timeout=60 \
+            --timeout-method=thread
