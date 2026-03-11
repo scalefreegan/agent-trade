@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useKalshiEvents, type KalshiEvent } from '../api/kalshi';
+import { useKalshiEvents, useKalshiSeriesList, buildSeriesSlugMap, type KalshiEvent } from '../api/kalshi';
 import { EventCard } from '../components/predictions/EventCard';
 import { SortControls, type SortOption, type MaxDateRange } from '../components/predictions/SortControls';
 
@@ -11,6 +11,12 @@ export function PredictionMarketsPage() {
   const [category, setCategory] = useState('');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allEvents, setAllEvents] = useState<KalshiEvent[]>([]);
+
+  const { data: seriesData } = useKalshiSeriesList();
+  const seriesSlugMap = useMemo(
+    () => buildSeriesSlugMap(seriesData?.series ?? []),
+    [seriesData],
+  );
 
   const { data, isLoading, error, isFetching } = useKalshiEvents({
     status: statusFilter || undefined,
@@ -228,7 +234,7 @@ export function PredictionMarketsPage() {
       {displayedEvents.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {displayedEvents.map((event) => (
-            <EventCard key={event.event_ticker} event={event} />
+            <EventCard key={event.event_ticker} event={event} seriesSlugMap={seriesSlugMap} />
           ))}
         </div>
       )}

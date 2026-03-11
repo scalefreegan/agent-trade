@@ -133,6 +133,55 @@ export interface UseKalshiMarketsParams {
   max_close_ts?: number;
 }
 
+// Series types and hooks
+export interface KalshiSeries {
+  ticker: string;
+  title: string;
+  category?: string;
+  frequency?: string;
+  tags?: string[];
+}
+
+export interface KalshiSeriesListResponse {
+  series: KalshiSeries[];
+  cursor?: string;
+}
+
+export function useKalshiSeriesList() {
+  return useQuery({
+    queryKey: ['kalshi-series'],
+    queryFn: () =>
+      fetchKalshi<KalshiSeriesListResponse>('/series', { limit: 1000 }),
+    staleTime: 5 * 60_000, // 5 minutes
+  });
+}
+
+/** Maps series ticker → URL slug derived from the series title */
+export function buildSeriesSlugMap(seriesList: KalshiSeries[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const s of seriesList) {
+    const slug = s.title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-');
+    map.set(s.ticker, slug);
+  }
+  return map;
+}
+
+/** Build a full Kalshi event URL, or '#' if the series slug can't be resolved */
+export function buildEventUrl(
+  eventTicker: string,
+  seriesTicker: string | undefined,
+  slugMap: Map<string, string>,
+): string {
+  if (!seriesTicker) return '#';
+  const slug = slugMap.get(seriesTicker);
+  if (!slug) return '#';
+  return `https://kalshi.com/markets/${seriesTicker.toLowerCase()}/${slug}/${eventTicker.toLowerCase()}`;
+}
+
 export function useKalshiMarkets(params: UseKalshiMarketsParams = {}) {
   const {
     status,
