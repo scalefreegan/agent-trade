@@ -2,7 +2,6 @@ export type SortOption =
   | 'volume_24h'
   | 'volume'
   | 'open_interest'
-  | 'yes_bid'
   | 'close_time'
   | 'created_time';
 
@@ -26,7 +25,6 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: 'volume_24h', label: 'Volume (24h)' },
   { value: 'volume', label: 'Total Volume' },
   { value: 'open_interest', label: 'Open Interest' },
-  { value: 'yes_bid', label: 'Yes Price' },
   { value: 'close_time', label: 'Ending Soon' },
   { value: 'created_time', label: 'Newest' },
 ];
@@ -64,7 +62,7 @@ export function SortControls({
         type="text"
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
-        placeholder="Search markets..."
+        placeholder="Search events..."
         className="w-full px-4 py-2 text-sm bg-card text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
       />
 

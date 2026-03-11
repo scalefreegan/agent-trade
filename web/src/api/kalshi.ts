@@ -23,13 +23,20 @@ export interface KalshiMarket {
   series_ticker?: string;
   category?: string;
   subtitle?: string;
+  yes_sub_title?: string;
+  no_sub_title?: string;
+  market_type?: string;
+  rules_primary?: string;
 }
 
 export interface KalshiEvent {
-  ticker: string;
+  event_ticker: string;
   title: string;
   category: string;
   sub_title?: string;
+  series_ticker?: string;
+  strike_period?: string;
+  collateral_return_type?: string;
   mutually_exclusive: boolean;
   markets?: KalshiMarket[];
 }
@@ -90,24 +97,27 @@ export interface UseKalshiEventsParams {
   limit?: number;
   cursor?: string;
   with_nested_markets?: boolean;
+  category?: string;
 }
 
 export function useKalshiEvents(params: UseKalshiEventsParams = {}) {
   const {
     status,
-    limit = 20,
+    limit = 200,
     cursor,
     with_nested_markets = true,
+    category,
   } = params;
 
   return useQuery({
-    queryKey: ['kalshi-events', { status, limit, cursor, with_nested_markets }],
+    queryKey: ['kalshi-events', { status, limit, cursor, with_nested_markets, category }],
     queryFn: () =>
       fetchKalshi<KalshiEventsResponse>('/events', {
         status,
         limit,
         cursor,
         with_nested_markets,
+        category,
       }),
     staleTime: 60_000, // 1 minute
   });

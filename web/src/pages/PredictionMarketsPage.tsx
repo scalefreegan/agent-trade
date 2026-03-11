@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useKalshiMarkets, type KalshiMarket } from '../api/kalshi';
-import { MarketCard } from '../components/predictions/MarketCard';
+import { useKalshiEvents, type KalshiEvent } from '../api/kalshi';
+import { EventCard } from '../components/predictions/EventCard';
 import { SortControls, type SortOption, type MaxDateRange } from '../components/predictions/SortControls';
 
 export function PredictionMarketsPage() {
@@ -10,81 +10,105 @@ export function PredictionMarketsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [allMarkets, setAllMarkets] = useState<KalshiMarket[]>([]);
+  const [allEvents, setAllEvents] = useState<KalshiEvent[]>([]);
 
-  // Compute max_close_ts from maxDateRange
-  const maxCloseTs = useMemo(() => {
-    if (maxDateRange === 'none') return undefined;
-    const now = new Date();
-    switch (maxDateRange) {
-      case '1m':
-        now.setMonth(now.getMonth() + 1);
-        break;
-      case '3m':
-        now.setMonth(now.getMonth() + 3);
-        break;
-      case '6m':
-        now.setMonth(now.getMonth() + 6);
-        break;
-      case '1y':
-        now.setFullYear(now.getFullYear() + 1);
-        break;
-    }
-    return Math.floor(now.getTime() / 1000);
-  }, [maxDateRange]);
-
-  const { data, isLoading, error, isFetching } = useKalshiMarkets({
+  const { data, isLoading, error, isFetching } = useKalshiEvents({
     status: statusFilter || undefined,
-    limit: 1000,
+    limit: 200,
     cursor,
-    max_close_ts: maxCloseTs,
-    series_ticker: category || undefined,
   });
 
-  // Accumulate markets from all loaded pages
+  // Accumulate events from all loaded pages
   useEffect(() => {
-    if (!data?.markets || error) return;
+    if (!data?.events || error) return;
 
     if (cursor) {
-      setAllMarkets((prev) => [...prev, ...data.markets]);
+      setAllEvents((prev) => [...prev, ...data.events]);
     } else {
-      setAllMarkets(data.markets);
+      setAllEvents(data.events);
     }
   }, [data, cursor, error]);
 
+  // Helper: aggregate volume_24h for an event
+  const eventVolume24h = (e: KalshiEvent) =>
+    (e.markets ?? []).reduce((sum, m) => sum + (m.volume_24h || 0), 0);
+  const eventVolume = (e: KalshiEvent) =>
+    (e.markets ?? []).reduce((sum, m) => sum + (m.volume || 0), 0);
+  const eventOI = (e: KalshiEvent) =>
+    (e.markets ?? []).reduce((sum, m) => sum + (m.open_interest || 0), 0);
+  const eventEarliestClose = (e: KalshiEvent): Date | null =>
+    (e.markets ?? []).reduce<Date | null>((earliest, m) => {
+      const d = new Date(m.close_time);
+      if (isNaN(d.getTime())) return earliest;
+      return earliest === null || d < earliest ? d : earliest;
+    }, null);
+  const eventLatestCreated = (e: KalshiEvent): Date =>
+    (e.markets ?? []).reduce((latest, m) => {
+      const d = new Date(m.created_time);
+      return d > latest ? d : latest;
+    }, new Date(0));
+
   // Client-side filtering and sorting
-  const displayedMarkets = useMemo(() => {
-    let markets = allMarkets;
+  const displayedEvents = useMemo(() => {
+    let events = allEvents;
+
+    // Category filter
+    if (category) {
+      events = events.filter((e) => e.category === category);
+    }
+
+    // Date range filter (client-side using earliest market close_time)
+    if (maxDateRange !== 'none') {
+      const cutoff = new Date();
+      switch (maxDateRange) {
+        case '1m': cutoff.setMonth(cutoff.getMonth() + 1); break;
+        case '3m': cutoff.setMonth(cutoff.getMonth() + 3); break;
+        case '6m': cutoff.setMonth(cutoff.getMonth() + 6); break;
+        case '1y': cutoff.setFullYear(cutoff.getFullYear() + 1); break;
+      }
+      events = events.filter((e) => {
+        const close = eventEarliestClose(e);
+        return close !== null && close.getTime() <= cutoff.getTime();
+      });
+    }
 
     // Text search filter
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      markets = markets.filter(
-        (m) =>
-          m.title.toLowerCase().includes(q) ||
-          (m.subtitle && m.subtitle.toLowerCase().includes(q)) ||
-          m.ticker.toLowerCase().includes(q)
+      events = events.filter(
+        (e) =>
+          e.title.toLowerCase().includes(q) ||
+          (e.sub_title && e.sub_title.toLowerCase().includes(q)) ||
+          (e.markets ?? []).some(
+            (m) =>
+              (m.yes_sub_title && m.yes_sub_title.toLowerCase().includes(q)) ||
+              m.title.toLowerCase().includes(q)
+          )
       );
     }
 
     // Sort
-    const sorted = [...markets];
+    const sorted = [...events];
     switch (sortBy) {
       case 'volume_24h':
-        return sorted.sort((a, b) => (b.volume_24h || 0) - (a.volume_24h || 0));
+        return sorted.sort((a, b) => eventVolume24h(b) - eventVolume24h(a));
       case 'volume':
-        return sorted.sort((a, b) => (b.volume || 0) - (a.volume || 0));
+        return sorted.sort((a, b) => eventVolume(b) - eventVolume(a));
       case 'open_interest':
-        return sorted.sort((a, b) => (b.open_interest || 0) - (a.open_interest || 0));
-      case 'yes_bid':
-        return sorted.sort((a, b) => (b.yes_bid || 0) - (a.yes_bid || 0));
-      case 'close_time':
-        return sorted.sort(
-          (a, b) => new Date(a.close_time).getTime() - new Date(b.close_time).getTime()
-        );
+        return sorted.sort((a, b) => eventOI(b) - eventOI(a));
+      case 'close_time': {
+        return sorted.sort((a, b) => {
+          const ca = eventEarliestClose(a);
+          const cb = eventEarliestClose(b);
+          if (!ca && !cb) return 0;
+          if (!ca) return 1;
+          if (!cb) return -1;
+          return ca.getTime() - cb.getTime();
+        });
+      }
       case 'created_time':
         return sorted.sort(
-          (a, b) => new Date(b.created_time).getTime() - new Date(a.created_time).getTime()
+          (a, b) => eventLatestCreated(b).getTime() - eventLatestCreated(a).getTime()
         );
       default: {
         const _exhaustive: never = sortBy;
@@ -92,11 +116,11 @@ export function PredictionMarketsPage() {
         return sorted;
       }
     }
-  }, [allMarkets, sortBy, searchQuery]);
+  }, [allEvents, sortBy, searchQuery, category, maxDateRange]);
 
   const resetPagination = () => {
     setCursor(undefined);
-    setAllMarkets([]);
+    setAllEvents([]);
   };
 
   const handleSortChange = (newSort: SortOption) => {
@@ -110,12 +134,10 @@ export function PredictionMarketsPage() {
 
   const handleMaxDateRangeChange = (newRange: MaxDateRange) => {
     setMaxDateRange(newRange);
-    resetPagination();
   };
 
   const handleCategoryChange = (newCategory: string) => {
     setCategory(newCategory);
-    resetPagination();
   };
 
   const handleLoadMore = () => {
@@ -126,14 +148,14 @@ export function PredictionMarketsPage() {
 
   const hasMore = !!data?.cursor;
 
-  // Collect unique series_tickers for category dropdown
+  // Collect unique categories from events
   const categories = useMemo(() => {
-    const tickers = new Set<string>();
-    allMarkets.forEach((m) => {
-      if (m.series_ticker) tickers.add(m.series_ticker);
+    const cats = new Set<string>();
+    allEvents.forEach((e) => {
+      if (e.category) cats.add(e.category);
     });
-    return Array.from(tickers).sort();
-  }, [allMarkets]);
+    return Array.from(cats).sort();
+  }, [allEvents]);
 
   return (
     <div className="space-y-6">
@@ -158,16 +180,16 @@ export function PredictionMarketsPage() {
       />
 
       {/* Result count */}
-      {allMarkets.length > 0 && (
+      {allEvents.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          {displayedMarkets.length === allMarkets.length
-            ? `${allMarkets.length} markets loaded`
-            : `${displayedMarkets.length} markets matching '${searchQuery}' (${allMarkets.length} loaded)`}
+          {displayedEvents.length === allEvents.length
+            ? `${allEvents.length} events loaded`
+            : `${displayedEvents.length} events matching filters (${allEvents.length} loaded)`}
         </p>
       )}
 
       {/* Loading skeleton */}
-      {isLoading && allMarkets.length === 0 && (
+      {isLoading && allEvents.length === 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
@@ -196,23 +218,23 @@ export function PredictionMarketsPage() {
         </div>
       )}
 
-      {/* Markets grid */}
-      {!isLoading && !error && displayedMarkets.length === 0 && (
+      {/* Events grid */}
+      {!isLoading && !error && displayedEvents.length === 0 && (
         <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-          No markets found
+          No events found
         </div>
       )}
 
-      {displayedMarkets.length > 0 && (
+      {displayedEvents.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {displayedMarkets.map((market) => (
-            <MarketCard key={market.ticker} market={market} />
+          {displayedEvents.map((event) => (
+            <EventCard key={event.event_ticker} event={event} />
           ))}
         </div>
       )}
 
       {/* Load more button */}
-      {hasMore && displayedMarkets.length > 0 && (
+      {hasMore && displayedEvents.length > 0 && (
         <div className="flex justify-center pt-4">
           <button
             onClick={handleLoadMore}
