@@ -5,9 +5,6 @@ import { MetricCard } from '../ui/MetricCard';
 import { useChartTheme } from '../../hooks/useChartTheme';
 import { formatCurrency } from '../../lib/format';
 
-// Muted colors for benchmark lines (distinct from agent's primary green)
-const BENCHMARK_COLORS = ['#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#f97316'];
-
 interface AgentPerformanceChartProps {
   dataPoints: PerformanceDataPoint[];
   agentId: string;
@@ -156,7 +153,7 @@ export function AgentPerformanceChart({
                   key={series.symbol}
                   type="monotone"
                   dataKey={series.symbol}
-                  stroke={BENCHMARK_COLORS[i % BENCHMARK_COLORS.length]}
+                  stroke={ct.benchmarkColors[i % ct.benchmarkColors.length]}
                   strokeWidth={1.5}
                   strokeDasharray="5 3"
                   dot={false}

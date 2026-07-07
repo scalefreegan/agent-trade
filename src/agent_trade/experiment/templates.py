@@ -11,13 +11,16 @@ from typing import Optional
 
 from .models import (
     AgentInitHints,
+    AgentState,
     AgentStrategy,
     DailyDecision,
     ExperimentConfig,
     ExperimentInitSpec,
+    GameState,
     InvestmentThesis,
     Order,
     Portfolio,
+    StockPosition,
     StrategyLearning,
     TaxLot,
 )
@@ -247,14 +250,12 @@ def parse_daily_decision(markdown: str, agent_id: str, date: str) -> DailyDecisi
     """
     Parse daily decision markdown into structured DailyDecision model.
 
-    Note: This is a simplified parser that extracts research notes but does not
-    parse orders or strategy updates. For production use, either:
-    1. Implement full markdown parsing
-    2. Have agents output structured JSON directly
-    3. Use this as a partial parser and extract orders/updates separately
+    Note: Markdown parsing intentionally extracts only research notes. Orders
+    and strategy updates are NOT parsed from markdown — they require structured
+    JSON input, which is how the production path (agent_runner) supplies them.
 
     Returns empty orders list and None for strategy_updates. Callers requiring
-    complete parsing should implement their own or use structured input.
+    orders/updates should use structured JSON input rather than markdown.
     """
     # Extract sections (simplified parsing)
     research_notes = ""
@@ -279,13 +280,9 @@ def parse_daily_decision(markdown: str, agent_id: str, date: str) -> DailyDecisi
             research_notes = "\n".join(lines[start_idx:]).strip()
             break
 
-    # Extract orders (section after "Trading Decisions")
-    # TODO: Implement order parsing from markdown
-    # For now, returns empty list - callers should use structured input
-
-    # Extract strategy updates (section after "Strategy Updates")
-    # TODO: Implement strategy update parsing from markdown
-    # For now, returns None - callers should use structured input
+    # Orders and strategy updates are not parsed from markdown by design; the
+    # production path supplies them as structured JSON via agent_runner. Here
+    # they remain an empty list and None respectively.
 
     return DailyDecision(
         date=date,
@@ -405,8 +402,8 @@ def create_initial_game_state(
     config: ExperimentConfig,
     experiment_id: str,
     experiment_name: str,
-    init_spec: Optional["ExperimentInitSpec"] = None,
-) -> "GameState":
+    init_spec: Optional[ExperimentInitSpec] = None,
+) -> GameState:
     """
     Create initial game state for a new experiment.
 
@@ -414,8 +411,6 @@ def create_initial_game_state(
     If init_spec is provided, agents get customized strategies and/or
     a seeded starting portfolio.
     """
-    from .models import AgentInitHints, AgentState, GameState, StockPosition
-
     # Build override map: agent_index (1-based) -> AgentInitHints
     override_map: dict[int, AgentInitHints] = {}
     if init_spec and init_spec.agent_overrides:

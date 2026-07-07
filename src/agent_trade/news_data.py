@@ -2,6 +2,7 @@
 
 import os
 import logging
+import requests
 from tiingo import TiingoClient
 from newsapi import NewsApiClient
 from .models import NewsResponse, NewsArticle
@@ -56,13 +57,24 @@ def get_stock_news(tickers: list[str], limit: int = 10) -> NewsResponse:
             count=len(formatted_articles),
             articles=formatted_articles,
         )
-    except ValueError as e:
+    except ValueError:
         # API key not set - this is a configuration error, raise it
         raise
-    except Exception as e:
-        # Log the error so it's visible even if caller doesn't check error field
+    except requests.RequestException as e:
+        # Expected network/HTTP failure talking to the Tiingo API
         error_msg = f"Tiingo API error: {type(e).__name__}: {str(e)}"
         logger.error(error_msg)
+        return NewsResponse(
+            source="tiingo",
+            tickers=tickers,
+            count=0,
+            articles=[],
+            error=error_msg,
+        )
+    except Exception as e:
+        # Unexpected error - log with traceback for diagnosis
+        error_msg = f"Tiingo API error: {type(e).__name__}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
         return NewsResponse(
             source="tiingo",
             tickers=tickers,
@@ -132,13 +144,24 @@ def search_news(
             articles=formatted_articles,
             total_results=response.get("totalResults", 0),
         )
-    except ValueError as e:
+    except ValueError:
         # API key not set - this is a configuration error, raise it
         raise
-    except Exception as e:
-        # Log the error so it's visible even if caller doesn't check error field
+    except requests.RequestException as e:
+        # Expected network/HTTP failure talking to the NewsAPI service
         error_msg = f"NewsAPI error: {type(e).__name__}: {str(e)}"
         logger.error(error_msg)
+        return NewsResponse(
+            source="newsapi",
+            query=query,
+            count=0,
+            articles=[],
+            error=error_msg,
+        )
+    except Exception as e:
+        # Unexpected error - log with traceback for diagnosis
+        error_msg = f"NewsAPI error: {type(e).__name__}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
         return NewsResponse(
             source="newsapi",
             query=query,

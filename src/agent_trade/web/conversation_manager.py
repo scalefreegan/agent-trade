@@ -335,12 +335,18 @@ class ConversationManager:
                 conv.add_message(MessageRole.ASSISTANT, response_text)
                 conv.status = ConversationStatus.IDLE
 
-        except Exception as e:
-            logger.exception("Error generating response for conversation %s", conv.id)
+        except Exception:
+            error_id = uuid.uuid4().hex[:8]
+            logger.exception(
+                "Error generating response for conversation %s (error_id=%s)",
+                conv.id,
+                error_id,
+            )
             with conv._lock:
                 conv.add_message(
                     MessageRole.ASSISTANT,
-                    f"Sorry, I encountered an error: {str(e)}",
+                    f"Sorry, I encountered an error (reference {error_id}). "
+                    "Please try again or share this reference if the problem persists.",
                 )
                 conv.status = ConversationStatus.IDLE
 

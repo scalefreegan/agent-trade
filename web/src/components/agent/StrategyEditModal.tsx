@@ -79,9 +79,9 @@ export function StrategyEditModal({
   if (!open) return null;
 
   const inputClass =
-    'w-full px-3 py-2.5 text-sm font-mono bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded transition-colors outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-brand-700 focus:border-brand-700 dark:focus:ring-brand-600 dark:focus:border-brand-600';
+    'w-full px-3 py-2.5 text-sm font-mono bg-muted border border-border rounded transition-colors outline-none text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary';
   const labelClass =
-    'block text-xs font-mono font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1.5';
+    'block text-xs font-mono font-semibold uppercase tracking-widest text-muted-foreground mb-1.5';
 
   return createPortal(
     <div
@@ -92,20 +92,20 @@ export function StrategyEditModal({
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 rounded overflow-hidden max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-2xl bg-card shadow-2xl border border-border rounded overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="bg-brand-900 px-6 py-4 flex items-center justify-between flex-shrink-0">
+        <div className="bg-primary px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div>
-            <p className="text-xs font-mono text-brand-400 uppercase tracking-widest mb-0.5">
+            <p className="text-xs font-mono text-primary-foreground/70 uppercase tracking-widest mb-0.5">
               Strategy
             </p>
-            <h2 id="strategy-edit-title" className="text-lg font-semibold text-white tracking-tight">
+            <h2 id="strategy-edit-title" className="text-lg font-semibold text-primary-foreground tracking-tight">
               Edit Investment Thesis
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="text-brand-300 hover:text-white transition-colors p-1 rounded"
+            className="text-primary-foreground/70 hover:text-primary-foreground transition-colors p-1 rounded"
             aria-label="Close"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -174,7 +174,7 @@ export function StrategyEditModal({
                 placeholder="e.g. Technology, Healthcare, Energy"
                 className={inputClass}
               />
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-600 font-mono">Comma-separated</p>
+              <p className="mt-1 text-xs text-muted-foreground font-mono">Comma-separated</p>
             </div>
 
             {/* Key Metrics */}
@@ -188,7 +188,7 @@ export function StrategyEditModal({
                 placeholder="e.g. P/E ratio, Revenue growth, Free cash flow"
                 className={inputClass}
               />
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-600 font-mono">Comma-separated</p>
+              <p className="mt-1 text-xs text-muted-foreground font-mono">Comma-separated</p>
             </div>
 
             {/* Rationale */}
@@ -205,19 +205,19 @@ export function StrategyEditModal({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-3 flex-shrink-0">
+          <div className="px-6 py-4 bg-muted border-t border-border flex items-center justify-end gap-3 flex-shrink-0">
             <button
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-4 py-2 text-sm font-mono text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 transition-colors"
+              className="px-4 py-2 text-sm font-mono text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="px-5 py-2 text-sm font-mono font-semibold rounded bg-brand-700 hover:bg-brand-800 text-white disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2"
+              className="px-5 py-2 text-sm font-mono font-semibold rounded bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
             >
               {isPending && (
                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">

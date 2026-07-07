@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="w-full max-w-md rounded border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 overflow-hidden shadow">
+        <div className="w-full max-w-md rounded border border-red-200 dark:border-red-800 bg-card overflow-hidden shadow">
           {/* Header stripe */}
           <div className="h-1 bg-red-500" />
 
@@ -63,7 +63,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 <p className="text-xs font-mono font-semibold uppercase tracking-widest text-red-500 mb-1">
                   Render Error
                 </p>
-                <p className="text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed break-words">
+                <p className="text-sm text-foreground font-mono leading-relaxed break-words">
                   {error.message || 'An unexpected error occurred.'}
                 </p>
               </div>
@@ -72,10 +72,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             {/* Stack hint */}
             {error.stack && (
               <details className="mt-4">
-                <summary className="text-xs font-mono text-gray-400 dark:text-gray-600 cursor-pointer hover:text-gray-600 dark:hover:text-gray-400 transition-colors select-none">
+                <summary className="text-xs font-mono text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none">
                   Stack trace
                 </summary>
-                <pre className="mt-2 text-xs font-mono text-gray-500 dark:text-gray-500 overflow-x-auto whitespace-pre-wrap bg-gray-50 dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-700">
+                <pre className="mt-2 text-xs font-mono text-muted-foreground overflow-x-auto whitespace-pre-wrap bg-muted rounded p-3 border border-border">
                   {error.stack}
                 </pre>
               </details>
@@ -86,10 +86,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               onClick={this.reset}
               className="
                 mt-4 w-full px-4 py-2 rounded text-sm font-mono font-semibold
-                bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700
-                text-gray-700 dark:text-gray-300
-                border border-gray-200 dark:border-gray-700
-                transition-colors focus:outline-none focus:ring-2 focus:ring-brand-700
+                bg-muted hover:bg-muted/80
+                text-foreground
+                border border-border
+                transition-colors focus:outline-none focus:ring-2 focus:ring-primary
               "
             >
               Try again

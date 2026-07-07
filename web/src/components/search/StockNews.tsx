@@ -201,36 +201,48 @@ export function StockNews({ symbol, companyName }: StockNewsProps) {
             aria-labelledby="tab-articles"
             className="flex-1 divide-y divide-border overflow-y-auto min-h-0"
           >
-            {paginatedArticles.map((article, i) => (
-              <a
-                key={article.url ?? i}
-                href={article.url ?? '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block px-6 py-3 hover:bg-muted/50 transition-colors"
-              >
-                <h4 className="text-sm font-medium text-foreground leading-snug">
-                  {article.title}
-                </h4>
-                {article.description && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {article.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-2 mt-1.5">
-                  {article.source && (
-                    <span className="text-xs font-medium text-primary">
-                      {article.source}
-                    </span>
+            {paginatedArticles.map((article, i) => {
+              const body = (
+                <>
+                  <h4 className="text-sm font-medium text-foreground leading-snug">
+                    {article.title}
+                  </h4>
+                  {article.description && (
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {article.description}
+                    </p>
                   )}
-                  {article.published_at && (
-                    <span className="text-xs text-muted-foreground">
-                      {formatDate(article.published_at)}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 mt-1.5">
+                    {article.source && (
+                      <span className="text-xs font-medium text-primary">
+                        {article.source}
+                      </span>
+                    )}
+                    {article.published_at && (
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(article.published_at)}
+                      </span>
+                    )}
+                  </div>
+                </>
+              );
+
+              return article.url ? (
+                <a
+                  key={article.url}
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block px-6 py-3 hover:bg-muted/50 transition-colors"
+                >
+                  {body}
+                </a>
+              ) : (
+                <div key={i} className="block px-6 py-3">
+                  {body}
                 </div>
-              </a>
-            ))}
+              );
+            })}
           </div>
           <Pagination
             currentPage={articlesPage}

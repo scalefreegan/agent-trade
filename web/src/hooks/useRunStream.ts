@@ -52,7 +52,6 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
         return;
       }
 
-      console.log('Starting polling fallback for run status');
       isPollingRef.current = true;
 
       const poll = async () => {
@@ -211,7 +210,6 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
         const maxAttempts = 5;
         if (reconnectAttemptsRef.current < maxAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
-          console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxAttempts})`);
 
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttemptsRef.current++;
@@ -219,7 +217,6 @@ export function useRunStream(experimentId: string | null, options: UseRunStreamO
           }, delay);
         } else {
           // Fall back to polling after max SSE attempts
-          console.log('SSE retry exhausted, falling back to polling');
           startPollingFallback();
         }
       };

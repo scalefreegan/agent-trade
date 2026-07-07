@@ -158,7 +158,7 @@ export function TaxImpactChart({ taxMetrics, agentNames }: TaxImpactChartProps) 
             tick={{ fill: ct.axis, fontSize: 13 }}
             stroke={ct.axisStroke}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(128,128,128,0.08)' }} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: ct.cursorFill }} />
           <Legend content={<CustomLegend />} />
 
           <Bar

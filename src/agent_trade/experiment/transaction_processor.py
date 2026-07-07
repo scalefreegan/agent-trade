@@ -16,7 +16,6 @@ from .models import (
     LotSale,
     Order,
     Portfolio,
-    TaxLot,
 )
 from .portfolio_tracker import add_shares, remove_shares_fifo
 
@@ -199,8 +198,9 @@ def execute_sell(
             f"gain ${capital_gain:.2f}, tax ${tax_amount:.2f}"
         )
 
-    # Calculate net proceeds (after tax)
-    gross_amount = order.amount * current_price
+    # Calculate net proceeds (after tax). FIFO removes exactly order.amount
+    # shares, so the per-lot proceeds sum is the authoritative gross amount.
+    gross_amount = total_proceeds
     net_proceeds = gross_amount - total_tax
 
     # Add net proceeds to cash

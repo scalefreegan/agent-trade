@@ -248,6 +248,8 @@ class Portfolio(BaseModel):
                     f"Cannot accurately value portfolio."
                 )
 
+        # `cash` is the balance remaining after margin is reserved, so adding
+        # `margin_used` back reconstructs the total capital under management.
         return self.cash + self.margin_used + stock_value + options_value + futures_pnl
 
 

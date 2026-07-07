@@ -27,16 +27,6 @@ web = [
     "rich>=13.0.0",
 ]
 
-# Optional: for running tests
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-timeout>=2.0.0",
-    "fastapi>=0.100.0",
-    "httpx>=0.24.0",
-    "typer>=0.9.0",
-]
-
 [project.scripts]
 # Run as standalone MCP server
 agent-trade = "agent_trade.server:main"
@@ -54,6 +44,17 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
+# Testing and linting (installed by default with `uv sync`)
 dev = [
     "pytest>=9.0.2",
+    "pytest-cov>=4.0.0",
+    "pytest-timeout>=2.0.0",
+    "fastapi>=0.100.0",
+    "httpx>=0.24.0",
+    "typer>=0.9.0",
+    "ruff>=0.8.0",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

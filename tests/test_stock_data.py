@@ -140,7 +140,9 @@ class TestGetDividendHistory:
     """Tests for get_dividend_history()."""
 
     def test_success_with_dividends(self, mock_ticker):
-        dates = pd.to_datetime(["2025-06-01", "2025-09-01"]).tz_localize("UTC")
+        # Use dates relative to now so the "1y" window never ages them out
+        now = pd.Timestamp.now(tz="UTC")
+        dates = pd.DatetimeIndex([now - pd.Timedelta(days=90), now - pd.Timedelta(days=30)])
         mock_ticker.dividends = pd.Series([0.25, 0.26], index=dates)
 
         result = get_dividend_history("AAPL", period="1y")
@@ -148,7 +150,7 @@ class TestGetDividendHistory:
         assert result.symbol == "AAPL"
         assert result.period == "1y"
         assert result.count == 2
-        assert result.dividends[0].date == "2025-06-01"
+        assert result.dividends[0].date == dates[0].strftime("%Y-%m-%d")
         assert result.dividends[0].amount == Decimal("0.25")
         assert result.dividends[1].amount == Decimal("0.26")
         assert result.message is None

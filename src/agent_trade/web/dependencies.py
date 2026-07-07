@@ -1,4 +1,5 @@
 """Shared dependencies for FastAPI routes."""
+import pathlib
 import threading
 import time
 from collections import deque
@@ -125,10 +126,8 @@ def require_advisor_rate_limit(request: Request) -> None:
         )
 
 
-def assert_path_within(child: "pathlib.Path", parent: "pathlib.Path") -> None:
+def assert_path_within(child: pathlib.Path, parent: pathlib.Path) -> None:
     """Raise 400 if *child* escapes *parent* after symlink resolution."""
-    import pathlib  # noqa: F811 — local to avoid circular at module level
-
     resolved = child.resolve()
     expected = parent.resolve()
     if not resolved.is_relative_to(expected):
