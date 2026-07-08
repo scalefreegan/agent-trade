@@ -30,3 +30,15 @@ export function getChartColor(rank: number): string {
   const index = Math.min(rank - 1, CHART_COLORS.length - 1);
   return CHART_COLORS[index];
 }
+
+/**
+ * Convert a `#rrggbb` hex string to an `rgba()` string with the given alpha.
+ * Used for subtle tints derived from a resolved theme color.
+ */
+export function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}

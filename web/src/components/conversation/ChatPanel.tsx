@@ -234,8 +234,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
             placeholder={isResponding ? 'Waiting for response...' : 'Type a message... (Enter to send, Shift+Enter for new line)'}
             disabled={isResponding}
             rows={1}
-            className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 min-h-[40px] max-h-[120px]"
-            style={{ height: 'auto', overflow: 'auto' }}
+            className="flex-1 resize-none overflow-auto rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 min-h-[40px] max-h-[120px]"
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;
               target.style.height = 'auto';

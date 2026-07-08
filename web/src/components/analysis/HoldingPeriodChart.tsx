@@ -14,6 +14,7 @@ interface TooltipCallbackProps {
   payload?: Array<{ payload?: unknown }>;
 }
 import { useChartTheme } from '../../hooks/useChartTheme';
+import { hexToRgba } from '../../lib/colors';
 import { Card } from '../ui/Card';
 import { MetricCard } from '../ui/MetricCard';
 
@@ -168,7 +169,7 @@ export function HoldingPeriodChart({ holdingPeriods, agentNames }: HoldingPeriod
             tick={{ fill: ct.axis, fontSize: 13 }}
             stroke={ct.axisStroke}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(128,128,128,0.08)' }} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: ct.cursorFill }} />
           <Legend content={<CustomLegend />} />
 
           <Bar dataKey="0-30" stackId="holding" fill={bucketColors['0-30']} animationDuration={800} animationBegin={0} />
@@ -201,7 +202,7 @@ export function HoldingPeriodChart({ holdingPeriods, agentNames }: HoldingPeriod
       </div>
 
       {/* Educational note */}
-      <div className="mt-6 p-4 rounded-lg border" style={{ backgroundColor: `${bucketColors['365+']}15`, borderColor: `${bucketColors['365+']}40` }}>
+      <div className="mt-6 p-4 rounded-lg border" style={{ backgroundColor: hexToRgba(bucketColors['365+'], 0.08), borderColor: hexToRgba(bucketColors['365+'], 0.25) }}>
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5" style={{ backgroundColor: bucketColors['365+'] }}>
             <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">

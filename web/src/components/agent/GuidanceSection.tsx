@@ -45,7 +45,7 @@ export function GuidanceSection({ guidance, onSave, isPending, error }: Guidance
   };
 
   const inputClass =
-    'w-full px-3 py-2.5 text-sm font-mono bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded transition-colors outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-brand-700 focus:border-brand-700 dark:focus:ring-brand-600 dark:focus:border-brand-600 resize-y';
+    'w-full px-3 py-2.5 text-sm font-mono bg-muted border border-border rounded transition-colors outline-none text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary focus:border-primary resize-y';
 
   return (
     <div className="mt-8">
@@ -86,7 +86,7 @@ export function GuidanceSection({ guidance, onSave, isPending, error }: Guidance
               type="button"
               onClick={handleCancel}
               disabled={isPending}
-              className="px-3 py-1.5 text-xs font-mono text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 transition-colors"
+              className="px-3 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
             >
               Cancel
             </button>
@@ -104,7 +104,7 @@ export function GuidanceSection({ guidance, onSave, isPending, error }: Guidance
               type="button"
               onClick={handleSave}
               disabled={isPending}
-              className="px-4 py-1.5 text-xs font-mono font-semibold rounded bg-brand-700 hover:bg-brand-800 text-white disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+              className="px-4 py-1.5 text-xs font-mono font-semibold rounded bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
             >
               {isPending && (
                 <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">

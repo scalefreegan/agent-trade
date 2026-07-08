@@ -9,10 +9,12 @@ uv sync
 
 Expected output: All dependencies installed successfully
 
-## 2. Test Stock Data Functions
+## 2. Manual Verification of Stock Data Functions
+
+This script makes real network calls to yfinance (and to Tiingo/NewsAPI if keys are set) — it is a manual verification script, not part of the pytest suite, and requires internet access.
 
 ```bash
-uv run python test_server.py
+uv run python examples/manual_verification.py
 ```
 
 Expected output:
@@ -129,9 +131,9 @@ NEWSAPI_KEY=your_newsapi_key
 export $(cat .env | xargs)
 ```
 
-6. Run tests again:
+6. Run the manual verification script again:
 ```bash
-uv run python test_server.py
+uv run python examples/manual_verification.py
 ```
 
 ## Project Structure
@@ -143,7 +145,8 @@ agent-trade/
 ├── .gitignore             # Git ignore patterns
 ├── README.md              # Full documentation
 ├── VERIFICATION.md        # This file
-├── test_server.py         # Functionality test script
+├── examples/
+│   └── manual_verification.py  # Manual functionality check (real network calls)
 └── src/
     └── agent_trade/
         ├── __init__.py         # Package initialization

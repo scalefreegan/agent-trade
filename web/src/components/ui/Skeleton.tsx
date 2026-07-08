@@ -5,7 +5,7 @@ interface SkeletonProps {
 export function Skeleton({ className = '' }: SkeletonProps) {
   return (
     <div
-      className={`animate-pulse rounded bg-gray-200 dark:bg-gray-700 ${className}`}
+      className={`animate-pulse rounded bg-muted ${className}`}
       aria-hidden="true"
     />
   );
@@ -14,7 +14,7 @@ export function Skeleton({ className = '' }: SkeletonProps) {
 export function ExperimentCardSkeleton() {
   return (
     <div
-      className="bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 p-6 animate-pulse"
+      className="bg-card rounded border border-border p-6 animate-pulse"
       aria-hidden="true"
     >
       {/* Title + badge row */}
@@ -38,9 +38,9 @@ export function ExperimentCardSkeleton() {
 
 export function LeaderboardSkeleton() {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse">
+    <div className="bg-card rounded border border-border overflow-hidden animate-pulse">
       {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex gap-6">
+      <div className="border-b border-border px-6 py-3 flex gap-6">
         {[8, 24, 20, 20, 16].map((w, i) => (
           <Skeleton key={i} className={`h-3 w-${w}`} />
         ))}
@@ -50,7 +50,7 @@ export function LeaderboardSkeleton() {
       {Array.from({ length: 5 }).map((_, row) => (
         <div
           key={row}
-          className="px-6 py-4 flex gap-6 items-center border-b border-gray-100 dark:border-gray-800 last:border-0"
+          className="px-6 py-4 flex gap-6 items-center border-b border-border last:border-0"
           style={{ opacity: 1 - row * 0.12 }}
         >
           <Skeleton className="h-4 w-5 rounded" />
@@ -67,7 +67,7 @@ export function LeaderboardSkeleton() {
 export function ChartSkeleton() {
   return (
     <div
-      className="w-full bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 p-6 animate-pulse"
+      className="w-full bg-card rounded border border-border p-6 animate-pulse"
       style={{ height: 300 }}
       aria-hidden="true"
     >
@@ -88,7 +88,7 @@ export function ChartSkeleton() {
               return (
                 <div
                   key={i}
-                  className="flex-1 rounded-t bg-gray-200 dark:bg-gray-700"
+                  className="flex-1 rounded-t bg-muted"
                   style={{ height: `${pct}%` }}
                 />
               );
@@ -96,7 +96,7 @@ export function ChartSkeleton() {
           </div>
 
           {/* X-axis labels */}
-          <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex justify-between pt-2 border-t border-border">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-3 w-8" />
             ))}

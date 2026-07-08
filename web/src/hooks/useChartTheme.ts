@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
-import { CHART_COLORS } from '../lib/colors';
+import { CHART_COLORS, hexToRgba } from '../lib/colors';
 
 interface ChartTheme {
   grid: string;
@@ -11,8 +11,12 @@ interface ChartTheme {
     border: string;
     text: string;
   };
+  // Subtle fill for the bar-hover cursor (derived from muted-foreground)
+  cursorFill: string;
   // Brand green palette (resolved hex values)
   brandColors: string[];
+  // Benchmark line palette (resolved from CSS vars, theme-aware)
+  benchmarkColors: string[];
   cashColor: string;
   primaryColor: string;
   gainColor: string;
@@ -40,8 +44,17 @@ function buildTheme(): ChartTheme {
       border: resolveVar('--border-color', '#e5e7eb'),
       text: resolveVar('--foreground', '#111827'),
     },
+    cursorFill: hexToRgba(resolveVar('--muted-foreground', '#6b7280'), 0.08),
     // Brand color palette — same hex in both themes (colors are perceptually distinct)
     brandColors: CHART_COLORS,
+    benchmarkColors: [
+      resolveVar('--chart-series-1', '#6366f1'),
+      resolveVar('--chart-series-2', '#f59e0b'),
+      resolveVar('--chart-series-3', '#ec4899'),
+      resolveVar('--chart-series-4', '#06b6d4'),
+      resolveVar('--chart-series-5', '#8b5cf6'),
+      resolveVar('--chart-series-6', '#f97316'),
+    ],
     cashColor: isDark ? '#64748b' : '#6B7280',
     primaryColor: isDark ? '#55A630' : '#007F5F',
     gainColor: resolveVar('--gain', '#059669'),

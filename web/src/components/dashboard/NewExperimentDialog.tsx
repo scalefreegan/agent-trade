@@ -8,6 +8,11 @@ interface PositionRow extends PortfolioPositionSpec {
   id: number;
 }
 
+let positionIdSeq = 0;
+function nextPositionId(): number {
+  return ++positionIdSeq;
+}
+
 interface NewExperimentDialogProps {
   open: boolean;
   onClose: () => void;

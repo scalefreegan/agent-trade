@@ -2,12 +2,15 @@
 
 import asyncio
 import json
+import logging
 import os
 import re
 import signal
 import tempfile
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Project root is two levels up from this file (src/agent_trade/claude_wrapper.py)
 _PROJECT_ROOT = str(Path(__file__).parent.parent.parent)
@@ -53,7 +56,7 @@ def _extract_json(text: str) -> dict:
     try:
         return _as_dict(json.loads(text))
     except json.JSONDecodeError:
-        pass
+        logger.debug("Direct JSON parse failed; trying fenced code block")
 
     # Search for a fenced code block anywhere in the text
     fence_match = re.search(r"```(?:json)?\s*\n(.*?)\n```", text, re.DOTALL)
@@ -61,7 +64,7 @@ def _extract_json(text: str) -> dict:
         try:
             return _as_dict(json.loads(fence_match.group(1)))
         except json.JSONDecodeError:
-            pass
+            logger.debug("Fenced code block JSON parse failed; trying first brace")
 
     # Search for the first { and try to parse from there
     brace_pos = text.find("{")
@@ -69,7 +72,7 @@ def _extract_json(text: str) -> dict:
         try:
             return _as_dict(json.loads(text[brace_pos:]))
         except json.JSONDecodeError:
-            pass
+            logger.debug("First-brace JSON parse failed; no valid JSON found")
 
     raise RuntimeError(f"Agent returned non-JSON output: {text[:200]}")
 
