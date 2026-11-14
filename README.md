@@ -23,7 +23,7 @@
 - **Works with any MCP client**: Claude Code, Cursor, and others, over a standalone FastMCP server.
 - **Claude Code automation**: `agent-trade-claude` drives the Claude Code CLI with access to all your skills and MCP servers.
 - **Multi-agent experiments**: `agent-trade-experiment` creates experiments with several agents, each starting with its own capital, which make trading decisions day by day.
-- **Local web UI**: a React app for visualizing and controlling those experiments.
+- **Local web UI**: a React app for visualizing and controlling those experiments, plus a prediction-markets page backed by Kalshi's public API (proxied by the Vite dev server).
 - **Tool usage logs**: `agent-trade-logs` shows tool-call logs and statistics.
 
 ## Available tools
@@ -39,7 +39,7 @@
 
 ## Get started
 
-Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/). The web UI additionally needs Node 20+ and npm 10+.
 
 ```bash
 git clone git@github.com:scalefreegan/agent-trade.git
@@ -139,10 +139,13 @@ uv sync --extra agent
 # Create an experiment (defaults: 10 agents, $1,000 each)
 agent-trade-experiment init --name "Q1-2026"
 agent-trade-experiment init --name "Test" --agents 5 --capital 500
+agent-trade-experiment init -n "Derivatives" -m multi_instrument   # default mode is stocks_only
 
 # Run a trading day (agents make decisions and execute trades)
 agent-trade-experiment run default      # "default" = most recent experiment, or pass an ID
 ```
+
+Other subcommands: `list`, `status`, `report`, `analyze`, `pause`, `resume` and `strategy` (see `agent-trade-experiment --help`).
 
 Then start the web UI:
 
@@ -153,7 +156,11 @@ make web            # runs backend and frontend together (Ctrl+C stops both)
 
 Or run them separately with `make web-backend` and `make web-frontend`. The backend serves on <http://localhost:8000>; open the frontend at <http://localhost:5173> (Vite proxies `/api` to the backend).
 
-`TIINGO_API_KEY` and `NEWSAPI_KEY` are optional for experiments but supply market data and news.
+The backend port defaults to 8000 and can be changed with `PORT`. `TIINGO_API_KEY` and `NEWSAPI_KEY` are optional for experiments but supply market data and news.
+
+## Logging
+
+Tool calls are logged; view them with `agent-trade-logs`. Behavior is configurable via `AGENT_TRADE_LOG_LEVEL`, `AGENT_TRADE_LOG_FILE` and `AGENT_TRADE_LOG_CONSOLE` (see [LOGGING.md](LOGGING.md)).
 
 ## Development
 
