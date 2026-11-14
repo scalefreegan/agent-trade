@@ -1,138 +1,32 @@
-# Agent Trade
+<h1 align="center">Agent Trade</h1>
 
-A **standalone MCP server** for stock market data and news that works with Claude Code, Cursor, and any MCP-compatible client.
+<p align="center"><b>An MCP server that gives AI assistants stock market data and financial news.</b></p>
+<p align="center">Plug it into Claude Code, Cursor, or any MCP client — and explore multi-agent paper-trading experiments in a local web UI.</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/MCP-server-6E56CF?style=flat-square" alt="MCP server">
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT license">
+</p>
+
+<p align="center">
+  <img src="docs/hero.png" alt="Agent Trade: market data and news flowing through an MCP server to AI agents" width="800">
+  <br>
+  <sub><i>Market data and news in, agent decisions out.</i></sub>
+</p>
+<!-- TODO: generate docs/hero.png from docs/hero-image-prompt.md -->
 
 ## Features
 
-- **Stock Data** (via yfinance):
-  - Current prices and company info
-  - Historical OHLCV data
-  - Dividend history
-  - Stock splits
+- **Stock data** via yfinance: current price and company info, historical OHLCV, dividend history, stock splits.
+- **News** via Tiingo (ticker-specific) and NewsAPI (keyword search).
+- **Works with any MCP client**: Claude Code, Cursor, and others, over a standalone FastMCP server.
+- **Claude Code automation**: `agent-trade-claude` drives the Claude Code CLI with access to all your skills and MCP servers.
+- **Multi-agent experiments**: `agent-trade-experiment` creates experiments with several agents, each starting with its own capital, which make trading decisions day by day.
+- **Local web UI**: a React app for visualizing and controlling those experiments.
+- **Tool usage logs**: `agent-trade-logs` shows tool-call logs and statistics.
 
-- **News** (via Tiingo + NewsAPI):
-  - Stock-specific financial news
-  - General keyword news search
-
-## Installation
-
-```bash
-# Install dependencies
-uv sync
-
-# Optional: Install with Claude Agent SDK support
-uv sync --extra agent
-
-# Optional: Install with Web UI backend support
-uv sync --extra web
-```
-
-## Setup
-
-1. Copy the environment template:
-```bash
-cp .env.example .env
-```
-
-2. Edit `.env` and add your API keys:
-```
-TIINGO_API_KEY=your_tiingo_api_key
-NEWSAPI_KEY=your_newsapi_key
-```
-
-Get API keys from:
-- Tiingo: https://www.tiingo.com/
-- NewsAPI: https://newsapi.org/
-
-## Usage
-
-There are **two modes** of operation:
-
-### Mode 1: Automate Claude Code CLI (Full Access)
-
-Automate Claude Code to access **all skills and MCP servers**:
-
-```bash
-# Requires agent-trade MCP server configured in Claude Code
-# (see "Connecting to Claude Code" section below)
-
-# Query through Claude Code (has access to ALL tools/skills)
-agent-trade-claude query "What is AAPL trading at?"
-agent-trade-claude query "Get historical prices for TSLA"
-```
-
-**Pros**: Access to all Claude Code features, skills, and MCP servers
-**Cons**: Requires Claude Code installed and configured
-
-### Mode 2: MCP Server (For Claude Code/Cursor)
-
-#### Option 1: With uvx (no install needed)
-```bash
-uvx --from . agent-trade
-```
-
-#### Option 2: After installing
-```bash
-uv run agent-trade
-```
-
-#### Option 3: Development mode with FastMCP
-```bash
-uv run fastmcp dev agent_trade.server:mcp
-```
-
-## Connecting to Claude Code
-
-Add to `~/.claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "agent-trade": {
-      "command": "uvx",
-      "args": ["--from", "/Users/brooks/Documents/git/agent-trade", "agent-trade"],
-      "env": {
-        "TIINGO_API_KEY": "${TIINGO_API_KEY}",
-        "NEWSAPI_KEY": "${NEWSAPI_KEY}"
-      }
-    }
-  }
-}
-```
-
-Or if installed globally:
-```json
-{
-  "mcpServers": {
-    "agent-trade": {
-      "command": "agent-trade",
-      "env": {
-        "TIINGO_API_KEY": "${TIINGO_API_KEY}",
-        "NEWSAPI_KEY": "${NEWSAPI_KEY}"
-      }
-    }
-  }
-}
-```
-
-## Connecting to Cursor
-
-Add to Cursor's MCP settings (Settings > MCP):
-
-```json
-{
-  "agent-trade": {
-    "command": "uvx",
-    "args": ["--from", "/Users/brooks/Documents/git/agent-trade", "agent-trade"],
-    "env": {
-      "TIINGO_API_KEY": "your_key_here",
-      "NEWSAPI_KEY": "your_key_here"
-    }
-  }
-}
-```
-
-## Available Tools
+## Available tools
 
 | Tool | Source | Description |
 |------|--------|-------------|
@@ -143,95 +37,130 @@ Add to Cursor's MCP settings (Settings > MCP):
 | `get_stock_news` | Tiingo | Financial news for specific tickers |
 | `search_news` | NewsAPI | General keyword news search |
 
-## Web UI (Local Development)
+## Get started
 
-React-based web UI for visualizing and controlling multi-agent trading experiments.
-
-### One-time setup
+Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-make web-install
+git clone git@github.com:scalefreegan/agent-trade.git
+cd agent-trade
+
+uv sync                    # core MCP server
+uv sync --extra agent      # optional: Claude Agent / experiment CLI
+uv sync --extra web        # optional: web UI backend
 ```
 
-Or manually: `uv sync --extra web` and `cd web && npm install`.
+Configure your API keys:
 
-### Run both servers
-
-**Option A – single command** (Ctrl+C stops both):
 ```bash
-make web
+cp .env.example .env
 ```
 
-**Option B – two terminals:**
+```
+TIINGO_API_KEY=your_tiingo_api_key
+NEWSAPI_KEY=your_newsapi_key
+```
+
+Get keys from [Tiingo](https://www.tiingo.com/) and [NewsAPI](https://newsapi.org/).
+
+## Usage
+
+There are two modes of operation.
+
+### Mode 1: MCP server (Claude Code, Cursor)
+
+Run the server:
+
 ```bash
-# Terminal 1 – backend
-make web-backend
-
-# Terminal 2 – frontend
-make web-frontend
+uvx --from . agent-trade        # no install needed
+uv run agent-trade              # after uv sync
+uv run fastmcp dev agent_trade.server:mcp   # development mode with FastMCP
 ```
 
-Backend runs at **http://localhost:8000**, frontend at **http://localhost:5173** with hot reload.
+**Claude Code** — add to your MCP config:
 
-### Open the app
-
-Visit **http://localhost:5173** in your browser. Vite proxies `/api` to the backend automatically.
-
-### Creating an experiment (CLI)
-
-The Web UI displays experiments; create them first with the CLI:
-
-1. **Install the agent extra** (required for experiments):
-```bash
-uv sync --extra agent
+```json
+{
+  "mcpServers": {
+    "agent-trade": {
+      "command": "uvx",
+      "args": ["--from", "/path/to/agent-trade", "agent-trade"],
+      "env": {
+        "TIINGO_API_KEY": "${TIINGO_API_KEY}",
+        "NEWSAPI_KEY": "${NEWSAPI_KEY}"
+      }
+    }
+  }
+}
 ```
 
-2. **Set API keys** (for market data):
-```bash
-export TIINGO_API_KEY="your_tiingo_key"    # optional
-export NEWSAPI_KEY="your_newsapi_key"      # optional
+If installed globally, use `"command": "agent-trade"` and omit `args`.
+
+**Cursor** — add to Settings > MCP:
+
+```json
+{
+  "agent-trade": {
+    "command": "uvx",
+    "args": ["--from", "/path/to/agent-trade", "agent-trade"],
+    "env": {
+      "TIINGO_API_KEY": "your_key_here",
+      "NEWSAPI_KEY": "your_key_here"
+    }
+  }
+}
 ```
 
-3. **Create an experiment**:
-```bash
-# Create with defaults (10 agents, $1,000 each)
-agent-trade-experiment init --name "Q1-2026"
-
-# Or with custom settings
-agent-trade-experiment init --name "Test" --agents 5 --capital 500
-```
-
-4. **Run a trading day** (agents make decisions and execute trades):
-```bash
-agent-trade-experiment run default
-```
-Use `default` for the most recent experiment, or the experiment ID from step 3.
-
-5. **View in the Web UI** – Refresh http://localhost:5173 to see the experiment.
-
-## Example Queries
-
-Once connected to Claude Code or Cursor, try:
+Then try prompts like:
 
 - "What is AAPL trading at?"
 - "Get the historical prices for TSLA over the last 3 months"
-- "Get news about Tesla stock"
 - "Search for news about Federal Reserve interest rates"
 - "What dividends has Microsoft paid in the last year?"
+
+### Mode 2: Automate the Claude Code CLI
+
+With the MCP server configured in Claude Code, query through it from the command line, with access to all of Claude Code's tools and skills:
+
+```bash
+agent-trade-claude query "What is AAPL trading at?"
+agent-trade-claude query "Get historical prices for TSLA"
+```
+
+This requires Claude Code to be installed and configured. See [USAGE_MODES.md](USAGE_MODES.md) for details.
+
+## Multi-agent experiments and web UI
+
+Experiments are created from the CLI and viewed in the web UI.
+
+```bash
+uv sync --extra agent
+
+# Create an experiment (defaults: 10 agents, $1,000 each)
+agent-trade-experiment init --name "Q1-2026"
+agent-trade-experiment init --name "Test" --agents 5 --capital 500
+
+# Run a trading day (agents make decisions and execute trades)
+agent-trade-experiment run default      # "default" = most recent experiment, or pass an ID
+```
+
+Then start the web UI:
+
+```bash
+make web-install    # one-time: uv sync --extra web + npm install in web/
+make web            # runs backend and frontend together (Ctrl+C stops both)
+```
+
+Or run them separately with `make web-backend` and `make web-frontend`. The backend serves on <http://localhost:8000>; open the frontend at <http://localhost:5173> (Vite proxies `/api` to the backend).
+
+`TIINGO_API_KEY` and `NEWSAPI_KEY` are optional for experiments but supply market data and news.
 
 ## Development
 
 ```bash
-# Install in development mode
 uv sync
-
-# Run tests (if added later)
 uv run pytest
-
-# Format code
 uv run ruff format .
-
-# Lint code
 uv run ruff check .
 ```
 
