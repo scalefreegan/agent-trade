@@ -14,7 +14,6 @@
   <br>
   <sub><i>Market data and news in, agent decisions out.</i></sub>
 </p>
-<!-- TODO: generate docs/hero.png from docs/hero-image-prompt.md -->
 
 ## Features
 
