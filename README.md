@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/MCP-server-6E56CF?style=flat-square" alt="MCP server">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT license">
+  <img src="https://img.shields.io/badge/status-not%20actively%20developed-lightgrey?style=flat-square" alt="Status: not actively developed">
 </p>
 
 <p align="center">
@@ -14,6 +15,9 @@
   <br>
   <sub><i>Market data and news in, agent decisions out.</i></sub>
 </p>
+
+> [!IMPORTANT]
+> **This project is no longer actively developed.** Brokerages such as Robinhood now offer agentic trading directly, along with many of the market summaries, news and analysis features this project assembled itself. The code stays up as a working reference for wiring market data into MCP agents and running multi-agent experiments. Issues and pull requests may not get a response.
 
 ## Features
 
