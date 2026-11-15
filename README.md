@@ -176,4 +176,4 @@ uv run ruff check .
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
