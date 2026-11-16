@@ -6,7 +6,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/MCP-server-6E56CF?style=flat-square" alt="MCP server">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT license">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square" alt="AGPL-3.0 license">
   <img src="https://img.shields.io/badge/status-not%20actively%20developed-lightgrey?style=flat-square" alt="Status: not actively developed">
 </p>
 
@@ -176,4 +176,6 @@ uv run ruff check .
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). You may use, change and share Agent Trade, but if you distribute it or run a changed version as a network service, you must offer its users the complete source under the same license.
+
+Versions published before 2026-11-16 were released under the MIT license.

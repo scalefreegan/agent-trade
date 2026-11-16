@@ -1,6 +1,7 @@
 [project]
 name = "agent-trade"
 version = "0.1.0"
+license = "AGPL-3.0-only"
 description = "MCP server for stock market data and news"
 requires-python = ">=3.10"
 dependencies = [
